@@ -7,6 +7,9 @@ const CreateProjectSchema = z.object({
   rootUrl: z.string().url().refine(u => ['http:', 'https:'].includes(new URL(u).protocol))
 })
 
+// Strict UUID v4 regex: 8-4-4-4-12 hex format with valid version (4) and variant (8/9/a/b) digits
+const UuidV4Schema = z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i, 'Invalid UUID v4 format')
+
 export function registerProjectsIpc(repos: Repositories): void {
   ipcMain.handle('projects:create', (_e, input) => {
     const parsed = CreateProjectSchema.safeParse(input)
@@ -17,13 +20,18 @@ export function registerProjectsIpc(repos: Repositories): void {
   ipcMain.handle('projects:list', () => repos.projects.list())
 
   ipcMain.handle('projects:get', (_e, projectId: string) => {
-    if (!crypto.randomUUID || !projectId.startsWith('5') && !/^[0-9a-f]{36}$/i.test(projectId)) {
-      // loose UUID check — let repo handle actual existence
-    }
+    UuidV4Schema.parse(projectId)
     return repos.projects.get(projectId)
   })
 
-  ipcMain.handle('projects:update', (_e, projectId: string, patch: any) => repos.projects.update(projectId, patch))
+  ipcMain.handle('projects:update', (_e, projectId: string, patch: any) => {
+    UuidV4Schema.parse(projectId)
+    return repos.projects.update(projectId, patch)
+  })
 
-  ipcMain.handle('projects:delete', (_e, projectId: string) => { repos.projects.delete(projectId); return true })
+  ipcMain.handle('projects:delete', (_e, projectId: string) => {
+    UuidV4Schema.parse(projectId)
+    repos.projects.delete(projectId)
+    return true
+  })
 }

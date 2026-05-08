@@ -8,7 +8,7 @@ export default function SettingsScreen() {
 
   useEffect(() => { loadInfo() }, [])
 
-  async function loadInfo() { try { setVersion(await window.crawldesk.app.getVersion()); setDataPath(await window.crawldesk.app.getDataPath()) } catch {} }
+  async function loadInfo() { try { setVersion(await window.crawldesk.app.getVersion()); setDataPath(await window.crawldesk.app.getDataPath()) } catch (e) { console.error('[Settings] Failed to load app info:', e) } }
 
   return (
     <div className="max-w-2xl">

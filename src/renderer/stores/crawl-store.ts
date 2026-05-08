@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import type { CrawlProgress as CrawlProgressType } from '../../../shared/types/crawl'
 
 interface CrawlProgressState {
   crawlId: string | null
@@ -16,7 +17,7 @@ interface CrawlProgressState {
 interface CrawlStore {
   progress: CrawlProgressState | null
   setStatus: (status: string) => void
-  updateProgress: (data: any) => void
+  updateProgress: (data: Partial<CrawlProgressType>) => void
   reset: () => void
 }
 

@@ -9,6 +9,8 @@ export interface FetchConfig {
   userAgent: string
   maxRedirects: number
   maxBodySize: Record<string, number>
+  rateLimitPerHost: number  // Max concurrent requests per host
+  requestDelayMs: number   // Delay between requests to same host (ms)
 }
 
 const DEFAULT_CONFIG: FetchConfig = {
@@ -16,14 +18,30 @@ const DEFAULT_CONFIG: FetchConfig = {
   userAgent: 'CrawlDeskBot/0.1 (+https://example.com/bot)',
   maxRedirects: 5,
   maxBodySize: { html: 5 * 1024 * 1024, other: 1 * 1024 * 1024 },
+  rateLimitPerHost: 3,     // Respectful default: 3 concurrent per host
+  requestDelayMs: 500,     // 500ms delay between requests to same host
 }
 
 function makeError(url: string, headersObj: Record<string, string>, contentType: string, bodyLen: number, elapsed: number, chain: RedirectHop[], code: string, message: string): FetchResult {
   return { body: Buffer.alloc(0), statusCode: 0, headers: headersObj, finalUrl: url, contentType, contentLength: bodyLen, responseTimeMs: elapsed, redirectChain: [...chain], error: { code, message } }
 }
 
+// Simple rate limiter: tracks last fetch time per hostname and enforces delays
+class RateLimiter {
+  private lastFetch: Map<string, number> = new Map()
+
+  async waitForSlot(hostname: string, minDelayMs: number): Promise<void> {
+    const last = this.lastFetch.get(hostname) ?? 0
+    const now = Date.now()
+    const waitMs = Math.max(0, minDelayMs - (now - last))
+    if (waitMs > 0) await new Promise(r => setTimeout(r, waitMs))
+    this.lastFetch.set(hostname, Date.now())
+  }
+}
+
 export class Fetcher {
   private guard = new PrivateIpGuard()
+  private rateLimiter = new RateLimiter()
 
   constructor(private config?: Partial<FetchConfig>) {}
 
@@ -47,6 +65,11 @@ export class Fetcher {
     }
     if (this.guard.isBlocked(normalized.hostname)) {
       return makeError(url, {}, '', 0, Date.now() - startTime, chain, 'blocked_private_ip', 'Private IP blocked')
+    }
+
+    // Rate limit by hostname to avoid overwhelming servers
+    if (normalized.hostname && this.config?.requestDelayMs !== undefined) {
+      await this.rateLimiter.waitForSlot(normalized.hostname, this.config.requestDelayMs)
     }
 
     return new Promise((resolve) => {

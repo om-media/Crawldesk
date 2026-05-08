@@ -25,7 +25,9 @@ export default function ProjectsScreen({ onNavigate }: Props) {
       new URL(url)
       const project = await window.crawldesk.projects.create({ name: name.trim(), rootUrl: url.trim() })
       if (project) { setSelectedProjectId(project.id); loadProjects(); setShowModal(false); setName(''); setUrl(''); if (onNavigate) onNavigate('overview') }
-    } catch {}
+    } catch (err) {
+      console.error('[Renderer] Failed to create project:', err)
+    }
   }
 
   async function openProject(id: string) { setSelectedProjectId(id); if (onNavigate) onNavigate('overview') }

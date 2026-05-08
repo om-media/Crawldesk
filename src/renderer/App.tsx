@@ -27,7 +27,7 @@ export default function App() {
         const crawls = await window.crawldesk.crawls.listByProject(selectedProjectId)
         if (crawls && crawls.length > 0) setActiveCrawlId(crawls[0].id)
         else setActiveCrawlId(null)
-      } catch { /* ignore */ }
+      } catch (err) { console.error('[App] Failed to resolve latest crawl:', err) }
     }
     resolveLatestCrawl()
   }, [selectedProjectId, setActiveCrawlId])

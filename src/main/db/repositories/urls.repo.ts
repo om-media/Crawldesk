@@ -4,21 +4,59 @@ import type { ListUrlsInput, PaginatedResult, UrlSummary } from '../../../shared
 import { getIndexability } from './url-utils'
 
 export class UrlsRepo {
-  constructor(private db: Database.Database) {}
+  private upsertStmt!: Database.Statement
+  private insertLinkStmt!: Database.Statement
+  private insertIssueStmt!: Database.Statement
+
+  constructor(private db: Database.Database) {
+    // Prepare statements once at construction for better performance during bulk inserts
+    this.upsertStmt = this.db.prepare(`
+      INSERT INTO urls (id, crawl_id, url, normalized_url, final_url, status_code, status_category, content_type,
+        content_length, is_internal, is_crawlable, indexability, indexability_reason, title, title_length,
+        meta_description, meta_description_length, h1, h1_count, canonical, robots_meta, x_robots_tag,
+        depth, response_time_ms, word_count, content_hash, discovered_from_url, fetch_error_code,
+        fetch_error_message, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(crawl_id, normalized_url) DO UPDATE SET
+        final_url = excluded.final_url,
+        status_code = excluded.status_code,
+        status_category = excluded.status_category,
+        content_type = excluded.content_type,
+        title = excluded.title,
+        title_length = excluded.title_length,
+        meta_description = excluded.meta_description,
+        meta_description_length = excluded.meta_description_length,
+        h1 = excluded.h1,
+        h1_count = excluded.h1_count,
+        canonical = excluded.canonical,
+        robots_meta = excluded.robots_meta,
+        x_robots_tag = excluded.x_robots_tag,
+        response_time_ms = excluded.response_time_ms,
+        word_count = excluded.word_count,
+        content_hash = excluded.content_hash,
+        indexability = excluded.indexability,
+        indexability_reason = excluded.indexability_reason,
+        updated_at = excluded.updated_at
+    `)
+
+    this.insertLinkStmt = this.db.prepare(`
+      INSERT OR IGNORE INTO links (id, crawl_id, source_url_id, source_url, target_url, normalized_target_url, anchor_text, link_type, is_internal, is_followed, rel, discovered_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `)
+
+    this.insertIssueStmt = this.db.prepare(`
+      INSERT INTO issues (id, crawl_id, url_id, url, issue_type, severity, message, recommendation, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `)
+  }
 
   upsertUrl(result: PageResult): void {
     const now = new Date().toISOString()
-    const isHtml = result.contentType?.includes('text/html') ?? false
-    const indexabilityResult = getIndexability(result)
-
     // Build link records too
     if (result.links && result.links.length > 0) {
       for (const link of result.links) {
         const normalizedTarget = this.normalizeForDb(link.targetUrl, result.finalUrl || result.url)
-        this.db.prepare(`
-          INSERT OR IGNORE INTO links (id, crawl_id, source_url_id, source_url, target_url, normalized_target_url, anchor_text, link_type, is_internal, is_followed, rel, discovered_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `).run(
+        this.insertLinkStmt.run(
           crypto.randomUUID(),
           result.crawlId,
           result.urlId,
@@ -40,35 +78,8 @@ export class UrlsRepo {
     const insert = this.db.transaction((items: typeof results) => {
       const now = new Date().toISOString()
       for (const r of items) {
-        // Upsert URL row
-          this.db.prepare(`
-            INSERT INTO urls (id, crawl_id, url, normalized_url, final_url, status_code, status_category, content_type,
-              content_length, is_internal, is_crawlable, indexability, indexability_reason, title, title_length,
-              meta_description, meta_description_length, h1, h1_count, canonical, robots_meta, x_robots_tag,
-              depth, response_time_ms, word_count, content_hash, discovered_from_url, fetch_error_code,
-              fetch_error_message, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(crawl_id, normalized_url) DO UPDATE SET
-              final_url = excluded.final_url,
-              status_code = excluded.status_code,
-              status_category = excluded.status_category,
-              content_type = excluded.content_type,
-              title = excluded.title,
-              title_length = excluded.title_length,
-              meta_description = excluded.meta_description,
-              meta_description_length = excluded.meta_description_length,
-              h1 = excluded.h1,
-              h1_count = excluded.h1_count,
-              canonical = excluded.canonical,
-              robots_meta = excluded.robots_meta,
-              x_robots_tag = excluded.x_robots_tag,
-              response_time_ms = excluded.response_time_ms,
-              word_count = excluded.word_count,
-              content_hash = excluded.content_hash,
-              indexability = excluded.indexability,
-              indexability_reason = excluded.indexability_reason,
-              updated_at = '${now}'
-          `).run(
+        // Upsert URL row using pre-prepared statement
+        this.upsertStmt.run(
           r.urlId, r.crawlId, r.url, r.normalizedUrl,
           r.finalUrl ?? null,
           r.statusCode ?? null,
@@ -94,10 +105,7 @@ export class UrlsRepo {
         if (r.links) {
           for (const link of r.links) {
             const normalizedTarget = this.normalizeForDb(link.targetUrl, r.finalUrl || r.url)
-            this.db.prepare(`
-              INSERT OR IGNORE INTO links (id, crawl_id, source_url_id, source_url, target_url, normalized_target_url, anchor_text, link_type, is_internal, is_followed, rel, discovered_at)
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            `).run(
+            this.insertLinkStmt.run(
               crypto.randomUUID(), r.crawlId, r.urlId, r.url, link.targetUrl, normalizedTarget,
               link.anchorText ?? null, link.linkType, r.isInternal ? 1 : 0,
               !(link.rel && /\bnofollow\b/i.test(link.rel)) ? 1 : 0, link.rel ?? null, now
@@ -109,10 +117,7 @@ export class UrlsRepo {
         // (issues may have stale empty-string IDs from worker-side detection before crawlId was assigned)
         if (r.issues) {
           for (const issue of r.issues) {
-            this.db.prepare(`
-              INSERT INTO issues (id, crawl_id, url_id, url, issue_type, severity, message, recommendation, created_at)
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            `).run(
+            this.insertIssueStmt.run(
               crypto.randomUUID(), r.crawlId, r.urlId, issue.url,
               issue.issue_type, issue.severity, issue.message, issue.recommendation, now
             )

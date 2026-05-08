@@ -78,6 +78,22 @@ export class CrawlJobManager {
     this.cleanup()
   }
 
+  // Gracefully stop any active crawl before app quit
+  gracefulShutdown(): void {
+    if (!this.worker || !this.activeCrawlId) return
+    console.log('[JOB] Graceful shutdown for crawl:', this.activeCrawlId)
+    this.repos.crawls.updateStatus(this.activeCrawlId, 'stopped')
+    this.worker.postMessage({ type: 'crawl:stop' })
+    // Give worker a moment to finish, then force terminate
+    setTimeout(() => {
+      try { this.worker!.terminate().catch(() => {}) } catch {}
+      this.worker = null
+      this.activeCrawlId = null
+      this.resumeResolve = null
+      this.isPaused = false
+    }, 2000)
+  }
+
   private handleWorkerMessage(msg: any): void {
     switch (msg.type) {
       case 'crawl:pageResultBatch':

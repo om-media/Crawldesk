@@ -46,6 +46,11 @@ app.whenReady().then(() => {
   })
 })
 
+app.on('before-quit', () => {
+  // Gracefully stop active crawls before quitting
+  jobManager?.gracefulShutdown()
+})
+
 app.on('window-all-closed', () => {
   closeDatabase()
   if (process.platform !== 'darwin') app.quit()

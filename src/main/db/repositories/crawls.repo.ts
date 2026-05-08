@@ -39,15 +39,32 @@ export class CrawlsRepo {
 
   updateStatus(crawlId: string, status: CrawlStatus, patch?: Partial<Pick<Crawl, 'error_code' | 'error_message'>>): void {
     const now = new Date().toISOString()
-    const updates = [`status = '${status}'`, "updated_at = '" + now + "'"]
-    if (status === 'running') updates.push("started_at = COALESCE(started_at, '" + now + "')")
-    if (status === 'completed' || status === 'stopped' || status === 'failed') updates.push(`finished_at = '${now}'`)
-    if (patch?.error_code !== undefined) updates.push(this.makeUpdate('error_code', patch.error_code))
-    if (patch?.error_message !== undefined) updates.push(this.makeUpdate('error_message', patch.error_message))
+    const stmts: Array<[string, any]> = []
+    
+    // Status is from CrawlStatus enum, safe to use directly
+    stmts.push(['status = ?', status])
+    stmts.push(['updated_at = ?', now])
+    
+    if (status === 'running') {
+      stmts.push(['started_at = COALESCE(started_at, ?)', now])
+    }
+    if (['completed', 'stopped', 'failed'].includes(status)) {
+      stmts.push(['finished_at = ?', now])
+    }
+    if (patch?.error_code !== undefined) {
+      stmts.push(['error_code = ?', patch.error_code ?? null])
+    }
+    if (patch?.error_message !== undefined) {
+      stmts.push(['error_message = ?', patch.error_message ?? null])
+    }
+
+    const updates = stmts.map(([clause]) => clause).join(', ')
+    const params = stmts.map(([, value]) => value) as any[]
+    params.push(crawlId)
 
     this.db.prepare(
-      `UPDATE crawls SET ${updates.join(', ')} WHERE id = ?`
-    ).run(crawlId)
+      `UPDATE crawls SET ${updates} WHERE id = ?`
+    ).run(...params)
   }
 
   get(crawlId: string): Crawl | null {

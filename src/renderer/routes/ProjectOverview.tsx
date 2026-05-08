@@ -30,13 +30,13 @@ export default function ProjectOverview({ crawlId, onNavigate }: Props) {
       setCrawls(list || [])
       if (list?.length > 0) {
         let s: any = null
-        try { s = await window.crawldesk.urls.summarize(list[0].id); setSummary(s) } catch {}
-        try { setIssueSummary((await window.crawldesk.issues.summarize(list[0].id)) || []) } catch {}
+        try { s = await window.crawldesk.urls.summarize(list[0].id); setSummary(s) } catch (e) { console.error('[Overview] Failed to load URL summary:', e) }
+        try { setIssueSummary((await window.crawldesk.issues.summarize(list[0].id)) || []) } catch (e) { console.error('[Overview] Failed to load issue summary:', e) }
         // Fetch recent URLs for the table
         try {
           const urlsResult = await window.crawldesk.urls.list({ crawlId: list[0].id, page: 0, pageSize: 8 })
           setRecentUrls(urlsResult.items || [])
-        } catch {}
+        } catch (e) { console.error('[Overview] Failed to load recent URLs:', e) }
         // Build depth distribution from summary or URL data
         try {
           const depthData: Record<number, number> = {}
@@ -47,7 +47,7 @@ export default function ProjectOverview({ crawlId, onNavigate }: Props) {
             ;(allForChart.items || []).forEach((u: any) => { depthData[u.depth] = (depthData[u.depth] || 0) + 1 })
           }
           setDepthDist(depthData)
-        } catch {}
+        } catch (e) { console.error('[Overview] Failed to build depth distribution:', e) }
       }
     } catch (e: any) {
       setLoadError(e?.message || 'Failed to load project data')
