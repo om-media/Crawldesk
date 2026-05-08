@@ -6,3 +6,8 @@ out/
 .env.local
 .DS_Store
 Thumbs.db
+
+# Figma assets & mockups (local only)
+figma-*.png
+figma-*.txt
+mockup*.png
