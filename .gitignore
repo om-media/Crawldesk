@@ -11,3 +11,7 @@ Thumbs.db
 figma-*.png
 figma-*.txt
 mockup*.png
+
+# Agent config (local only)
+AGENTS.md
+docs/agents/
