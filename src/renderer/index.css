@@ -1,0 +1,36 @@
+/* Rethink Sans from Google Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Rethink+Sans:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * { border-color: #1f3640; }
+  body { font-family: 'Rethink Sans', sans-serif; background: #071016; color: #e6f6f4; }
+}
+
+@layer components {
+  /* Buttons */
+  .btn-primary { @apply inline-flex items-center justify-center gap-1.5 rounded-[10px] bg-gradient-to-r from-teal-accent to-emerald px-4 py-2.5 text-sm font-semibold text-white transition-all hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed; }
+  .btn-secondary { @apply inline-flex items-center justify-center gap-1.5 rounded-lg border border-lumen bg-panel-dark px-3 py-2 text-xs font-medium text-primary-text hover:bg-midnight/80 transition-colors disabled:opacity-40; }
+  .btn-danger { @apply inline-flex items-center justify-center rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 transition-colors disabled:opacity-50; }
+
+  /* Pills / Badges */
+  .pill-success { @apply inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium bg-[#123827] text-emerald; }
+  .pill-warning { @apply inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium bg-[#3a2a0a] text-amber; }
+  .pill-error { @apply inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium bg-[#3b171b] text-red-500; }
+  .pill-neutral { @apply inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium bg-panel-dark border border-lumen text-primary-muted; }
+
+  /* Cards */
+  .card { @apply rounded-xl border border-lumen bg-panel-dark p-5 shadow-lg shadow-midnight/30; }
+  .kpi-card { @apply rounded-[10px] border border-lumen bg-[#0f2028] p-4; }
+
+  /* Inputs */
+  .input-field { @apply block w-full rounded-[10px] border border-lumen bg-panel-dark px-3 py-2 text-sm text-primary-text placeholder:text-primary-muted focus:border-teal-accent focus:outline-none focus:ring-1 focus:ring-teal-accent transition-colors; }
+
+  /* Table overrides for dark theme */
+  table thead tr { @apply border-b border-row; }
+  table thead th { @apply text-primary-muted text-xs font-semibold uppercase tracking-wider; }
+  table tbody tr { @apply border-b border-row hover:bg-midnight/40 transition-colors; }
+}
