@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "main": "main/main.js",
-  "description": "Desktop SEO Crawler",
+  "description": "Local-first desktop SEO crawler",
   "scripts": {
     "build:main": "tsc --project tsconfig.main.json",
     "build:preload": "tsc --project tsconfig.preload.json",
