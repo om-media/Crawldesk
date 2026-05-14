@@ -16,6 +16,56 @@ export default function ResultsScreen() {
   const [sortField, setSortField] = useState('url')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
   const [selectedUrl, setSelectedUrl] = useState<UrlRecord | null>(null)
+  const [drawerTab, setDrawerTab] = useState<'Details' | 'Inlinks' | 'Outlinks'>('Details')
+  const [drawerInlinks, setDrawerInlinks] = useState<any[]>([])
+  const [drawerOutlinks, setDrawerOutlinks] = useState<any[]>([])
+  const [drawerLoading, setDrawerLoading] = useState(false)
+
+  // Load inlinks/outlinks when a URL is selected and tab changes
+  useEffect(() => {
+    if (!selectedUrl || !activeCrawlId) {
+      setDrawerInlinks([])
+      setDrawerOutlinks([])
+      return
+    }
+    if (drawerTab === 'Details') return // no need to load
+    setDrawerLoading(true)
+    const load = async () => {
+      try {
+        if (drawerTab === 'Inlinks') {
+          const result = await window.crawldesk.links.list({ crawlId: activeCrawlId, page: 0, pageSize: 50, filters: { targetUrl: selectedUrl.url } })
+          setDrawerInlinks((result.items || []).map((l: any) => ({
+            source_url: l.source_url || l.sourceUrl || '',
+            target_url: l.target_url || l.targetUrl || '',
+            anchor_text: l.anchor_text || l.anchorText || '',
+            link_type: l.link_relation || l.link_type || 'link',
+            is_internal: l.is_internal ?? false,
+          })))
+        } else if (drawerTab === 'Outlinks') {
+          const result = await window.crawldesk.links.list({ crawlId: activeCrawlId, page: 0, pageSize: 50, filters: { sourceUrl: selectedUrl.url } })
+          setDrawerOutlinks((result.items || []).map((l: any) => ({
+            source_url: l.source_url || l.sourceUrl || '',
+            target_url: l.target_url || l.targetUrl || '',
+            anchor_text: l.anchor_text || l.anchorText || '',
+            link_type: l.link_relation || l.link_type || 'link',
+            is_internal: l.is_internal ?? false,
+          })))
+        }
+      } catch (e) {
+        console.error('[Results] Failed to load links:', e)
+      } finally {
+        setDrawerLoading(false)
+      }
+    }
+    load()
+  }, [selectedUrl, drawerTab, activeCrawlId])
+
+  // Reset tab when URL changes
+  useEffect(() => {
+    setDrawerTab('Details')
+    setDrawerInlinks([])
+    setDrawerOutlinks([])
+  }, [selectedUrl?.id])
 
   const loadUrls = useCallback(async () => {
     if (!activeCrawlId || !selectedProjectId) return
@@ -112,17 +162,62 @@ export default function ResultsScreen() {
         </div>
       )}
 
-      {/* URL Detail Drawer — Status badge rendered separately to avoid string check bug */}
+      {/* URL Detail Drawer */}
       {selectedUrl && (
         <div className="fixed inset-0 bg-black/60 z-50 flex justify-end" onClick={() => setSelectedUrl(null)}>
-          <div className="w-full max-w-md bg-panel-dark h-full overflow-y-auto shadow-xl border-l border-lumen p-6" onClick={e => e.stopPropagation()}>
-            <div className="flex items-start justify-between mb-4"><h2 className="text-lg font-semibold text-primary-text break-all pr-2">{selectedUrl.url}</h2><button onClick={() => setSelectedUrl(null)} className="text-primary-muted hover:text-primary-text text-xl leading-none">&times;</button></div>
-            <dl className="space-y-3 text-sm">
-              <div className="border-b border-row pb-2"><dt className="text-xs text-primary-muted uppercase tracking-wider">Status</dt><dd className="font-medium mt-0.5">{statusBadge(selectedUrl.status_code)}</dd></div>
-              {[['Indexability', selectedUrl.indexability || 'unknown'], ['Title', selectedUrl.title || '-'], ['Meta Description', selectedUrl.meta_description || '-'], ['H1', selectedUrl.h1 || '-'], ['Canonical', selectedUrl.canonical || '-'], ['Depth', String(selectedUrl.depth)], ['Response Time', `${selectedUrl.response_time_ms ?? '-'}ms`], ['Content Type', selectedUrl.content_type || '-']].map(([label, value]) => (
-                <div key={String(label)} className="border-b border-row pb-2"><dt className="text-xs text-primary-muted uppercase tracking-wider">{label}</dt><dd className="font-medium mt-0.5 break-all text-primary-text">{typeof value === 'string' ? value : null}</dd></div>
-              ))}
-            </dl>
+          <div className="w-full max-w-lg bg-panel-dark h-full overflow-y-auto shadow-xl border-l border-lumen" onClick={e => e.stopPropagation()}>
+            <div className="sticky top-0 bg-panel-dark border-b border-lumen px-6 py-4 flex items-start justify-between">
+              <h2 className="text-lg font-semibold text-primary-text break-all pr-2 leading-tight">{selectedUrl.url}</h2>
+              <button onClick={() => setSelectedUrl(null)} className="text-primary-muted hover:text-primary-text text-xl leading-none ml-2 shrink-0">&times;</button>
+            </div>
+
+            {/* Detail tabs */}
+            <div className="px-6 pt-3">
+              <div className="flex gap-1 mb-4 border-b border-luen">
+                {(['Details', 'Inlinks', 'Outlinks'] as const).map(tab => (
+                  <button key={tab} onClick={() => setDrawerTab(tab)} className={`px-3 py-2 text-sm font-medium transition-colors border-b-2 ${drawerTab === tab ? 'text-teal-accent border-teal-accent' : 'text-primary-muted border-transparent hover:text-primary-text'}`}>{tab}</button>
+                ))}
+              </div>
+            </div>
+
+            <div className="px-6 pb-6">
+              {drawerTab === 'Details' && (
+                <dl className="space-y-3 text-sm">
+                  <div className="border-b border-row pb-2"><dt className="text-xs text-primary-muted uppercase tracking-wider">Status</dt><dd className="font-medium mt-0.5">{statusBadge(selectedUrl.status_code)}</dd></div>
+                  {[['Indexability', selectedUrl.indexability || 'unknown'], ['Title', selectedUrl.title || '-'], ['Meta Description', selectedUrl.meta_description || '-'], ['H1', selectedUrl.h1 || '-'], ['Canonical', selectedUrl.canonical || '-'], ['Word Count', selectedUrl.word_count ? String(selectedUrl.word_count) : '-'], ['Depth', String(selectedUrl.depth)], ['Response Time', `${selectedUrl.response_time_ms ?? '-'}ms`], ['Content Type', selectedUrl.content_type || '-'], ['Content Length', selectedUrl.content_length ? `${(selectedUrl.content_length / 1024).toFixed(1)} KB` : '-']].map(([label, value]) => (
+                    <div key={String(label)} className="border-b border-row pb-2"><dt className="text-xs text-primary-muted uppercase tracking-wider">{label}</dt><dd className="font-medium mt-0.5 break-all text-primary-text">{value}</dd></div>
+                  ))}
+                </dl>
+              )}
+
+              {drawerTab === 'Inlinks' && (
+                <div>
+                  {(drawerInlinks.length === 0 && !drawerLoading) && <p className="text-sm text-primary-muted py-4">No inlinks found for this URL.</p>}
+                  {drawerInlinks.map((link, i) => (
+                    <div key={i} className="flex items-center gap-2 py-2 border-b border-row text-xs">
+                      <span className="pill-success shrink-0">{link.link_type || 'link'}</span>
+                      <span className="text-teal-text truncate font-mono">{link.source_url}</span>
+                      {link.anchor_text && <span className="text-primary-muted truncate max-w-[120px]">"{link.anchor_text}"</span>}
+                    </div>
+                  ))}
+                  {drawerLoading && <div className="py-4 text-center"><div className="animate-spin h-5 w-5 border-2 border-teal-accent border-t-transparent rounded-full mx-auto"></div></div>}
+                </div>
+              )}
+
+              {drawerTab === 'Outlinks' && (
+                <div>
+                  {(drawerOutlinks.length === 0 && !drawerLoading) && <p className="text-sm text-primary-muted py-4">No outlinks found for this URL.</p>}
+                  {drawerOutlinks.map((link, i) => (
+                    <div key={i} className="flex items-center gap-2 py-2 border-b border-row text-xs">
+                      <span className={`${link.is_internal ? 'pill-success' : 'pill-warning'} shrink-0`}>{link.is_internal ? 'internal' : 'external'}</span>
+                      <span className="text-teal-text truncate font-mono">{link.target_url}</span>
+                      {link.anchor_text && <span className="text-primary-muted truncate max-w-[120px]">"{link.anchor_text}"</span>}
+                    </div>
+                  ))}
+                  {drawerLoading && <div className="py-4 text-center"><div className="animate-spin h-5 w-5 border-2 border-teal-accent border-t-transparent rounded-full mx-auto"></div></div>}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}

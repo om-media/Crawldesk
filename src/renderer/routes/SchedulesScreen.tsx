@@ -22,6 +22,30 @@ export default function SchedulesScreen() {
   const [form, setForm] = useState({ startUrl: '', cronExpression: '' })
   const [saving, setSaving] = useState(false)
 
+  // Human-readable cron descriptions
+  const cronPresets = [
+    { label: 'Every day at 2:00 AM', expr: '0 2 * * *' },
+    { label: 'Every Monday at 3:00 AM', expr: '0 3 * * 1' },
+    { label: 'Every hour', expr: '0 * * * *' },
+    { label: 'Every 6 hours', expr: '0 */6 * * *' },
+    { label: 'Every month on the 1st', expr: '0 2 1 * *' },
+  ]
+
+  function describeCron(expr: string): string {
+    if (!expr) return ''
+    const parts = expr.trim().split(/\s+/)
+    if (parts.length < 5) return expr
+    const [min, hour, dayOfMonth, month, dayOfWeek] = parts
+    if (dayOfMonth === '*' && month === '*') {
+      if (min === '0' && hour === '*') return 'Every hour'
+      if (min === '0' && hour.startsWith('*/')) return `Every ${hour.slice(2)} hours`
+      if (dayOfWeek === '*') return `Daily at ${hour.padStart(2, '0')}:${min.padStart(2, '0')}`
+      const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+      return `Every ${days[parseInt(dayOfWeek)] || 'day'} at ${hour.padStart(2, '0')}:${min.padStart(2, '0')}`
+    }
+    return expr
+  }
+
   async function loadSchedules() {
     if (!selectedProjectId) return
     setLoading(true)
@@ -85,6 +109,14 @@ export default function SchedulesScreen() {
           <div className="w-48">
             <label className="block text-xs text-primary-muted uppercase tracking-wider mb-1">Cron Expression</label>
             <input value={form.cronExpression} onChange={e => setForm(f => ({ ...f, cronExpression: e.target.value }))} placeholder="0 2 * * *" className="input-field w-full !py-2 !text-sm" required />
+            {form.cronExpression && <p className="text-xs text-teal-accent mt-1">{describeCron(form.cronExpression)}</p>}
+          </div>
+          <div className="w-48">
+            <label className="block text-xs text-primary-muted uppercase tracking-wider mb-1">Quick Presets</label>
+            <select onChange={e => { if (e.target.value) setForm(f => ({ ...f, cronExpression: e.target.value })) }} className="input-field w-full !py-2 !text-sm" defaultValue="">
+              <option value="">Choose...</option>
+              {cronPresets.map(p => <option key={p.expr} value={p.expr}>{p.label}</option>)}
+            </select>
           </div>
           <button type="submit" disabled={saving || !selectedProjectId} className="btn-primary !py-2 !px-4">{saving ? 'Saving...' : 'Save'}</button>
           <button type="button" onClick={() => setShowForm(false)} className="btn-secondary !py-2 !px-3">Cancel</button>
@@ -111,6 +143,7 @@ export default function SchedulesScreen() {
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-3 mb-1">
               <code className="font-mono text-teal-accent text-sm">{s.cron_expression}</code>
+              <span className="text-xs text-primary-muted ml-1">{describeCron(s.cron_expression)}</span>
               <span className={`text-xs ${s.enabled ? 'text-emerald' : 'text-primary-muted'}`}>{s.enabled ? '● Active' : '○ Disabled'}</span>
             </div>
             <p className="text-sm text-primary-text truncate">{s.start_url}</p>

@@ -193,7 +193,31 @@ export function setupMockCrawldesk() {
       },
       list: async (input: any) => {
         await delay()
-        return { items: MOCK_ISSUES, total: MOCK_ISSUES.length }
+        const issueType = input.filters?.issueType
+        const issueUrls: Record<string, any[]> = {
+          missing_title: [
+            { id: '1', url: '/about', severity: 'high', message: 'Title tag is empty' },
+            { id: '2', url: '/contact', severity: 'high', message: 'Title tag is empty' },
+            { id: '3', url: '/blog/post-3', severity: 'high', message: 'Title tag is empty' },
+          ],
+          missing_meta_description: [
+            { id: '4', url: '/', severity: 'medium', message: 'No meta description found' },
+            { id: '5', url: '/services', severity: 'medium', message: 'No meta description found' },
+            { id: '6', url: '/team', severity: 'medium', message: 'No meta description found' },
+          ],
+          broken_internal_link: [
+            { id: '9', url: '/old-page', severity: 'critical', message: 'Returns 404' },
+            { id: '10', url: '/removed-product', severity: 'critical', message: 'Returns 404' },
+          ],
+          duplicate_title: [
+            { id: '20', url: '/products/a', severity: 'medium', message: 'Duplicate of /products/b title' },
+            { id: '21', url: '/products/b', severity: 'medium', message: 'Duplicate of /products/a title' },
+          ],
+        }
+        const urls = (issueType && issueUrls[issueType]) || [
+          { id: '99', url: '/example', severity: 'medium', message: 'Issue detected' },
+        ]
+        return { items: urls, total: urls.length }
       },
     },
     links: {
@@ -202,6 +226,8 @@ export function setupMockCrawldesk() {
         let filtered = [...MOCK_LINKS]
         if (input.filters?.isInternal === true) filtered = filtered.filter(l => l.is_internal)
         if (input.filters?.isInternal === false) filtered = filtered.filter(l => !l.is_internal)
+        if (input.filters?.sourceUrl) filtered = filtered.filter(l => l.source_url === input.filters.sourceUrl)
+        if (input.filters?.targetUrl) filtered = filtered.filter(l => l.target_url === input.filters.targetUrl)
         const page = input.page ?? 0
         const pageSize = input.pageSize ?? 50
         const start = page * pageSize
