@@ -92,9 +92,16 @@ const MOCK_LINKS = Array.from({ length: 50 }, (_, i) => ({
 
 const MOCK_URL_SUMMARY = {
   totalUrls: 247,
+  total_urls: 247,
   indexable: 210,
-  nonIndexable: 37,
+  indexableCount: 210,
+  noindex: 37,
+  blocked_by_robots: 0,
+  non_200_status: 22,
+  average_depth: 2.3,
+  avgResponseTimeMs: 245,
   statusCodeDistribution: { '200': 210, '301': 15, '404': 12, '500': 10 },
+  depthDistribution: { '0': 1, '1': 45, '2': 98, '3': 72, '4': 28, '5': 3 },
 }
 
 const MOCK_LINK_SUMMARY = {

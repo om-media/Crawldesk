@@ -124,6 +124,8 @@ fn run_migrations(conn: &Connection) -> Result<()> {
         )?;
     }
 
+    ensure_current_schema(conn)?;
+
     Ok(())
 }
 
@@ -380,13 +382,12 @@ fn create_v2_schema(conn: &Connection) -> Result<()> {
     )?;
 
     // Add v2 indexes (heavier post-crawl)
-    conn.execute(
+    conn.execute_batch(
         "CREATE INDEX IF NOT EXISTS idx_urls_indexability ON urls(indexability);
          CREATE INDEX IF NOT EXISTS idx_issues_type_severity ON issues(issue_type, severity);
          CREATE INDEX IF NOT EXISTS idx_urls_content_hash ON urls(content_hash);
          CREATE INDEX IF NOT EXISTS idx_crawl_diffs_project ON crawl_diffs(project_id);
          CREATE INDEX IF NOT EXISTS idx_psi_results_url ON psi_results(url_id);",
-        [],
     )?;
 
     Ok(())
@@ -423,18 +424,168 @@ fn create_v3_schema(conn: &Connection) -> Result<()> {
     }
 
     // Add indexes for links table performance
-    conn.execute(
+    conn.execute_batch(
         "CREATE INDEX IF NOT EXISTS idx_links_crawl ON links(crawl_id);
          CREATE INDEX IF NOT EXISTS idx_links_target ON links(target_url);
          CREATE INDEX IF NOT EXISTS idx_links_type ON links(link_type);
-         CREATE INDEX IF NOT EXISTS idx_issues_crawl ON issues(url, crawl_id);
          CREATE INDEX IF NOT EXISTS idx_urls_status_code ON urls(crawl_id, status_code);
          CREATE INDEX IF NOT EXISTS idx_urls_title ON urls(crawl_id, title);
          CREATE INDEX IF NOT EXISTS idx_urls_canonical ON urls(crawl_id, canonical_url);",
-        [],
     )?;
 
     Ok(())
+}
+
+/// Ensure databases that already claim the latest migration version still have
+/// the current columns and indexes. Some pre-release builds created old tables
+/// and then marked schema_migrations as current, so version checks alone are
+/// not enough.
+fn ensure_current_schema(conn: &Connection) -> Result<()> {
+    let url_columns = [
+        ("normalized_url", "TEXT"),
+        ("final_url", "TEXT"),
+        ("status_code", "INTEGER"),
+        ("content_type", "TEXT"),
+        ("title", "TEXT"),
+        ("title_length", "INTEGER"),
+        ("meta_description", "TEXT"),
+        ("meta_description_length", "INTEGER"),
+        ("h1", "TEXT"),
+        ("h1_count", "INTEGER DEFAULT 0"),
+        ("word_count", "INTEGER"),
+        ("canonical_url", "TEXT"),
+        ("meta_robots", "TEXT"),
+        ("x_robots_tag", "TEXT"),
+        ("response_time_ms", "REAL"),
+        ("size_bytes", "INTEGER"),
+        ("language", "TEXT"),
+        ("inlinks_count", "INTEGER DEFAULT 0"),
+        ("outlinks_count", "INTEGER DEFAULT 0"),
+        ("content_hash", "TEXT"),
+        ("crawl_source", "TEXT DEFAULT 'spider'"),
+        ("fetch_result_json", "TEXT"),
+        ("seo_data_json", "TEXT"),
+        ("indexability", "TEXT NOT NULL DEFAULT 'unknown'"),
+        ("depth", "INTEGER NOT NULL DEFAULT 0"),
+        ("discovered_at", "TEXT"),
+        ("fetched_at", "TEXT"),
+        ("last_crawled_at", "TEXT"),
+    ];
+    add_columns_if_missing(conn, "urls", &url_columns);
+
+    let link_columns = [
+        ("crawl_id", "INTEGER"),
+        ("target_normalized_url", "TEXT"),
+        ("target_url_id", "INTEGER"),
+        ("link_type", "TEXT DEFAULT 'html_a'"),
+        ("is_followed", "INTEGER NOT NULL DEFAULT 1"),
+        ("source_element", "TEXT"),
+        ("source_attribute", "TEXT"),
+        ("status_code", "INTEGER"),
+    ];
+    add_columns_if_missing(conn, "links", &link_columns);
+
+    let issue_columns = [
+        ("url_id", "INTEGER"),
+        ("url", "TEXT DEFAULT ''"),
+        ("message", "TEXT DEFAULT ''"),
+        ("details_json", "TEXT"),
+        ("detected_at", "TEXT"),
+        ("is_fixed", "INTEGER NOT NULL DEFAULT 0"),
+    ];
+    add_columns_if_missing(conn, "issues", &issue_columns);
+
+    conn.execute_batch(
+        "UPDATE links
+         SET source_url_id = (
+           SELECT MIN(kept.id)
+           FROM urls duplicate
+           JOIN urls kept
+             ON kept.crawl_id = duplicate.crawl_id
+            AND kept.url = duplicate.url
+           WHERE duplicate.id = links.source_url_id
+         )
+         WHERE source_url_id IN (
+           SELECT id FROM urls
+           WHERE crawl_id IS NOT NULL
+             AND id NOT IN (
+               SELECT MIN(id) FROM urls WHERE crawl_id IS NOT NULL GROUP BY crawl_id, url
+             )
+         );
+
+         UPDATE links
+         SET target_url_id = (
+           SELECT MIN(kept.id)
+           FROM urls duplicate
+           JOIN urls kept
+             ON kept.crawl_id = duplicate.crawl_id
+            AND kept.url = duplicate.url
+           WHERE duplicate.id = links.target_url_id
+         )
+         WHERE target_url_id IN (
+           SELECT id FROM urls
+           WHERE crawl_id IS NOT NULL
+             AND id NOT IN (
+               SELECT MIN(id) FROM urls WHERE crawl_id IS NOT NULL GROUP BY crawl_id, url
+             )
+         );
+
+         UPDATE issues
+         SET url_id = (
+           SELECT MIN(kept.id)
+           FROM urls duplicate
+           JOIN urls kept
+             ON kept.crawl_id = duplicate.crawl_id
+            AND kept.url = duplicate.url
+           WHERE duplicate.id = issues.url_id
+         )
+         WHERE url_id IN (
+           SELECT id FROM urls
+           WHERE crawl_id IS NOT NULL
+             AND id NOT IN (
+               SELECT MIN(id) FROM urls WHERE crawl_id IS NOT NULL GROUP BY crawl_id, url
+             )
+         );",
+    )?;
+
+    conn.execute(
+        "DELETE FROM urls
+         WHERE crawl_id IS NOT NULL
+           AND id NOT IN (
+             SELECT MIN(id) FROM urls WHERE crawl_id IS NOT NULL GROUP BY crawl_id, url
+           )",
+        [],
+    )?;
+
+    conn.execute_batch(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_urls_crawl_url_unique ON urls(crawl_id, url);
+         CREATE INDEX IF NOT EXISTS idx_urls_status_code ON urls(crawl_id, status_code);
+         CREATE INDEX IF NOT EXISTS idx_urls_title ON urls(crawl_id, title);
+         CREATE INDEX IF NOT EXISTS idx_urls_canonical ON urls(crawl_id, canonical_url);
+         CREATE INDEX IF NOT EXISTS idx_urls_indexability ON urls(indexability);
+         CREATE INDEX IF NOT EXISTS idx_urls_content_hash ON urls(content_hash);
+         CREATE INDEX IF NOT EXISTS idx_links_crawl ON links(crawl_id);
+         CREATE INDEX IF NOT EXISTS idx_links_target ON links(target_url);
+         CREATE INDEX IF NOT EXISTS idx_links_target_norm ON links(target_normalized_url);
+         CREATE INDEX IF NOT EXISTS idx_links_target_url_id ON links(target_url_id);
+         CREATE INDEX IF NOT EXISTS idx_links_type ON links(link_type);
+         CREATE INDEX IF NOT EXISTS idx_issues_type_severity ON issues(issue_type, severity);",
+    )?;
+
+    Ok(())
+}
+
+fn add_columns_if_missing(conn: &Connection, table_name: &str, columns: &[(&str, &str)]) {
+    for (col_name, col_def) in columns {
+        conn.execute(
+            &format!(
+                "ALTER TABLE {} ADD COLUMN {} {}",
+                table_name, col_name, col_def
+            ),
+            [],
+        )
+        .ok();
+    }
 }
 
 /// Crate-internal test helper: run migrations on an arbitrary connection
@@ -443,4 +594,150 @@ fn create_v3_schema(conn: &Connection) -> Result<()> {
 #[cfg(test)]
 pub fn test_run_migrations(conn: &Connection) -> Result<(), String> {
     run_migrations(conn).map_err(|e| e.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn has_column(conn: &Connection, table_name: &str, column_name: &str) -> bool {
+        let mut stmt = conn
+            .prepare(&format!("PRAGMA table_info({})", table_name))
+            .expect("prepare table_info");
+        let columns = stmt
+            .query_map([], |row| row.get::<_, String>(1))
+            .expect("query table_info");
+
+        let has_match = columns
+            .filter_map(|column| column.ok())
+            .any(|column| column == column_name);
+        has_match
+    }
+
+    #[test]
+    fn repairs_current_version_database_missing_dedicated_columns() {
+        let conn = Connection::open_in_memory().expect("open in-memory database");
+
+        conn.execute_batch(
+            "
+            PRAGMA foreign_keys = ON;
+
+            CREATE TABLE schema_migrations (
+                version INTEGER PRIMARY KEY,
+                applied_at TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+            INSERT INTO schema_migrations (version) VALUES (3);
+
+            CREATE TABLE projects (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                root_url TEXT NOT NULL,
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+
+            CREATE TABLE crawls (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                project_id INTEGER NOT NULL,
+                status TEXT NOT NULL DEFAULT 'created',
+                url_count INTEGER NOT NULL DEFAULT 0,
+                issue_count INTEGER NOT NULL DEFAULT 0,
+                link_count INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                FOREIGN KEY (project_id) REFERENCES projects(id)
+            );
+
+            CREATE TABLE urls (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                url TEXT NOT NULL,
+                project_id INTEGER NOT NULL,
+                crawl_id INTEGER,
+                indexability TEXT NOT NULL DEFAULT 'unknown',
+                FOREIGN KEY (project_id) REFERENCES projects(id),
+                FOREIGN KEY (crawl_id) REFERENCES crawls(id) ON DELETE SET NULL
+            );
+
+            CREATE TABLE links (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                source_url_id INTEGER NOT NULL,
+                source_url TEXT NOT NULL,
+                target_url TEXT NOT NULL,
+                link_relation TEXT NOT NULL DEFAULT 'html_a',
+                anchor_text TEXT,
+                is_internal INTEGER NOT NULL DEFAULT 1,
+                is_no_follow INTEGER NOT NULL DEFAULT 0,
+                detected_at TEXT NOT NULL DEFAULT (datetime('now')),
+                FOREIGN KEY (source_url_id) REFERENCES urls(id) ON DELETE CASCADE
+            );
+
+            CREATE TABLE issues (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                issue_type TEXT NOT NULL,
+                severity TEXT NOT NULL,
+                category TEXT NOT NULL,
+                url_id INTEGER,
+                url TEXT NOT NULL,
+                message TEXT NOT NULL,
+                FOREIGN KEY (url_id) REFERENCES urls(id) ON DELETE SET NULL
+            );
+
+            INSERT INTO projects (id, name, root_url) VALUES (1, 'Example', 'https://example.com/');
+            INSERT INTO crawls (id, project_id, status) VALUES (1, 1, 'completed');
+            INSERT INTO urls (id, url, project_id, crawl_id) VALUES
+                (10, 'https://example.com/', 1, 1),
+                (11, 'https://example.com/', 1, 1),
+                (12, 'https://example.com/about', 1, 1);
+            INSERT INTO links (source_url_id, source_url, target_url)
+                VALUES (11, 'https://example.com/', 'https://example.com/about');
+            INSERT INTO issues (issue_type, severity, category, url_id, url, message)
+                VALUES ('missing_title', 'high', 'metadata', 11, 'https://example.com/', 'Missing title');
+            ",
+        )
+        .expect("create stale current-version schema");
+
+        test_run_migrations(&conn).expect("repair current schema");
+
+        for column in [
+            "normalized_url",
+            "status_code",
+            "meta_description",
+            "inlinks_count",
+        ] {
+            assert!(has_column(&conn, "urls", column), "missing urls.{column}");
+        }
+        assert!(has_column(&conn, "links", "target_normalized_url"));
+        assert!(has_column(&conn, "links", "target_url_id"));
+        assert!(has_column(&conn, "issues", "details_json"));
+
+        let duplicate_count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM urls WHERE crawl_id = 1 AND url = 'https://example.com/'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("count deduplicated urls");
+        assert_eq!(duplicate_count, 1);
+
+        let link_source_id: i64 = conn
+            .query_row("SELECT source_url_id FROM links", [], |row| row.get(0))
+            .expect("read repaired link");
+        assert_eq!(link_source_id, 10);
+
+        let issue_url_id: i64 = conn
+            .query_row("SELECT url_id FROM issues", [], |row| row.get(0))
+            .expect("read repaired issue");
+        assert_eq!(issue_url_id, 10);
+
+        let duplicate_insert = conn.execute(
+            "INSERT INTO urls (url, project_id, crawl_id) VALUES ('https://example.com/', 1, 1)",
+            [],
+        );
+        assert!(duplicate_insert.is_err());
+
+        conn.prepare(
+            "SELECT normalized_url, status_code, meta_description, inlinks_count
+             FROM urls",
+        )
+        .expect("query can reference repaired dedicated columns");
+    }
 }

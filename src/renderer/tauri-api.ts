@@ -263,7 +263,7 @@ function setupCrawldesk() {
         sortOrder: input.sort?.direction,
       }),
       get: (urlId: string) => invoke('get_url_details', { urlId: toId(urlId) }),
-      summarize: (projectId: string) => invoke('summarize_urls', { projectId: toId(projectId) }),
+      summarize: (crawlId: string) => invoke('summarize_urls_by_crawl', { crawlId: toId(crawlId) }),
     },
     issues: {
       definitions: async () => {

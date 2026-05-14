@@ -56,6 +56,7 @@ pub fn run() {
             commands::url::query_urls,
             commands::url::get_url_details,
             commands::url::summarize_urls,
+            commands::url::summarize_urls_by_crawl,
             // Keyword analysis commands
             commands::keyword::analyze_keywords,
             // Content clustering commands

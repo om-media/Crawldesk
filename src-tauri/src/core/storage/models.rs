@@ -437,6 +437,14 @@ pub struct UrlSummary {
     pub blocked_by_robots: i64,
     pub non_200_status: i64,
     pub average_depth: f64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub avg_response_time_ms: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub status_code_distribution: Option<std::collections::HashMap<String, i64>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub depth_distribution: Option<std::collections::HashMap<String, i64>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub indexable_count: Option<i64>,
 }
 
 // ─── PSI Result Types ────────────────────────────────────────────

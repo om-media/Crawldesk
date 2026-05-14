@@ -14,7 +14,9 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint src/ shared/",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "smoke:mock-ui": "node scripts/smoke-mock-ui.mjs",
+    "smoke:tauri-release": "node scripts/smoke-tauri-release.mjs"
   },
   "dependencies": {
     "@tanstack/react-table": "^8.21.3",

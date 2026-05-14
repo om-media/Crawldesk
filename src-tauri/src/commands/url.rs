@@ -2,6 +2,7 @@
 
 use crate::core::storage::{db, models, queries};
 use tracing::info;
+use std::collections::HashMap;
 
 #[tauri::command]
 pub fn query_urls(
@@ -56,14 +57,14 @@ pub fn get_url_details(url_id: i64) -> Result<Option<models::UrlRecord>, String>
     Ok(url)
 }
 
-#[tauri::command]
-pub fn summarize_urls(project_id: i64) -> Result<models::UrlSummary, String> {
-    let conn = db::get_connection().map_err(|e| e.to_string())?;
-
+/// Build a URL summary from a filter clause. Used by both project_id and crawl_id variants.
+fn build_summary(conn: &rusqlite::Connection, where_clause: &str, params: &[&dyn rusqlite::types::ToSql]) -> Result<models::UrlSummary, String> {
     // Count by indexability
-    let mut stmt = conn.prepare(
-        "SELECT indexability, COUNT(*) as count FROM urls WHERE project_id = ?1 GROUP BY indexability"
-    ).map_err(|e| e.to_string())?;
+    let sql_indexability = format!(
+        "SELECT indexability, COUNT(*) as count FROM urls WHERE {} GROUP BY indexability",
+        where_clause
+    );
+    let mut stmt = conn.prepare(&sql_indexability).map_err(|e| e.to_string())?;
 
     let mut summary = models::UrlSummary {
         total_urls: 0,
@@ -72,16 +73,18 @@ pub fn summarize_urls(project_id: i64) -> Result<models::UrlSummary, String> {
         blocked_by_robots: 0,
         non_200_status: 0,
         average_depth: 0.0,
+        avg_response_time_ms: None,
+        status_code_distribution: None,
+        depth_distribution: None,
+        indexable_count: None,
     };
 
-    let rows = stmt
-        .query_map(rusqlite::params![project_id], |row| {
-            Ok((
-                row.get::<_, String>("indexability")?,
-                row.get::<_, i64>("count")?,
-            ))
-        })
-        .map_err(|e| e.to_string())?;
+    let rows = stmt.query_map(params, |row| {
+        Ok((
+            row.get::<_, String>(0)?,
+            row.get::<_, i64>(1)?,
+        ))
+    }).map_err(|e| e.to_string())?;
 
     for row in rows.filter_map(|r| r.ok()) {
         let (indexability, count) = row;
@@ -95,15 +98,65 @@ pub fn summarize_urls(project_id: i64) -> Result<models::UrlSummary, String> {
         }
     }
 
+    // Non-200 status codes
+    let sql_non200 = format!(
+        "SELECT COUNT(*) FROM urls WHERE {} AND status_code >= 400",
+        where_clause
+    );
+    summary.non_200_status = conn.query_row(&sql_non200, params, |row| row.get(0)).unwrap_or(0);
+
     // Average depth
-    let avg_depth: f64 = conn
-        .query_row(
-            "SELECT AVG(depth) FROM urls WHERE project_id = ?1",
-            [project_id],
-            |row| row.get(0),
-        )
-        .unwrap_or(0.0);
-    summary.average_depth = avg_depth;
+    let sql_avg_depth = format!("SELECT AVG(depth) FROM urls WHERE {}", where_clause);
+    summary.average_depth = conn.query_row(&sql_avg_depth, params, |row| row.get(0)).unwrap_or(0.0);
+
+    // Average response time
+    let sql_avg_time = format!("SELECT AVG(response_time_ms) FROM urls WHERE {}", where_clause);
+    summary.avg_response_time_ms = Some(conn.query_row(&sql_avg_time, params, |row| row.get(0)).unwrap_or(0.0));
+
+    // Status code distribution
+    let sql_status = format!(
+        "SELECT CAST(status_code AS TEXT), COUNT(*) as count FROM urls WHERE {} GROUP BY status_code ORDER BY count DESC",
+        where_clause
+    );
+    let mut status_stmt = conn.prepare(&sql_status).map_err(|e| e.to_string())?;
+    let status_rows = status_stmt.query_map(params, |row| {
+        Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?))
+    }).map_err(|e| e.to_string())?;
+    let mut status_dist = HashMap::new();
+    for row in status_rows.filter_map(|r| r.ok()) {
+        status_dist.insert(row.0, row.1);
+    }
+    summary.status_code_distribution = Some(status_dist);
+
+    // Depth distribution
+    let sql_depth = format!(
+        "SELECT CAST(depth AS TEXT), COUNT(*) as count FROM urls WHERE {} GROUP BY depth ORDER BY depth",
+        where_clause
+    );
+    let mut depth_stmt = conn.prepare(&sql_depth).map_err(|e| e.to_string())?;
+    let depth_rows = depth_stmt.query_map(params, |row| {
+        Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?))
+    }).map_err(|e| e.to_string())?;
+    let mut depth_dist = HashMap::new();
+    for row in depth_rows.filter_map(|r| r.ok()) {
+        depth_dist.insert(row.0, row.1);
+    }
+    summary.depth_distribution = Some(depth_dist);
+
+    // Indexable count (alias for clarity)
+    summary.indexable_count = Some(summary.indexable);
 
     Ok(summary)
+}
+
+#[tauri::command]
+pub fn summarize_urls(project_id: i64) -> Result<models::UrlSummary, String> {
+    let conn = db::get_connection().map_err(|e| e.to_string())?;
+    build_summary(&conn, "project_id = ?1", &[&project_id])
+}
+
+#[tauri::command]
+pub fn summarize_urls_by_crawl(crawl_id: i64) -> Result<models::UrlSummary, String> {
+    let conn = db::get_connection().map_err(|e| e.to_string())?;
+    build_summary(&conn, "crawl_id = ?1", &[&crawl_id])
 }

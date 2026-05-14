@@ -57,8 +57,8 @@ export default function ProjectOverview({ crawlId, onNavigate }: Props) {
   function retryLoad() { setLoadError(null); loadCrawls() }
 
   // Compute KPIs from data
-  const totalUrls = summary?.total ?? 0
-  const indexableCount = summary?.indexableCount ?? 0
+  const totalUrls = summary?.totalUrls ?? 0
+  const indexableCount = summary?.indexableCount ?? summary?.indexable ?? 0
   const criticalIssues = issueSummary.filter(i => i.severity === 'critical').reduce((a, b) => a + b.count, 0)
   const highIssues = issueSummary.filter(i => i.severity === 'high').reduce((a, b) => a + b.count, 0)
   const avgResponseTime = summary?.avgResponseTimeMs ?? 0
