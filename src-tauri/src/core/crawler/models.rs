@@ -1,4 +1,4 @@
-//! Crawl engine models — core data types for URLs, SEO data, fetch results, and issues.
+//! Crawl engine models — URL records, SEO data, fetch results, and page-level issue types.
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

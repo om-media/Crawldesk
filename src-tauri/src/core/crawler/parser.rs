@@ -1,4 +1,4 @@
-//! HTML parser and SEO data extractor — extracts links, meta tags, structured data from HTML.
+//! HTML parser — extracts links, meta tags, structured data, and SEO fields from page content.
 
 use super::models::{ExtractedLink, LinkType, SeoData};
 use super::normalizer::{are_same_url, extract_hostname, resolve_url};

@@ -1,3 +1,7 @@
+/**
+ * Issue type definitions — shared between Rust backend and React frontend.
+ * Severity and category enums match the issue_registry module.
+ */
 export type Severity = 'critical' | 'warning' | 'info'
 
 export type IssueCategory =

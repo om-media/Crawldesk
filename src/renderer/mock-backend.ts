@@ -1,6 +1,6 @@
 /**
- * Mock backend for CrawlDesk — used when window.__TAURI__ is not available
- * (e.g. running in a regular browser for Playwright E2E testing).
+ * Mock backend for CrawlDesk — simulates Tauri APIs when running in a browser
+ * (used for Playwright E2E testing and local dev without Tauri).
  *
  * Provides realistic fake data so the full UI flow can be tested without Tauri.
  *

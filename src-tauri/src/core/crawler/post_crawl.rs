@@ -1,7 +1,6 @@
-//! Post-crawl analysis detectors — canonical, content, hreflang, image, security,
-//! social, structured data, JS rendering, and cross-page duplicate/cluster detectors.
-//! DB-dependent detectors (link-graph, sitemap-comparison, pagination) accept
-//! pre-fetched data structures so they remain testable without a live DB connection.
+//! Post-crawl analysis — canonical, content, hreflang, image, security,
+//! social, structured data, JS rendering, and cross-page detectors.
+//! DB-dependent detectors accept pre-fetched data so they remain testable without a live DB.
 
 use super::issue_registry::{issue_with, IssueType};
 use super::models::{FetchResult, IssueCategory, IssueSeverity, SeoData, SeoIssue};

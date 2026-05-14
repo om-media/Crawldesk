@@ -1,4 +1,7 @@
-import { useState, useEffect } from 'react'
+/**
+ * Issue definitions screen — lists all known SEO issue types from the registry
+ * with severity badges, category chips, and detailed recommendations.
+ */
 import { useProjectStore } from '../stores/project-store'
 import ErrorBanner from '../components/ErrorBanner'
 import type { IssueCategory, IssueDefinition, IssueRecord, IssueSummary as IssueType, Severity } from '@shared/types/issue'

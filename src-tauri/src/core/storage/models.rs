@@ -1,5 +1,4 @@
-//! Rust types matching TypeScript interfaces in src/shared/types/
-//! All serializable models use `#[serde(rename_all = "camelCase")]` to match frontend.
+//! Shared Rust type definitions — serialized with camelCase to match frontend TypeScript interfaces.
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};

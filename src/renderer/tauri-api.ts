@@ -1,3 +1,7 @@
+/**
+ * Tauri API bridge — typed wrapper around window.crawldesk for invocations
+ * and event listeners. Falls back to mock backend when Tauri is unavailable.
+ */
 type TauriGlobal = NonNullable<Window['__TAURI__']>
 
 const READY_EVENT = 'crawldesk:ready'

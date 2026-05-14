@@ -1,6 +1,5 @@
-//! Stable SEO issue taxonomy.
-//!
-//! Detectors should emit issue IDs from this registry instead of ad hoc strings.
+//! Stable SEO issue taxonomy — defines all issue types with labels,
+//! severity, and recommendations for consistent reporting across detectors.
 //! The DB still stores strings for compatibility, but this module is the source
 //! of truth for IDs, default severity/category, labels, and recommendations.
 
