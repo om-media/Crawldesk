@@ -86,8 +86,16 @@ pub(crate) fn run_post_crawl_for_connection(
     conn: &mut Connection,
     crawl_id: i64,
 ) -> Result<i64, String> {
+    run_post_crawl_for_connection_with_sitemaps(conn, crawl_id, &[])
+}
+
+pub(crate) fn run_post_crawl_for_connection_with_sitemaps(
+    conn: &mut Connection,
+    crawl_id: i64,
+    sitemap_urls: &[String],
+) -> Result<i64, String> {
     use crate::core::crawler::models::{FetchResult, SeoData, SeoIssue};
-    use crate::core::crawler::post_crawl::run_post_crawl_analysis;
+    use crate::core::crawler::post_crawl::run_post_crawl_analysis_with_sitemaps;
 
     // Load all URL records for this crawl
     let records = queries::get_all_url_records_for_crawl(conn, crawl_id)
@@ -121,7 +129,12 @@ pub(crate) fn run_post_crawl_for_connection(
     }
 
     // Run all post-crawl detectors
-    let issues = run_post_crawl_analysis(&records, &seo_data_map, &fetch_results);
+    let issues = run_post_crawl_analysis_with_sitemaps(
+        &records,
+        &seo_data_map,
+        &fetch_results,
+        sitemap_urls,
+    );
     let issue_count = issues.len() as i64;
 
     if issue_count > 0 {

@@ -103,6 +103,54 @@ pub fn parse_sitemap(content: &str) -> Result<Vec<SitemapUrl>, String> {
     Ok(urls)
 }
 
+/// Parse a sitemap index and extract child sitemap URLs.
+pub fn parse_sitemap_index(content: &str) -> Result<Vec<String>, String> {
+    debug!("Parsing sitemap index");
+
+    let parser = EventReader::new(content.as_bytes());
+    let mut urls = Vec::new();
+    let mut in_sitemap = false;
+    let mut in_loc = false;
+    let mut text_buffer = String::new();
+
+    for event in parser {
+        match event {
+            Ok(XmlEvent::StartElement { name, .. }) => match name.local_name.as_ref() {
+                "sitemap" => in_sitemap = true,
+                "loc" if in_sitemap => in_loc = true,
+                _ => {}
+            },
+            Ok(XmlEvent::Characters(text)) => {
+                let trimmed = text.trim();
+                if !trimmed.is_empty() {
+                    text_buffer.push_str(trimmed);
+                }
+            }
+            Ok(XmlEvent::EndElement { name }) => match name.local_name.as_ref() {
+                "loc" => {
+                    if in_loc && !text_buffer.is_empty() {
+                        urls.push(text_buffer.clone());
+                    }
+                    in_loc = false;
+                    text_buffer.clear();
+                }
+                "sitemap" => in_sitemap = false,
+                _ => {}
+            },
+            Err(e) => {
+                warn!("XML parse error: {}", e);
+            }
+            _ => {}
+        }
+    }
+
+    debug!(
+        "Parsed {} child sitemap URLs from sitemap index",
+        urls.len()
+    );
+    Ok(urls)
+}
+
 /// Parse HTML sitemap links.
 pub fn parse_html_sitemap(html: &str) -> Vec<String> {
     use scraper::{Html, Selector};
@@ -114,4 +162,30 @@ pub fn parse_html_sitemap(html: &str) -> Vec<String> {
         .select(&selector)
         .filter_map(|el| el.value().attr("href").map(String::from))
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_sitemap_index_extracts_child_sitemaps() {
+        let urls = parse_sitemap_index(
+            r#"
+            <sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+              <sitemap><loc>https://example.com/sitemap-pages.xml</loc></sitemap>
+              <sitemap><loc>https://example.com/sitemap-posts.xml</loc></sitemap>
+            </sitemapindex>
+            "#,
+        )
+        .unwrap();
+
+        assert_eq!(
+            urls,
+            vec![
+                "https://example.com/sitemap-pages.xml".to_string(),
+                "https://example.com/sitemap-posts.xml".to_string()
+            ]
+        );
+    }
 }

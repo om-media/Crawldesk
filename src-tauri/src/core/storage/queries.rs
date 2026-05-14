@@ -1009,12 +1009,29 @@ pub fn summarize_links(conn: &Connection, project_id: i64) -> Result<LinkSummary
         .filter_map(|r| r.ok())
         .collect();
 
+    // Compute broken links: targets where the linked URL has a 4xx/5xx status
+    let broken_count: i64 = conn
+        .query_row(
+            "SELECT COUNT(DISTINCT l.target_url)
+         FROM links l
+         JOIN urls u ON l.source_url_id = u.id
+         JOIN urls t ON (
+             t.normalized_url = l.target_url
+             OR t.url = l.target_url
+             OR t.final_url = l.target_url
+         )
+         WHERE u.project_id = ?1 AND t.status_code >= 400",
+            params![project_id],
+            |row| row.get(0),
+        )
+        .unwrap_or(0);
+
     Ok(LinkSummary {
         total_links: total,
         total_internal: internal,
         total_external: external,
         nofollow_links: nofollow,
-        broken_count: 0, // TODO: compute from link targets with non-2xx status
+        broken_count,
         link_relation_counts: relation_counts,
     })
 }
@@ -1406,12 +1423,29 @@ pub fn summarize_links_by_crawl(conn: &Connection, crawl_id: i64) -> Result<Link
         .filter_map(|r| r.ok())
         .collect();
 
+    // Compute broken links for this crawl
+    let broken_count: i64 = conn
+        .query_row(
+            "SELECT COUNT(DISTINCT l.target_url)
+             FROM links l
+             JOIN urls u ON l.source_url_id = u.id
+             JOIN urls t ON (
+                 t.normalized_url = l.target_url
+                 OR t.url = l.target_url
+                 OR t.final_url = l.target_url
+             )
+             WHERE u.crawl_id = ?1 AND t.status_code >= 400",
+            params![crawl_id],
+            |row| row.get(0),
+        )
+        .unwrap_or(0);
+
     Ok(LinkSummary {
         total_links: total,
         total_internal: internal,
         total_external: external,
         nofollow_links: nofollow,
-        broken_count: 0, // TODO: compute from link targets with non-2xx status
+        broken_count,
         link_relation_counts: relation_counts,
     })
 }

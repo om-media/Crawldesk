@@ -15,9 +15,11 @@ use super::normalizer::normalize_url;
 use super::parser::{extract_html_links, parse_html};
 use super::robots::RobotsService;
 use super::scope::ScopeService;
+use super::sitemap;
 use crate::core::storage::writer::{
     IssueWriteRecord, LinkWriteRecord, PageCrawledData, WriteHandle,
 };
+use std::collections::HashSet;
 
 /// Configuration for the crawl engine.
 #[derive(Debug, Clone)]
@@ -29,6 +31,7 @@ pub struct CrawlEngineConfig {
     pub delay_between_requests_ms: u64,
     pub fetcher_config: FetcherConfig,
     pub respect_robots_txt: bool,
+    pub respect_sitemaps: bool,
     pub custom_headers: Option<Vec<(String, String)>>,
 }
 
@@ -64,6 +67,7 @@ pub enum CrawlEvent {
         total_issues: usize,
         total_links: usize,
         elapsed_ms: u64,
+        sitemap_urls: Vec<String>,
     },
 }
 
@@ -75,6 +79,7 @@ pub struct CrawlEngine {
     robots: Arc<Mutex<RobotsService>>,
     callback: Option<CrawlCallback>,
     stats: Arc<Mutex<CrawlStats>>,
+    sitemap_urls: Arc<Mutex<HashSet<String>>>,
     writer: Option<WriteHandle>,
     /// Project ID and crawl ID for SQLite persistence.
     project_id: i64,
@@ -90,6 +95,7 @@ impl Clone for CrawlEngine {
             robots: Arc::clone(&self.robots),
             callback: None, // callbacks are not cloned
             stats: Arc::clone(&self.stats),
+            sitemap_urls: Arc::clone(&self.sitemap_urls),
             writer: self.writer.clone(),
             project_id: self.project_id,
             crawl_id: self.crawl_id,
@@ -217,6 +223,7 @@ impl CrawlEngine {
             robots: Arc::new(Mutex::new(RobotsService::new())),
             callback: None,
             stats: Arc::new(Mutex::new(CrawlStats::default())),
+            sitemap_urls: Arc::new(Mutex::new(HashSet::new())),
             writer: None,
             project_id: 0,
             crawl_id: 0,
@@ -283,6 +290,17 @@ impl CrawlEngine {
         if self.config.respect_robots_txt {
             if let Err(e) = self.fetch_robots().await {
                 warn!("Failed to fetch robots.txt: {}", e);
+            }
+        }
+
+        if self.config.respect_sitemaps {
+            match self.fetch_sitemap_urls().await {
+                Ok(urls) => {
+                    let seeded = self.seed_urls(urls.clone(), 0).await;
+                    self.sitemap_urls.lock().await.extend(urls);
+                    info!("Loaded sitemap URLs; seeded {} in-scope URL(s)", seeded);
+                }
+                Err(e) => warn!("Failed to fetch sitemap URLs: {}", e),
             }
         }
 
@@ -425,11 +443,14 @@ impl CrawlEngine {
 
         // Emit completion event
         if let Some(ref callback) = self.callback {
+            let sitemap_urls: Vec<String> =
+                self.sitemap_urls.lock().await.iter().cloned().collect();
             callback(&CrawlEvent::Completed {
                 total_crawled: s.total_crawled,
                 total_issues: s.total_issues,
                 total_links: s.total_links,
                 elapsed_ms: elapsed,
+                sitemap_urls,
             });
         }
 
@@ -518,6 +539,65 @@ impl CrawlEngine {
         }
 
         Ok(())
+    }
+
+    /// Fetch and parse sitemap.xml for the root hostname.
+    async fn fetch_sitemap_urls(&self) -> Result<Vec<String>, anyhow::Error> {
+        let base_url = url::Url::parse(&self.config.root_url)?;
+        let hostname = base_url.host_str().unwrap_or("");
+        let scheme = base_url.scheme();
+        let sitemap_url = format!("{}://{}/sitemap.xml", scheme, hostname);
+        let fetcher = Fetcher::new(self.config.fetcher_config.clone());
+
+        self.fetch_sitemap_tree(&fetcher, &sitemap_url, 0).await
+    }
+
+    async fn fetch_sitemap_tree(
+        &self,
+        fetcher: &Fetcher,
+        sitemap_url: &str,
+        depth: usize,
+    ) -> Result<Vec<String>, anyhow::Error> {
+        if depth > 2 {
+            return Ok(Vec::new());
+        }
+
+        let result = fetcher.fetch(sitemap_url).await;
+        if result.status_code != 200 {
+            debug!(
+                "No sitemap found at {} (status {})",
+                sitemap_url, result.status_code
+            );
+            return Ok(Vec::new());
+        }
+
+        let Some(content) = result.html_content else {
+            return Ok(Vec::new());
+        };
+
+        let mut urls: Vec<String> = sitemap::parse_sitemap(&content)
+            .map_err(anyhow::Error::msg)?
+            .into_iter()
+            .filter_map(|entry| normalize_url(&entry.loc))
+            .collect();
+
+        if urls.is_empty() {
+            for child_sitemap in
+                sitemap::parse_sitemap_index(&content).map_err(anyhow::Error::msg)?
+            {
+                let Some(child_url) = super::normalizer::resolve_url(sitemap_url, &child_sitemap)
+                else {
+                    continue;
+                };
+                let mut child_urls =
+                    Box::pin(self.fetch_sitemap_tree(fetcher, &child_url, depth + 1)).await?;
+                urls.append(&mut child_urls);
+            }
+        }
+
+        urls.sort();
+        urls.dedup();
+        Ok(urls)
     }
 
     /// Check if a fetch result is crawlable.

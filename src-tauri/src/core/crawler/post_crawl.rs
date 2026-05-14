@@ -27,6 +27,15 @@ pub fn run_post_crawl_analysis(
     seo_data_map: &HashMap<String, SeoData>,
     fetch_results: &HashMap<String, FetchResult>,
 ) -> Vec<SeoIssue> {
+    run_post_crawl_analysis_with_sitemaps(urls, seo_data_map, fetch_results, &[])
+}
+
+pub fn run_post_crawl_analysis_with_sitemaps(
+    urls: &[UrlRecord],
+    seo_data_map: &HashMap<String, SeoData>,
+    fetch_results: &HashMap<String, FetchResult>,
+    sitemap_urls: &[String],
+) -> Vec<SeoIssue> {
     let mut issues = Vec::new();
 
     // ── Per-page detectors ──────────────────────────────────────
@@ -70,6 +79,7 @@ pub fn run_post_crawl_analysis(
     detect_redirect_chains(seo_data_map, &mut issues);
     detect_amp_cross_page_issues(seo_data_map, &mut issues);
     detect_hreflang_cross_page_issues(seo_data_map, fetch_results, &mut issues);
+    detect_sitemap_comparison_from_records(urls, sitemap_urls, &mut issues);
 
     info!("Post-crawl analysis: {} issues found", issues.len());
 
@@ -1373,6 +1383,68 @@ pub fn detect_sitemap_comparison_issues(data: &SitemapComparisonData) -> Vec<Seo
     issues
 }
 
+fn detect_sitemap_comparison_from_records(
+    urls: &[UrlRecord],
+    sitemap_urls: &[String],
+    issues: &mut Vec<SeoIssue>,
+) {
+    if sitemap_urls.is_empty() || urls.is_empty() {
+        return;
+    }
+
+    let sitemap_urls: std::collections::HashSet<String> =
+        sitemap_urls.iter().map(|url| url.to_lowercase()).collect();
+    let crawled_urls: Vec<(i64, String)> = urls
+        .iter()
+        .map(|record| {
+            (
+                record.id,
+                record
+                    .normalized_url
+                    .clone()
+                    .unwrap_or_else(|| record.url.clone()),
+            )
+        })
+        .collect();
+    let indexable_pages: Vec<(i64, String)> = urls
+        .iter()
+        .filter(|record| record.indexability == "indexable")
+        .map(|record| {
+            (
+                record.id,
+                record
+                    .normalized_url
+                    .clone()
+                    .unwrap_or_else(|| record.url.clone()),
+            )
+        })
+        .collect();
+    let sitemap_lower: std::collections::HashSet<String> =
+        sitemap_urls.iter().map(|url| url.to_lowercase()).collect();
+    let sitemap_error_pages: Vec<(i64, String, i32)> = urls
+        .iter()
+        .filter_map(|record| {
+            let normalized = record
+                .normalized_url
+                .clone()
+                .unwrap_or_else(|| record.url.clone());
+            let status = record.status_code?;
+            if status >= 400 && sitemap_lower.contains(&normalized.to_lowercase()) {
+                Some((record.id, normalized, status))
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    issues.extend(detect_sitemap_comparison_issues(&SitemapComparisonData {
+        sitemap_urls,
+        crawled_urls,
+        indexable_pages,
+        sitemap_error_pages,
+    }));
+}
+
 // ─────────────────────────────────────────────────────────────────
 // Cross-page detectors (existing, retained)
 // ─────────────────────────────────────────────────────────────────
@@ -1664,6 +1736,41 @@ mod tests {
             was_js_rendered: false,
             html_content: html.map(str::to_string),
             error_message: None,
+        }
+    }
+
+    fn make_url_record(id: i64, url: &str, status_code: i32, indexability: &str) -> UrlRecord {
+        UrlRecord {
+            id,
+            url: url.to_string(),
+            project_id: 1,
+            crawl_id: Some(1),
+            normalized_url: Some(url.to_string()),
+            final_url: Some(url.to_string()),
+            status_code: Some(status_code),
+            content_type: Some("text/html".to_string()),
+            title: Some("Test".to_string()),
+            title_length: Some(4),
+            meta_description: None,
+            meta_description_length: None,
+            h1: None,
+            h1_count: None,
+            word_count: None,
+            canonical_url: None,
+            meta_robots: None,
+            response_time_ms: None,
+            size_bytes: None,
+            language: None,
+            inlinks_count: None,
+            outlinks_count: None,
+            content_hash: None,
+            indexability: indexability.to_string(),
+            depth: 0,
+            fetch_result_json: None,
+            seo_data_json: None,
+            discovered_at: None,
+            fetched_at: None,
+            last_crawled_at: None,
         }
     }
 
@@ -2217,5 +2324,37 @@ mod tests {
         assert!(issues
             .iter()
             .any(|i| i.issue_type == "sitemap_url_not_crawled"));
+    }
+
+    #[test]
+    fn test_sitemap_comparison_from_records_is_wired_into_analysis() {
+        let records = vec![
+            make_url_record(1, "https://example.com/indexable", 200, "indexable"),
+            make_url_record(2, "https://example.com/error", 404, "non_indexable"),
+        ];
+        let mut seo_data_map = HashMap::new();
+        seo_data_map.insert("https://example.com/indexable".to_string(), make_seo_data());
+        seo_data_map.insert("https://example.com/error".to_string(), make_seo_data());
+        let sitemap_urls = vec![
+            "https://example.com/error".to_string(),
+            "https://example.com/missing".to_string(),
+        ];
+
+        let issues = run_post_crawl_analysis_with_sitemaps(
+            &records,
+            &seo_data_map,
+            &HashMap::new(),
+            &sitemap_urls,
+        );
+
+        assert!(issues
+            .iter()
+            .any(|issue| issue.issue_type == "crawled_url_missing_from_sitemap"));
+        assert!(issues
+            .iter()
+            .any(|issue| issue.issue_type == "sitemap_url_not_crawled"));
+        assert!(issues
+            .iter()
+            .any(|issue| issue.issue_type == "sitemap_url_error_status"));
     }
 }

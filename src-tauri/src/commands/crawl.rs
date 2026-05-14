@@ -93,6 +93,7 @@ pub async fn start_crawl(
         delay_between_requests_ms: settings.delay_between_requests_ms as u64,
         fetcher_config,
         respect_robots_txt: settings.respect_robots_txt,
+        respect_sitemaps: settings.respect_sitemaps,
         custom_headers: None,
     };
 
@@ -230,6 +231,7 @@ pub async fn start_crawl(
                 total_issues,
                 total_links,
                 elapsed_ms,
+                sitemap_urls,
             } => {
                 info!(
                     "Crawl completed: {} URLs, {} issues, {} links in {:.0}s",
@@ -259,8 +261,11 @@ pub async fn start_crawl(
                 if let Ok(mut conn) = db::get_connection() {
                     // Aggregate inlinks_count for all URLs in this crawl before post-crawl detectors.
                     let _ = crate::core::storage::queries::update_inlinks_counts(&conn, crawl_id);
-                    match crate::commands::issue::run_post_crawl_for_connection(&mut conn, crawl_id)
-                    {
+                    match crate::commands::issue::run_post_crawl_for_connection_with_sitemaps(
+                        &mut conn,
+                        crawl_id,
+                        sitemap_urls,
+                    ) {
                         Ok(count) => post_crawl_issues = count,
                         Err(e) => warn!("Post-crawl analysis failed for crawl {}: {}", crawl_id, e),
                     }
