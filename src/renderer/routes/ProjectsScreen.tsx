@@ -51,6 +51,7 @@ export default function ProjectsScreen({ onNavigate }: Props) {
   async function openProject(id: string) { setSelectedProjectId(id); if (onNavigate) onNavigate('overview') }
 
   async function deleteProject(id: string) {
+    if (!window.confirm('Delete this project and all its crawl data? This cannot be undone.')) return
     await window.crawldesk.projects.delete(id)
     if (selectedProjectId === id) setSelectedProjectId(null)
     loadProjects()

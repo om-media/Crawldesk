@@ -11,21 +11,26 @@ import IssuesScreen from './routes/IssuesScreen'
 import LinksScreen from './routes/LinksScreen'
 import ExportsScreen from './routes/ExportsScreen'
 import SettingsScreen from './routes/SettingsScreen'
+import PerformanceScreen from './routes/PerformanceScreen'
+import ClientErrorsScreen from './routes/ClientErrorsScreen'
+import KeywordsScreen from './routes/KeywordsScreen'
+import ClustersScreen from './routes/ClustersScreen'
+import ExtractionsScreen from './routes/ExtractionsScreen'
+import SchedulesScreen from './routes/SchedulesScreen'
 
-type Route = 'projects' | 'overview' | 'setup' | 'live' | 'results' | 'issues' | 'links' | 'exports' | 'settings'
-
-declare global { interface Window { crawldesk: any } }
+type Route = 'projects' | 'overview' | 'setup' | 'live' | 'results' | 'issues' | 'links' | 'exports' | 'settings' | 'performance' | 'client-errors' | 'keywords' | 'clusters' | 'extractions' | 'schedules'
 
 export default function App() {
   const [route, setRoute] = useState<Route>('projects')
   const [backendReady, setBackendReady] = useState(() => Boolean(window.crawldesk))
-  const { selectedProjectId, setActiveCrawlId, projects } = useProjectStore()
+  const { selectedProjectId, projects, activeCrawlId } = useProjectStore()
   const selectedProject = projects.find(p => p.id === selectedProjectId)
   const [targetUrl, setTargetUrl] = useState('')
   const [toolbarError, setToolbarError] = useState<string | null>(null)
   const [isStarting, setIsStarting] = useState(false)
   const updateProgress = useCrawlStore(s => s.updateProgress)
   const resetCrawlProgress = useCrawlStore(s => s.reset)
+  const crawlProgress = useCrawlStore(s => s.progress)
 
   useEffect(() => {
     if (window.crawldesk) {
@@ -44,12 +49,12 @@ export default function App() {
     async function resolveLatestCrawl() {
       try {
         const crawls = await window.crawldesk.crawls.listByProject(selectedProjectId)
-        if (crawls && crawls.length > 0) setActiveCrawlId(crawls[0].id)
-        else setActiveCrawlId(null)
+        if (crawls && crawls.length > 0) useProjectStore.getState().setActiveCrawlId(crawls[0].id)
+        else useProjectStore.getState().setActiveCrawlId(null)
       } catch (err) { console.error('[App] Failed to resolve latest crawl:', err) }
     }
     resolveLatestCrawl()
-  }, [backendReady, selectedProjectId, setActiveCrawlId])
+  }, [backendReady, selectedProjectId])
 
   useEffect(() => {
     if (selectedProject?.root_url) setTargetUrl(selectedProject.root_url)
@@ -92,7 +97,7 @@ export default function App() {
         includePatterns: [],
         excludePatterns: [],
       })
-      setActiveCrawlId(crawl.id)
+      useProjectStore.getState().setActiveCrawlId(crawl.id)
       updateProgress({
         crawlId: crawl.id,
         status: 'running',
@@ -115,7 +120,7 @@ export default function App() {
     if (!selectedProjectId && route !== 'projects' && route !== 'settings') return <ProjectsScreen />
     switch (route) {
       case 'projects': return <ProjectsScreen onNavigate={navigate} />
-      case 'overview': return <ProjectOverview crawlId={useProjectStore.getState().activeCrawlId} onNavigate={navigate} />
+      case 'overview': return <ProjectOverview crawlId={activeCrawlId} onNavigate={navigate} />
       case 'setup': return <CrawlSetup onComplete={() => navigate('live')} />
       case 'live': return <LiveCrawl onCompleted={() => navigate('results')} />
       case 'results': return <ResultsScreen />
@@ -123,7 +128,13 @@ export default function App() {
       case 'links': return <LinksScreen />
       case 'exports': return <ExportsScreen />
       case 'settings': return <SettingsScreen />
-      default: return <ProjectsScreen />
+      case 'performance': return <PerformanceScreen />
+      case 'client-errors': return <ClientErrorsScreen />
+      case 'keywords': return <KeywordsScreen />
+      case 'clusters': return <ClustersScreen />
+      case 'extractions': return <ExtractionsScreen />
+      case 'schedules': return <SchedulesScreen />
+      default: return <ProjectsScreen onNavigate={navigate} />
     }
   }
 
@@ -158,10 +169,25 @@ export default function App() {
           <button className="start-button" onClick={startToolbarCrawl} disabled={isStarting}>
             <span>▷</span>{isStarting ? 'Starting' : 'Start Crawl'}
           </button>
-          <button className="toolbar-button" onClick={() => navigate('live')}>Ⅱ Pause</button>
-          <button className="toolbar-button" onClick={() => setActiveCrawlId(null)}>⌫ Clear</button>
+          {activeCrawlId && crawlProgress?.status === 'running' && (
+            <button className="toolbar-button" onClick={async () => {
+              try { await window.crawldesk.crawls.pause(activeCrawlId); useCrawlStore.getState().updateProgress({ status: 'paused' }) } catch {}
+            }}>Ⅱ Pause</button>
+          )}
+          {activeCrawlId && crawlProgress?.status === 'paused' && (
+            <button className="toolbar-button" onClick={async () => {
+              try { await window.crawldesk.crawls.resume(activeCrawlId); useCrawlStore.getState().updateProgress({ status: 'running' }) } catch {}
+            }}>▶ Resume</button>
+          )}
+          {activeCrawlId && (
+            <button className="toolbar-button" onClick={() => { useProjectStore.getState().setActiveCrawlId(null); resetCrawlProgress() }}>⌫ Clear</button>
+          )}
           <button className="icon-button">⋮</button>
-          <div className="crawl-state"><span /> Crawl Idle</div>
+          <div className="crawl-state">
+            <span style={{ color: activeCrawlId ? (crawlProgress?.status === 'running' ? '#10b981' : crawlProgress?.status === 'paused' ? '#f59e0b' : '#89a4aa') : '#89a4aa' }}>
+              ● {activeCrawlId ? (crawlProgress?.status === 'running' ? 'Crawling' : crawlProgress?.status === 'paused' ? 'Paused' : 'Completed') : 'Idle'}
+            </span>
+          </div>
         </header>
         {toolbarError && <div className="mx-6 mt-3 rounded-md border border-red-500/40 bg-red-950/40 px-3 py-2 text-sm text-red-200">{toolbarError}</div>}
         <div className="flex-1 overflow-auto px-5 py-4">
@@ -170,14 +196,15 @@ export default function App() {
           </div>
         </div>
         <footer className="status-bar">
-          <span className="text-emerald">● Crawl ready</span>
+          <span style={{ color: activeCrawlId ? (crawlProgress?.status === 'running' ? '#10b981' : '#f59e0b') : '#89a4aa' }}>
+            ● {activeCrawlId ? (crawlProgress?.status === 'running' ? 'Crawling' : crawlProgress?.status === 'paused' ? 'Paused' : 'Completed') : 'Ready'}
+          </span>
           <span>|</span>
           <span>{selectedProject?.name || 'No project selected'}</span>
           <span>|</span>
-          <span>{new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</span>
-          <span className="ml-auto">Average: -- ms</span>
+          <span>Average: {crawlProgress?.avgResponseTimeMs ? `${Math.round(crawlProgress.avgResponseTimeMs)} ms` : '-- ms'}</span>
           <span>|</span>
-          <span>Current: -- ms</span>
+          <span>Current: {crawlProgress?.urlsPerMinute ? `${crawlProgress.urlsPerMinute.toFixed(1)} url/min` : '--'}</span>
         </footer>
       </main>
     </div>

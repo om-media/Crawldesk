@@ -11,13 +11,13 @@ type NavItem = { id: string; label: string; icon: string; count?: string; disabl
 
 const projectNavItems: NavItem[] = [
   { id: 'overview', label: 'Overview', icon: '▦' },
-  { id: 'results', label: 'All URLs', icon: '│', count: '10,431' },
-  { id: 'issues', label: 'Issues', icon: '△', count: '256' },
-  { id: 'setup', label: 'Pages', icon: '▧', count: '10,431' },
-  { id: 'links', label: 'Links', icon: '↗', count: '32,921' },
-  { id: 'exports', label: 'Images', icon: '□', count: '4,289' },
-  { id: 'javascript', label: 'JavaScript', icon: '┼', count: '1,102', disabled: true },
-  { id: 'sitemaps', label: 'Sitemaps', icon: '⊕', count: '8', disabled: true },
+  { id: 'results', label: 'All URLs', icon: '│' },
+  { id: 'issues', label: 'Issues', icon: '△' },
+  { id: 'setup', label: 'Crawl Setup', icon: '▧' },
+  { id: 'links', label: 'Links', icon: '↗' },
+  { id: 'exports', label: 'Exports', icon: '□' },
+  { id: 'javascript', label: 'JavaScript', icon: '┼', disabled: true },
+  { id: 'sitemaps', label: 'Sitemaps', icon: '⊕', disabled: true },
   { id: 'performance', label: 'Performance', icon: '◉' },
 ]
 
@@ -46,7 +46,7 @@ export default function Sidebar({ currentRoute, onNavigate }: SidebarProps) {
         <div className="flex items-center gap-3 min-w-0">
           <div className="brand-mark" aria-hidden="true">☘</div>
           <h1 className="truncate text-[18px] font-bold leading-none tracking-normal text-primary-text">OpenCrawler</h1>
-          <span className="rounded-full border border-lumen bg-panel-dark px-2 py-0.5 text-[11px] font-semibold text-primary-muted">v1.0.0</span>
+          <span className="rounded-full border border-lumen bg-panel-dark px-2 py-0.5 text-[11px] font-semibold text-primary-muted">v0.1</span>
         </div>
       </div>
 
@@ -91,23 +91,24 @@ export default function Sidebar({ currentRoute, onNavigate }: SidebarProps) {
             <span>Projects</span>
             <span>⌄</span>
           </div>
-          {(projects.length ? projects : [{ id: 'demo', name: 'Aventerra Park', root_url: '', created_at: '', updated_at: '' }]).slice(0, 3).map((p) => (
+          {(projects.length > 0 ? projects.slice(0, 3).map((p) => (
             <div key={p.id} className={`mt-1 flex items-center justify-between rounded px-2 py-1.5 text-[13px] ${p.id === selectedProjectId ? 'bg-teal-bg text-primary-text' : 'text-primary-muted'}`}>
               <span className="truncate">▧ {p.name}</span>
               {p.id === selectedProjectId && <span className="text-emerald">●</span>}
             </div>
+          )) : (
+            <p className="mt-1 text-xs text-primary-muted px-2">No projects yet</p>
           ))}
         </button>
       </div>
 
       <div className="border-t border-lumen px-5 py-4">
         <div className="mb-3 flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#303941] text-sm font-bold text-primary-text">AD</div>
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#303941] text-sm font-bold text-primary-text">CD</div>
           <div className="min-w-0">
-            <div className="truncate text-sm font-semibold text-primary-text">Alex Developer</div>
-            <div className="truncate text-xs text-primary-muted">alex@example.com</div>
+            <div className="truncate text-sm font-semibold text-primary-text">CrawlDesk</div>
+            <div className="truncate text-xs text-primary-muted">{typeof window !== 'undefined' && window.crawldesk?.app?.getVersion ? 'Loading...' : 'v0.1'}</div>
           </div>
-          <span className="ml-auto text-primary-muted">⌄</span>
         </div>
         <button className="flex w-full items-center justify-between rounded-md border border-lumen bg-panel-dark px-3 py-2.5 text-sm text-primary-text">
           <span>◔ Dark Mode</span>

@@ -73,7 +73,7 @@ export default function ProjectOverview({ crawlId, onNavigate }: Props) {
         <div className="w-16 h-16 rounded-full bg-teal-bg/50 flex items-center justify-center mb-4">
           <span className="text-3xl text-teal-accent">⌂</span>
         </div>
-        <h2 className="text-xl font-bold text-primary-text mb-2">Welcome to LumenCrawl</h2>
+        <h2 className="text-xl font-bold text-primary-text mb-2">Welcome to CrawlDesk</h2>
         <p className="text-sm text-primary-muted max-w-md text-center mb-6">Start crawling websites locally with enterprise-grade SEO analysis. Create your first project to get started.</p>
         <button onClick={() => onNavigate?.('setup')} className="btn-primary py-3 px-6 text-base">Start New Crawl</button>
       </div>
@@ -91,7 +91,9 @@ export default function ProjectOverview({ crawlId, onNavigate }: Props) {
       {/* Page header */}
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-[30px] font-bold text-primary-text tracking-tight leading-none">{lastCrawl?.startUrl ? new URL(lastCrawl.startUrl).hostname : selectedProjectId}</h1>
+          <h1 className="text-[30px] font-bold text-primary-text tracking-tight leading-none">
+            {(() => { try { return lastCrawl?.startUrl ? new URL(lastCrawl.startUrl).hostname : selectedProjectId } catch { return selectedProjectId } })()}
+          </h1>
           <p className="text-sm text-primary-muted mt-1 font-normal">Technical health and crawl intelligence</p>
         </div>
         <div className="flex items-center gap-4">
@@ -107,11 +109,11 @@ export default function ProjectOverview({ crawlId, onNavigate }: Props) {
       {/* KPI Cards */}
       <div className="grid grid-cols-5 gap-4">
         {[
-          { label: 'Total URLs', value: totalUrls.toLocaleString(), icon: '#3b82f6', trend: '+1.2%', up: true },
-          { label: 'Indexable Pages', value: indexableCount.toLocaleString(), icon: '#10b981', trend: '+2.6%', up: true },
-          { label: 'Critical Issues', value: criticalIssues.toString(), icon: '#ef4444', trend: '-8.1%', up: false },
+          { label: 'Total URLs', value: totalUrls.toLocaleString(), icon: '#3b82f6', trend: '', up: true },
+          { label: 'Indexable Pages', value: indexableCount.toLocaleString(), icon: '#10b981', trend: '', up: true },
+          { label: 'Critical Issues', value: criticalIssues.toString(), icon: '#ef4444', trend: '', up: false },
           { label: 'Avg Response Time', value: avgResponseTime ? `${avgResponseTime} ms` : '-', icon: '#3b82f6', trend: '', up: true },
-          { label: 'Health Score', value: `${healthScore}/100`, icon: '#10b981', trend: `+${Math.max(0, Math.floor((healthScore - 80)))}`, up: healthScore > 80 }
+          { label: 'Health Score', value: `${healthScore}/100`, icon: '#10b981', trend: '', up: healthScore > 80 }
         ].map(kpi => (
           <div key={kpi.label} className="kpi-card">
             <div className="flex items-center gap-2 mb-2">
@@ -131,7 +133,7 @@ export default function ProjectOverview({ crawlId, onNavigate }: Props) {
       </div>
 
       {/* Two column layout */}
-      <div className="grid grid-cols-[920px_390px] gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_390px] gap-4">
         {/* Left column - Chart card + URL table */}
         <div className="space-y-4">
           {/* Crawl Activity chart placeholder */}
@@ -155,10 +157,9 @@ export default function ProjectOverview({ crawlId, onNavigate }: Props) {
                     return <div key={depth} className="flex-1 rounded-sm group relative" style={{ height: `${h}px`, backgroundColor: '#14B8A6', opacity: 0.5 + (Number(count) / maxVal) * 0.5 }} title={`Depth ${depth}: ${count} URLs`}>
                       <div className="absolute -top-6 left-1/2 -translate-x-1/2 text-[10px] text-primary-muted font-medium opacity-0 group-hover:opacity-100 whitespace-nowrap pointer-events-none">{count} @ d{depth}</div>
                     </div>
-                  }) : Array.from({ length: 50 }).map((_, i) => {
-                    const h = Math.max(8, (Math.sin(i * 0.3) * 0.3 + 0.7) * 60 + Math.random() * 10)
-                    return <div key={i} className="flex-1 rounded-sm" style={{ height: `${h}px`, backgroundColor: '#14B8A6', opacity: 0.5 + (i / 50) * 0.5 }} />
-                  })}
+                  }) : (
+                    <div className="flex items-center justify-center w-full text-xs text-primary-muted py-2">No depth data available</div>
+                  )}
                 </div>
               </div>
             </div>

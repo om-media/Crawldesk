@@ -30,7 +30,7 @@ export default function IssuesScreen() {
   const severityConfig = [
     { k: 'critical', label: 'Critical', color: '#ef4444' },
     { k: 'high', label: 'High', color: '#f59e0b' },
-    { k: 'medium', label: 'Medium', color: '#f59e0b' },
+    { k: 'medium', label: 'Medium', color: '#fb923c' },
     { k: 'low', label: 'Low', color: '#3b82f6' },
   ]
 

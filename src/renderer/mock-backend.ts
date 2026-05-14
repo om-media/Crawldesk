@@ -109,6 +109,10 @@ export function setupMockCrawldesk() {
         await delay()
         const idx = MOCK_PROJECTS.findIndex(p => p.id === id)
         if (idx >= 0) MOCK_PROJECTS.splice(idx, 1)
+        // Also clean up associated crawls
+        for (let i = MOCK_CRAWLS.length - 1; i >= 0; i--) {
+          if (MOCK_CRAWLS[i].project_id === id) MOCK_CRAWLS.splice(i, 1)
+        }
       },
     },
     crawls: {
@@ -177,7 +181,16 @@ export function setupMockCrawldesk() {
       summarize: async () => { await delay(); return MOCK_URL_SUMMARY },
     },
     issues: {
-      summarize: async () => { await delay(); return MOCK_ISSUES },
+      summarize: async () => {
+        await delay()
+        // Return proper summary objects (issue_type, severity, count)
+        return [
+          { issue_type: 'missing_title', severity: 'high', category: 'content', count: 3, label: 'Missing Title Tag', explanation: 'Pages have no title tag', recommendation: 'Add descriptive title tags' },
+          { issue_type: 'duplicate_title', severity: 'medium', category: 'content', count: 5, label: 'Duplicate Title Tag', explanation: 'Multiple pages share the same title', recommendation: 'Make each title unique' },
+          { issue_type: 'missing_meta_description', severity: 'medium', category: 'seo', count: 4, label: 'Missing Meta Description', explanation: 'Pages have no meta description', recommendation: 'Add meta descriptions' },
+          { issue_type: 'broken_internal_link', severity: 'critical', category: 'links', count: 2, label: 'Broken Internal Link', explanation: 'Internal links return 404', recommendation: 'Fix or remove broken links' },
+        ]
+      },
       list: async (input: any) => {
         await delay()
         return { items: MOCK_ISSUES, total: MOCK_ISSUES.length }
@@ -206,7 +219,7 @@ export function setupMockCrawldesk() {
       getVersion: async () => '0.1.0-mock',
       getDataPath: async () => '/tmp/crawldesk-mock',
       openExternalUrl: async () => { console.log('[Mock] Open external URL') },
-      openPath: async () => { console.log('[Mock] Open path') },
+      openPath: async () => { throw new Error('Open path is not implemented in mock mode') },
     },
     keywords: { analyze: async () => ([]), },
     clusters: { find: async () => ([]), },

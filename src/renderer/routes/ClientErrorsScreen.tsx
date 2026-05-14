@@ -28,7 +28,7 @@ export default function ClientErrorsScreen() {
       let sortField = sortByPriority ? 'inlink_count' : 'url'
       if (statusFilter === 'other') {
         // Fetch all 4xx then filter client-side for non-standard codes
-        const result = await window.crawldesk.urls.list({ crawlId: activeCrawlId, page: 0, pageSize: 10000, sort: { field: sortField, direction: 'desc' }, filters })
+        const result = await window.crawldesk.urls.list({ crawlId: activeCrawlId, page: 0, pageSize: 500, sort: { field: sortField, direction: 'desc' }, filters })
         const others = (result.items || []).filter((u: UrlRecord) => ![403, 404, 410].includes(u.status_code ?? 0))
         setUrls(others)
         setTotal(others.length)
@@ -90,7 +90,7 @@ export default function ClientErrorsScreen() {
       {/* Status filter tabs */}
       <div className="flex gap-2 mb-4 flex-wrap">
         {tabs.map(tab => (
-          <button key={tab.key} onClick={() => setStatusFilter(tab.key)} className={`!px-4 !py-1.5 rounded-full text-sm transition-colors ${statusFilter === tab.key ? 'bg-teal-bg border border-lumen text-teal-accent' : 'bg-panel-dark text-primary-muted hover:text-primary-text'}`}>
+          <button key={tab.key} onClick={() => { setStatusFilter(tab.key); setPage(0) }} className={`!px-4 !py-1.5 rounded-full text-sm transition-colors ${statusFilter === tab.key ? 'bg-teal-bg border border-lumen text-teal-accent' : 'bg-panel-dark text-primary-muted hover:text-primary-text'}`}>
             {tab.label}
           </button>
         ))}
