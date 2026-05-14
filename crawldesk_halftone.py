@@ -1,3 +1,4 @@
+"""Generate halftone animation for CrawlDesk branding."""
 #!/usr/bin/env python3
 """Animated halftone Crawldesk GIF — character density art."""
 

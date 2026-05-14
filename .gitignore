@@ -8,6 +8,9 @@ Thumbs.db
 
 # Tauri build output
 src-tauri/target/
+src-tauri/gen/
+src-tauri/icons/
+crawldesk_halftone.gif
 
 # Old Electron source (no longer maintained)
 main/

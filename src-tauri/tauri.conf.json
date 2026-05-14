@@ -25,7 +25,11 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["deb", "appimage", "nsis"],
+    "targets": [
+      "deb",
+      "appimage",
+      "nsis"
+    ],
     "icon": [
       "icons/icon.png",
       "icons/128x128.png",
@@ -33,5 +37,10 @@
       "icons/16x16.png",
       "icons/icon.ico"
     ]
+  },
+  "package": {
+    "info": {
+      "description": "Local-first desktop SEO crawler"
+    }
   }
 }
