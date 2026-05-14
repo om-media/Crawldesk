@@ -37,10 +37,5 @@
       "icons/16x16.png",
       "icons/icon.ico"
     ]
-  },
-  "package": {
-    "info": {
-      "description": "Local-first desktop SEO crawler"
-    }
   }
 }
