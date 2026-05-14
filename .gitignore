@@ -19,7 +19,15 @@ preload/**/*.js.map
 
 # Agent config (local only)
 AGENTS.md
+CLAUDE.md
 docs/agents/
+
+# Project planning docs (local only, not for public repo)
+PRD.md
+HANDOVER.md
+DEVELOPER-SPEC.md
+PHASE2-TODO.md
+ARCHITECTURE.md
 
 # Hermes local config
 .hermes/
