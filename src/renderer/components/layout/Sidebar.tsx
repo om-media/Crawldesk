@@ -14,6 +14,8 @@ const projectNavItems: NavItem[] = [
   { id: 'overview', label: 'Overview', icon: '▦' },
   { id: 'results', label: 'All URLs', icon: '│' },
   { id: 'issues', label: 'Issues', icon: '△' },
+  { id: 'keywords', label: 'Keywords', icon: '#' },
+  { id: 'clusters', label: 'Clusters', icon: '◎' },
   { id: 'setup', label: 'Crawl Setup', icon: '▧' },
   { id: 'links', label: 'Links', icon: '↗' },
   { id: 'exports', label: 'Exports', icon: '□' },
