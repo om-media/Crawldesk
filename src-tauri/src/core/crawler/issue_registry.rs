@@ -546,9 +546,10 @@ impl IssueType {
     }
 }
 
-pub fn issue(issue_type: IssueType, message: impl Into<String>, details: Value) -> SeoIssue {
+pub fn issue(url: impl Into<String>, issue_type: IssueType, message: impl Into<String>, details: Value) -> SeoIssue {
     let definition = issue_type.definition();
     SeoIssue {
+        url: url.into(),
         issue_type: definition.id.to_string(),
         severity: definition.severity,
         category: definition.category,
@@ -558,6 +559,7 @@ pub fn issue(issue_type: IssueType, message: impl Into<String>, details: Value) 
 }
 
 pub fn issue_with(
+    url: impl Into<String>,
     issue_type: IssueType,
     severity: IssueSeverity,
     category: IssueCategory,
@@ -566,6 +568,7 @@ pub fn issue_with(
 ) -> SeoIssue {
     let definition = issue_type.definition();
     SeoIssue {
+        url: url.into(),
         issue_type: definition.id.to_string(),
         severity,
         category,
@@ -647,6 +650,7 @@ mod tests {
     #[test]
     fn builder_uses_registry_defaults() {
         let detected = issue(
+            "https://example.com",
             IssueType::MissingMetaDescription,
             "Missing meta description",
             serde_json::json!({"url": "https://example.com"}),
@@ -664,6 +668,7 @@ mod tests {
     #[test]
     fn builder_can_preserve_detector_specific_overrides() {
         let detected = issue_with(
+            "https://example.com",
             IssueType::MissingH1,
             IssueSeverity::Warning,
             IssueCategory::Structure,
@@ -679,6 +684,7 @@ mod tests {
     #[test]
     fn builder_preserves_detector_specific_recommendation() {
         let detected = issue(
+            "https://example.com",
             IssueType::TitleTooShort,
             "Title too short",
             serde_json::json!({

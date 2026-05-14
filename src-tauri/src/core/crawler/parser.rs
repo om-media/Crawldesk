@@ -1,6 +1,6 @@
 //! HTML parser — extracts links, meta tags, structured data, and SEO fields from page content.
 
-use super::models::{ExtractedLink, LinkType, SeoData};
+use super::models::{ExtractedLink, HreflangLink, LinkType, SeoData};
 use super::normalizer::{are_same_url, extract_hostname, resolve_url};
 use crate::core::crawler::sitemap;
 use scraper::{Html, Selector};
@@ -212,9 +212,17 @@ pub fn parse_html(base_url: &str, html: &str) -> SeoData {
     }
 
     // Extract hreflang links
-    for el in document.select(&Selector::parse("link[rel='alternate'][hreflang]").unwrap()) {
+    for el in document.select(&Selector::parse("link[rel~='alternate'][hreflang]").unwrap()) {
         if let Some(hreflang) = el.value().attr("hreflang") {
             seo_data.hreflang_alternates.push(hreflang.to_string());
+            if let Some(href) = el.value().attr("href") {
+                if let Some(resolved) = resolve_url(base_url, href) {
+                    seo_data.hreflang_links.push(HreflangLink {
+                        hreflang: hreflang.to_string(),
+                        href: resolved,
+                    });
+                }
+            }
         }
     }
 
@@ -382,5 +390,27 @@ mod tests {
             amp.canonical_url.as_deref(),
             Some("https://example.com/page")
         );
+    }
+
+    #[test]
+    fn parse_html_extracts_hreflang_targets() {
+        let seo = parse_html(
+            "https://example.com/en/page",
+            r#"
+            <html>
+              <head>
+                <link rel="alternate" hreflang="de" href="/de/page">
+                <link rel="alternate external" hreflang="x-default" href="https://example.com/">
+              </head>
+            </html>
+            "#,
+        );
+
+        assert_eq!(seo.hreflang_alternates, vec!["de", "x-default"]);
+        assert_eq!(seo.hreflang_links.len(), 2);
+        assert_eq!(seo.hreflang_links[0].hreflang, "de");
+        assert_eq!(seo.hreflang_links[0].href, "https://example.com/de/page");
+        assert_eq!(seo.hreflang_links[1].hreflang, "x-default");
+        assert_eq!(seo.hreflang_links[1].href, "https://example.com/");
     }
 }

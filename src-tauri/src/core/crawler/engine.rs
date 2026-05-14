@@ -618,6 +618,7 @@ mod tests {
             ],
             issues: vec![
                 SeoIssue {
+                    url: "https://example.com/page".to_string(),
                     issue_type: "missing_meta_description".to_string(),
                     severity: IssueSeverity::Warning,
                     category: IssueCategory::Content,

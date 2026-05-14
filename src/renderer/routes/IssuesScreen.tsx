@@ -2,6 +2,7 @@
  * Issue definitions screen — lists all known SEO issue types from the registry
  * with severity badges, category chips, and detailed recommendations.
  */
+import { useEffect, useState } from 'react'
 import { useProjectStore } from '../stores/project-store'
 import ErrorBanner from '../components/ErrorBanner'
 import type { IssueCategory, IssueDefinition, IssueRecord, IssueSummary as IssueType, Severity } from '@shared/types/issue'
@@ -19,7 +20,7 @@ export default function IssuesScreen() {
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>('all')
   const [searchTerm, setSearchTerm] = useState('')
   const [exportMessage, setExportMessage] = useState<string | null>(null)
-  const [affectedUrls, setAffectedUrls] = useState<any[]>([])
+  const [affectedUrls, setAffectedUrls] = useState<IssueRecord[]>([])
   const [affectedTotal, setAffectedTotal] = useState(0)
   const [affectedPage, setAffectedPage] = useState(0)
   const [affectedLoading, setAffectedLoading] = useState(false)
@@ -115,7 +116,7 @@ export default function IssuesScreen() {
     }
   }
 
-  function parseDetails(issue: IssueRecord | null) {
+  function parseDetails(issue: IssueRecord | null): Record<string, unknown> {
     if (!issue?.details_json) return {}
     try {
       const parsed = JSON.parse(issue.details_json)
@@ -147,7 +148,9 @@ export default function IssuesScreen() {
   const counts: Record<Severity, number> = { critical: 0, warning: 0, info: 0 }
   for (const i of issues) counts[i.severity as keyof typeof counts] += i.count
 
-  const categories = Array.from(new Set(issues.map(i => i.category).filter(Boolean))).sort()
+  const categories: IssueCategory[] = Array.from(
+    new Set(issues.map((issue) => issue.category).filter((category): category is IssueCategory => Boolean(category)))
+  ).sort()
   const normalizedSearch = searchTerm.trim().toLowerCase()
   const filteredIssues = issues.filter(i => {
     const severityMatches = severityFilter === 'all' || i.severity === severityFilter
@@ -298,7 +301,7 @@ export default function IssuesScreen() {
                       <p className="text-xs text-primary-muted py-2">Click to load affected URLs</p>
                     ) : (
                       <div className="max-h-[240px] overflow-y-auto space-y-1">
-                        {affectedUrls.map((u, idx) => (
+                        {affectedUrls.map((u: IssueRecord, idx: number) => (
                           <button
                             key={u.id || idx}
                             type="button"

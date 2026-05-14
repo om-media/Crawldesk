@@ -291,6 +291,11 @@ function setupCrawldesk() {
         const result = await invoke('get_issue_details', { issueId: toId(issueId) })
         return result ? normalizeIssueRecord(result) : null
       },
+      /** Run post-crawl cross-page analysis (duplicate titles, canonical clusters, etc.). */
+      runPostCrawl: async (crawlId: string) => {
+        const result = await invoke<number>('run_post_crawl', { crawlId: toId(crawlId) })
+        return result
+      },
     },
     links: {
       list: async (input: any) => {

@@ -253,17 +253,24 @@ pub async fn start_crawl(
                     warn!("Failed to shut down writer: {}", e);
                 }
 
+                let mut post_crawl_issues = 0i64;
+
                 // Update crawl counters in database
-                if let Ok(conn) = db::get_connection() {
+                if let Ok(mut conn) = db::get_connection() {
+                    // Aggregate inlinks_count for all URLs in this crawl before post-crawl detectors.
+                    let _ = crate::core::storage::queries::update_inlinks_counts(&conn, crawl_id);
+                    match crate::commands::issue::run_post_crawl_for_connection(&mut conn, crawl_id)
+                    {
+                        Ok(count) => post_crawl_issues = count,
+                        Err(e) => warn!("Post-crawl analysis failed for crawl {}: {}", crawl_id, e),
+                    }
                     let _ = crate::core::storage::queries::update_crawl_counters(
                         &conn,
                         crawl_id,
                         *total_crawled as i64,
-                        *total_issues as i64,
+                        *total_issues as i64 + post_crawl_issues,
                         *total_links as i64,
                     );
-                    // Aggregate inlinks_count for all URLs in this crawl
-                    let _ = crate::core::storage::queries::update_inlinks_counts(&conn, crawl_id);
                     let _ = crate::core::storage::queries::update_crawl_status(
                         &conn,
                         crawl_id,
@@ -272,7 +279,7 @@ pub async fn start_crawl(
                 }
 
                 let total_crawled_i64 = *total_crawled as i64;
-                let total_issues_i64 = *total_issues as i64;
+                let total_issues_i64 = *total_issues as i64 + post_crawl_issues;
                 let total_links_i64 = *total_links as i64;
                 let elapsed_seconds = *elapsed_ms as f64 / 1000.0;
 

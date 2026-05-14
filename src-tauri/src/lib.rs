@@ -65,6 +65,7 @@ pub fn run() {
             commands::issue::query_issues,
             commands::issue::get_issue_details,
             commands::issue::get_issue_definitions,
+            commands::issue::run_post_crawl,
             // Link commands
             commands::link::query_links,
             commands::link::summarize_links,

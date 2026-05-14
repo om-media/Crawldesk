@@ -45,6 +45,7 @@ fn detect_missing_title(
                 .unwrap_or(true)
         {
             issues.push(issue(
+                &fetch_result.final_url,
                 IssueType::MissingTitle,
                 "Page has no title tag or it is empty",
                 serde_json::json!({"url": fetch_result.final_url}),
@@ -62,6 +63,7 @@ fn detect_title_too_long(
         let len = title.chars().count();
         if len > 60 {
             issues.push(issue(
+                &fetch_result.final_url,
                 IssueType::TitleTooLong,
                 format!("Title is {} characters (recommended: 50-60)", len),
                 serde_json::json!({"length": len, "url": fetch_result.final_url}),
@@ -84,6 +86,7 @@ fn detect_missing_meta_description(
                 .unwrap_or(true)
         {
             issues.push(issue(
+                &fetch_result.final_url,
                 IssueType::MissingMetaDescription,
                 "Page has no meta description tag or it is empty",
                 serde_json::json!({"url": fetch_result.final_url}),
@@ -101,6 +104,7 @@ fn detect_meta_description_too_long(
         let len = desc.chars().count();
         if len > 160 {
             issues.push(issue(
+                &fetch_result.final_url,
                 IssueType::MetaDescriptionTooLong,
                 format!(
                     "Meta description is {} characters (recommended: 150-160)",
@@ -115,6 +119,7 @@ fn detect_meta_description_too_long(
 fn detect_missing_h1(fetch_result: &FetchResult, seo_data: &SeoData, issues: &mut Vec<SeoIssue>) {
     if !seo_data.has_h1 {
         issues.push(issue(
+            &fetch_result.final_url,
             IssueType::MissingH1,
             "Page has no H1 heading",
             serde_json::json!({"url": fetch_result.final_url}),
@@ -125,6 +130,7 @@ fn detect_missing_h1(fetch_result: &FetchResult, seo_data: &SeoData, issues: &mu
 fn detect_multiple_h1(fetch_result: &FetchResult, seo_data: &SeoData, issues: &mut Vec<SeoIssue>) {
     if seo_data.h1_count > 1 {
         issues.push(issue(
+            &fetch_result.final_url,
             IssueType::MultipleH1,
             format!(
                 "Page has {} H1 headings (recommended: 1)",
@@ -141,6 +147,7 @@ fn detect_missing_h2(fetch_result: &FetchResult, seo_data: &SeoData, issues: &mu
     } else if seo_data.has_h1 && seo_data.word_count.map(|w| w > 50).unwrap_or(false) {
         // Long page with H1 but no H2 — suspicious
         issues.push(issue(
+            &fetch_result.final_url,
             IssueType::MissingH2,
             "Long page has H1 but no H2 headings",
             serde_json::json!({"word_count": seo_data.word_count.unwrap_or(0), "url": fetch_result.final_url}),
@@ -151,6 +158,7 @@ fn detect_missing_h2(fetch_result: &FetchResult, seo_data: &SeoData, issues: &mu
 fn detect_noindex(fetch_result: &FetchResult, seo_data: &SeoData, issues: &mut Vec<SeoIssue>) {
     if seo_data.noindex && fetch_result.status_code >= 200 && fetch_result.status_code < 400 {
         issues.push(issue(
+            &fetch_result.final_url,
             IssueType::Noindex,
             "Page has noindex meta tag — not indexed by search engines",
             serde_json::json!({"url": fetch_result.final_url}),
@@ -169,6 +177,7 @@ fn detect_non_200_status(fetch_result: &FetchResult, issues: &mut Vec<SeoIssue>)
         };
 
         let mut detected = issue(
+            &fetch_result.final_url,
             IssueType::Non200Status,
             format!("HTTP status code: {}", fetch_result.status_code),
             serde_json::json!({"status_code": fetch_result.status_code, "url": fetch_result.final_url}),
@@ -181,6 +190,7 @@ fn detect_non_200_status(fetch_result: &FetchResult, issues: &mut Vec<SeoIssue>)
 fn detect_slow_response(fetch_result: &FetchResult, issues: &mut Vec<SeoIssue>) {
     if fetch_result.response_time_ms > 3000.0 {
         issues.push(issue(
+            &fetch_result.final_url,
             IssueType::SlowResponse,
             format!("Response time {:.0}ms exceeds 3s threshold", fetch_result.response_time_ms),
             serde_json::json!({"response_time_ms": fetch_result.response_time_ms, "url": fetch_result.final_url}),
@@ -196,12 +206,14 @@ fn detect_missing_canonical(
     if !seo_data.noindex && fetch_result.status_code >= 200 && fetch_result.status_code < 400 {
         if seo_data.canonical_url.is_none() {
             issues.push(issue(
+                &fetch_result.final_url,
                 IssueType::MissingCanonical,
                 "Page has no canonical tag",
                 serde_json::json!({"url": fetch_result.final_url}),
             ));
         } else if !seo_data.self_referencing_canonical {
             issues.push(issue(
+                &fetch_result.final_url,
                 IssueType::NonSelfReferencingCanonical,
                 "Canonical URL points to a different URL",
                 serde_json::json!({
@@ -223,6 +235,7 @@ fn detect_images_without_alt(
             / (seo_data.images_without_alt + seo_data.images_with_alt) as f64;
         if ratio < 0.8 && seo_data.image_count > 2 {
             issues.push(issue(
+                &fetch_result.final_url,
                 IssueType::ImagesWithoutAlt,
                 format!(
                     "{} of {} images have no alt text ({:.0}%)",

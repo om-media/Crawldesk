@@ -29,7 +29,13 @@ export default function LiveCrawl({ onCompleted }: Props) {
         if (event.crawlId && String(event.crawlId) !== String(activeCrawlId)) return
         setStatus(event.status)
         if (event.status === 'failed') setError('Crawl failed. Check logs for details.')
-        if (event.status === 'completed') onCompleted()
+        if (event.status === 'completed') {
+          // Trigger post-crawl cross-page analysis (duplicate titles, canonical clusters, etc.)
+          window.crawldesk.issues.runPostCrawl?.(String(activeCrawlId))
+            .then((count: number) => { if (count > 0) console.log(`[LiveCrawl] Post-crawl analysis found ${count} cross-page issues`) })
+            .catch((e: any) => console.warn('[LiveCrawl] Post-crawl analysis failed or not available:', e?.message))
+          onCompleted()
+        }
       })
       return () => { unsub1(); unsub2() }
     } catch (e: any) {

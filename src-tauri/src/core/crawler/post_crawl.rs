@@ -67,6 +67,7 @@ pub fn run_post_crawl_analysis(
     detect_canonical_clusters(seo_data_map, &mut issues);
     detect_redirect_chains(seo_data_map, &mut issues);
     detect_amp_cross_page_issues(seo_data_map, &mut issues);
+    detect_hreflang_cross_page_issues(seo_data_map, fetch_results, &mut issues);
 
     info!("Post-crawl analysis: {} issues found", issues.len());
 
@@ -93,6 +94,7 @@ fn detect_canonical_issues(url: &str, seo: &SeoData, issues: &mut Vec<SeoIssue>)
     // --- No canonical tag ---
     if seo.canonical_url.is_none() || seo.canonical_url.as_ref().map_or(true, |c| c.is_empty()) {
         issues.push(issue_with(
+            url,
             IssueType::NoCanonicalTag,
             IssueSeverity::Warning,
             IssueCategory::Technical,
@@ -125,6 +127,7 @@ fn detect_canonical_issues(url: &str, seo: &SeoData, issues: &mut Vec<SeoIssue>)
                 .map_or(String::new(), |h| h.to_lowercase())
     }) {
         issues.push(issue_with(
+            url,
             IssueType::ExternalCanonical,
             IssueSeverity::Critical,
             IssueCategory::Technical,
@@ -145,6 +148,7 @@ fn detect_canonical_issues(url: &str, seo: &SeoData, issues: &mut Vec<SeoIssue>)
     let canon_norm = canon_url.to_string().trim_end_matches('/').to_lowercase();
     if canon_norm != page_norm {
         issues.push(issue_with(
+            url,
             IssueType::CanonicalizedUrl,
             IssueSeverity::Warning,
             IssueCategory::Technical,
@@ -173,6 +177,7 @@ fn detect_content_issues(url: &str, seo: &SeoData, issues: &mut Vec<SeoIssue>) {
             let len = t.chars().count();
             if len > 60 {
                 issues.push(issue_with(
+                    url,
                     IssueType::TitleTooLong,
                     IssueSeverity::Info,
                     IssueCategory::Content,
@@ -189,6 +194,7 @@ fn detect_content_issues(url: &str, seo: &SeoData, issues: &mut Vec<SeoIssue>) {
             }
             if len < 30 {
                 issues.push(issue_with(
+                    url,
                     IssueType::TitleTooShort,
                     IssueSeverity::Info,
                     IssueCategory::Content,
@@ -207,6 +213,7 @@ fn detect_content_issues(url: &str, seo: &SeoData, issues: &mut Vec<SeoIssue>) {
         _ => {
             // None or empty string
             issues.push(issue_with(
+                url,
                 IssueType::MissingTitle,
                 IssueSeverity::Critical,
                 IssueCategory::Content,
@@ -225,6 +232,7 @@ fn detect_content_issues(url: &str, seo: &SeoData, issues: &mut Vec<SeoIssue>) {
             let len = d.chars().count();
             if len > 160 {
                 issues.push(issue_with(
+                    url,
                     IssueType::MetaDescriptionTooLong,
                     IssueSeverity::Info,
                     IssueCategory::Content,
@@ -238,6 +246,7 @@ fn detect_content_issues(url: &str, seo: &SeoData, issues: &mut Vec<SeoIssue>) {
             }
             if len < 70 {
                 issues.push(issue_with(
+                    url,
                     IssueType::MetaDescriptionTooShort,
                     IssueSeverity::Info,
                     IssueCategory::Content,
@@ -253,6 +262,7 @@ fn detect_content_issues(url: &str, seo: &SeoData, issues: &mut Vec<SeoIssue>) {
         _ => {
             // None or empty string
             issues.push(issue_with(
+                url,
                 IssueType::MissingMetaDescription,
                 IssueSeverity::Warning,
                 IssueCategory::Content,
@@ -268,6 +278,7 @@ fn detect_content_issues(url: &str, seo: &SeoData, issues: &mut Vec<SeoIssue>) {
     // --- H1 checks ---
     if !seo.has_h1 || seo.h1_count == 0 {
         issues.push(issue_with(
+            url,
             IssueType::MissingH1,
             IssueSeverity::Warning,
             IssueCategory::Structure,
@@ -279,6 +290,7 @@ fn detect_content_issues(url: &str, seo: &SeoData, issues: &mut Vec<SeoIssue>) {
         ));
     } else if seo.h1_count > 1 {
         issues.push(issue_with(
+            url,
             IssueType::MultipleH1,
             IssueSeverity::Info,
             IssueCategory::Structure,
@@ -294,6 +306,7 @@ fn detect_content_issues(url: &str, seo: &SeoData, issues: &mut Vec<SeoIssue>) {
     // --- Missing H2 (port of content-detector missing_h2) ---
     if seo.headings_h2.is_empty() && seo.word_count.map_or(false, |w| w > 0) {
         issues.push(issue_with(
+            url,
             IssueType::MissingH2,
             IssueSeverity::Info,
             IssueCategory::Structure,
@@ -315,6 +328,7 @@ fn detect_content_issues(url: &str, seo: &SeoData, issues: &mut Vec<SeoIssue>) {
     }) || seo.noindex;
     if is_noindex {
         issues.push(issue_with(
+            url,
             IssueType::ImportantPageNoindex,
             IssueSeverity::Critical,
             IssueCategory::Technical,
@@ -348,6 +362,7 @@ fn detect_non_sequential_headings(url: &str, seo: &SeoData, issues: &mut Vec<Seo
         if *level > prev_level + 1 {
             let from_level = if prev_level < 0 { 0 } else { prev_level };
             issues.push(issue_with(
+                url,
                 IssueType::HeadingNonSequential,
                 IssueSeverity::Warning,
                 IssueCategory::Structure,
@@ -390,6 +405,7 @@ fn detect_hreflang_issues(url: &str, seo: &SeoData, issues: &mut Vec<SeoIssue>) 
     for (lang, count) in &lang_counts {
         if *count > 1 {
             issues.push(issue_with(
+                url,
                 IssueType::HreflangDuplicateLang,
                 IssueSeverity::Critical,
                 IssueCategory::Internationalization,
@@ -413,6 +429,7 @@ fn detect_hreflang_issues(url: &str, seo: &SeoData, issues: &mut Vec<SeoIssue>) 
     for lang in &seo.hreflang_alternates {
         if !valid_lang_re.is_match(lang) && lang != "*" {
             issues.push(issue_with(
+                url,
                 IssueType::HreflangInvalidCode,
                 IssueSeverity::Warning,
                 IssueCategory::Internationalization,
@@ -426,6 +443,80 @@ fn detect_hreflang_issues(url: &str, seo: &SeoData, issues: &mut Vec<SeoIssue>) 
                     "recommendation": "Use ISO 639-1 language codes (e.g., \"en\", \"de\") with optional region (e.g., \"en-US\")."
                 }),
             ));
+        }
+    }
+}
+
+fn detect_hreflang_cross_page_issues(
+    seo_data_map: &HashMap<String, SeoData>,
+    fetch_results: &HashMap<String, FetchResult>,
+    issues: &mut Vec<SeoIssue>,
+) {
+    for (source_url, seo) in seo_data_map {
+        for link in &seo.hreflang_links {
+            let scheme_is_invalid = Url::parse(&link.href)
+                .map(|target| !matches!(target.scheme(), "http" | "https"))
+                .unwrap_or(true);
+
+            if scheme_is_invalid {
+                issues.push(issue_with(
+                    source_url.clone(),
+                    IssueType::HreflangInvalidTarget,
+                    IssueSeverity::Warning,
+                    IssueCategory::Internationalization,
+                    "Hreflang link points to a non-crawlable target URL.",
+                    serde_json::json!({
+                        "url": source_url,
+                        "hreflang": link.hreflang,
+                        "target_url": link.href,
+                        "recommendation": "Point hreflang tags only to canonical HTTP or HTTPS URLs."
+                    }),
+                ));
+                continue;
+            }
+
+            if let Some(fetch) = find_fetch_by_url(fetch_results, &link.href) {
+                if fetch.status_code >= 400 {
+                    issues.push(issue_with(
+                        source_url.clone(),
+                        IssueType::HreflangInvalidTarget,
+                        IssueSeverity::Warning,
+                        IssueCategory::Internationalization,
+                        format!("Hreflang target returned HTTP {}.", fetch.status_code),
+                        serde_json::json!({
+                            "url": source_url,
+                            "hreflang": link.hreflang,
+                            "target_url": link.href,
+                            "status_code": fetch.status_code,
+                            "recommendation": "Update hreflang targets so every alternate URL returns a successful status."
+                        }),
+                    ));
+                }
+            }
+
+            let Some((_target_url, target_seo)) = find_seo_by_url(seo_data_map, &link.href) else {
+                continue;
+            };
+            let has_reciprocal = target_seo
+                .hreflang_links
+                .iter()
+                .any(|target_link| are_same_url(&target_link.href, source_url));
+
+            if !has_reciprocal {
+                issues.push(issue_with(
+                    source_url.clone(),
+                    IssueType::HreflangMissingReciprocal,
+                    IssueSeverity::Warning,
+                    IssueCategory::Internationalization,
+                    "Hreflang target does not link back to this page.",
+                    serde_json::json!({
+                        "url": source_url,
+                        "hreflang": link.hreflang,
+                        "target_url": link.href,
+                        "recommendation": "Add reciprocal hreflang tags on every alternate page."
+                    }),
+                ));
+            }
         }
     }
 }
@@ -444,6 +535,7 @@ fn detect_amp_issues(url: &str, seo: &SeoData, issues: &mut Vec<SeoIssue>) {
             .is_none()
     {
         issues.push(issue_with(
+            url,
             IssueType::AmpMissingCanonical,
             IssueSeverity::Warning,
             IssueCategory::Technical,
@@ -464,6 +556,7 @@ fn detect_amp_issues(url: &str, seo: &SeoData, issues: &mut Vec<SeoIssue>) {
 
         if invalid_scheme || are_same_url(url, amp_url) {
             issues.push(issue_with(
+                url,
                 IssueType::AmpInvalidTarget,
                 IssueSeverity::Warning,
                 IssueCategory::Technical,
@@ -497,6 +590,7 @@ fn detect_amp_cross_page_issues(
 
         if !amp_seo.is_amp {
             issues.push(issue_with(
+                canonical_url,
                 IssueType::AmpInvalidTarget,
                 IssueSeverity::Warning,
                 IssueCategory::Technical,
@@ -516,6 +610,7 @@ fn detect_amp_cross_page_issues(
 
         if !are_same_url(amp_canonical, canonical_url) {
             issues.push(issue_with(
+                canonical_url,
                 IssueType::AmpCanonicalMismatch,
                 IssueSeverity::Warning,
                 IssueCategory::Technical,
@@ -541,6 +636,16 @@ fn find_seo_by_url<'a>(
         .map(|(url, seo)| (url.as_str(), seo))
 }
 
+fn find_fetch_by_url<'a>(
+    fetch_results: &'a HashMap<String, FetchResult>,
+    target_url: &str,
+) -> Option<&'a FetchResult> {
+    fetch_results
+        .iter()
+        .find(|(url, _fetch)| are_same_url(url, target_url))
+        .map(|(_, fetch)| fetch)
+}
+
 // ─────────────────────────────────────────────────────────────────
 // Image Detector
 // ─────────────────────────────────────────────────────────────────
@@ -551,6 +656,7 @@ fn detect_image_issues(url: &str, seo: &SeoData, issues: &mut Vec<SeoIssue>) {
     // --- Images missing alt attribute entirely ---
     if seo.images_without_alt > 0 {
         issues.push(issue_with(
+            url,
             IssueType::ImageMissingAltAttribute,
             IssueSeverity::Critical,
             IssueCategory::Content,
@@ -565,6 +671,7 @@ fn detect_image_issues(url: &str, seo: &SeoData, issues: &mut Vec<SeoIssue>) {
 
     if seo.images_missing_dimensions > 0 {
         issues.push(issue_with(
+            url,
             IssueType::ImageMissingDimensions,
             IssueSeverity::Info,
             IssueCategory::Performance,
@@ -582,6 +689,7 @@ fn detect_image_issues(url: &str, seo: &SeoData, issues: &mut Vec<SeoIssue>) {
 
     if seo.images_missing_lazy_loading > 0 {
         issues.push(issue_with(
+            url,
             IssueType::ImageMissingLazyLoading,
             IssueSeverity::Info,
             IssueCategory::Performance,
@@ -599,6 +707,7 @@ fn detect_image_issues(url: &str, seo: &SeoData, issues: &mut Vec<SeoIssue>) {
 
     if seo.total_image_size_kb > 1024.0 {
         issues.push(issue_with(
+            url,
             IssueType::ImageOversized,
             IssueSeverity::Warning,
             IssueCategory::Performance,
@@ -670,6 +779,7 @@ fn detect_security_issues(
 
     if !is_https {
         issues.push(issue_with(
+            url,
             IssueType::InsecureHttp,
             IssueSeverity::Critical,
             IssueCategory::Security,
@@ -683,6 +793,7 @@ fn detect_security_issues(
 
     if !has_header(fetch, "x-content-type-options") {
         issues.push(issue_with(
+            url,
             IssueType::MissingXContentTypeOptions,
             IssueSeverity::Warning,
             IssueCategory::Security,
@@ -697,6 +808,7 @@ fn detect_security_issues(
 
     if !has_header(fetch, "x-frame-options") && !csp_has_frame_ancestors(fetch) {
         issues.push(issue_with(
+            url,
             IssueType::MissingXFrameOptions,
             IssueSeverity::Warning,
             IssueCategory::Security,
@@ -711,6 +823,7 @@ fn detect_security_issues(
 
     if !has_header(fetch, "content-security-policy") {
         issues.push(issue_with(
+            url,
             IssueType::MissingCsp,
             IssueSeverity::Warning,
             IssueCategory::Security,
@@ -725,6 +838,7 @@ fn detect_security_issues(
 
     if !has_header(fetch, "referrer-policy") {
         issues.push(issue_with(
+            url,
             IssueType::MissingReferrerPolicy,
             IssueSeverity::Info,
             IssueCategory::Security,
@@ -740,6 +854,7 @@ fn detect_security_issues(
     if is_https {
         if !has_header(fetch, "strict-transport-security") {
             issues.push(issue_with(
+                url,
                 IssueType::MissingHsts,
                 IssueSeverity::Warning,
                 IssueCategory::Security,
@@ -755,6 +870,7 @@ fn detect_security_issues(
         if let Some(html) = &fetch.html_content {
             if html_contains_mixed_content(html) {
                 issues.push(issue_with(
+                    url,
                     IssueType::MixedContent,
                     IssueSeverity::Critical,
                     IssueCategory::Security,
@@ -836,6 +952,7 @@ fn detect_social_issues(url: &str, seo: &SeoData, issues: &mut Vec<SeoIssue>) {
     // --- Missing OG tags entirely ---
     if !has_any_og {
         issues.push(issue_with(
+            url,
             IssueType::MissingOgTags,
             IssueSeverity::Warning,
             IssueCategory::Social,
@@ -848,6 +965,7 @@ fn detect_social_issues(url: &str, seo: &SeoData, issues: &mut Vec<SeoIssue>) {
     } else if (!og_title.is_empty() || !og_desc.is_empty()) && og_image.is_empty() {
         // OG tags present but no image
         issues.push(issue_with(
+            url,
             IssueType::OgMissingImage,
             IssueSeverity::Info,
             IssueCategory::Social,
@@ -862,6 +980,7 @@ fn detect_social_issues(url: &str, seo: &SeoData, issues: &mut Vec<SeoIssue>) {
     // --- Missing Twitter Card ---
     if twitter_card.is_empty() {
         issues.push(issue_with(
+            url,
             IssueType::MissingTwitterCard,
             IssueSeverity::Info,
             IssueCategory::Social,
@@ -874,6 +993,7 @@ fn detect_social_issues(url: &str, seo: &SeoData, issues: &mut Vec<SeoIssue>) {
     } else if twitter_image.is_empty() {
         // Twitter card present but no image
         issues.push(issue_with(
+            url,
             IssueType::TwitterMissingImage,
             IssueSeverity::Info,
             IssueCategory::Social,
@@ -971,6 +1091,7 @@ fn detect_structured_data_issues(url: &str, seo: &SeoData, issues: &mut Vec<SeoI
 
             if !missing.is_empty() {
                 issues.push(issue_with(
+                    url,
                     structured_data_issue_type(schema_type, &missing),
                     IssueSeverity::Warning,
                     IssueCategory::Technical,
@@ -1022,6 +1143,7 @@ pub fn detect_link_graph_issues(data: &LinkGraphData) -> Vec<SeoIssue> {
             }
         }
         issues.push(issue_with(
+            url,
             IssueType::OrphanedPage,
             IssueSeverity::Critical,
             IssueCategory::Links,
@@ -1037,6 +1159,7 @@ pub fn detect_link_graph_issues(data: &LinkGraphData) -> Vec<SeoIssue> {
     // --- Anchor text over-optimization ---
     for (_target_id, source_url, anchor, pct) in &data.anchor_over_optimized {
         issues.push(issue_with(
+            source_url.clone(),
             IssueType::AnchorTextOverOptimized,
             IssueSeverity::Info,
             IssueCategory::Links,
@@ -1056,6 +1179,7 @@ pub fn detect_link_graph_issues(data: &LinkGraphData) -> Vec<SeoIssue> {
     // --- Internal links to 4xx ---
     for (url_id, source_url, count) in &data.links_to_4xx {
         issues.push(issue_with(
+            source_url.clone(),
             IssueType::InternalLinkTo4xx,
             IssueSeverity::Warning,
             IssueCategory::Links,
@@ -1095,6 +1219,7 @@ pub fn detect_pagination_issues(data: &PaginationData) -> Vec<SeoIssue> {
         if let Some(next_url) = next {
             if !data.crawled_urls.contains(&next_url.to_lowercase()) {
                 issues.push(issue_with(
+                    url,
                     IssueType::BrokenPaginationChain,
                     IssueSeverity::Warning,
                     IssueCategory::Links,
@@ -1114,6 +1239,7 @@ pub fn detect_pagination_issues(data: &PaginationData) -> Vec<SeoIssue> {
         if let Some(prev_url) = prev {
             if !data.crawled_urls.contains(&prev_url.to_lowercase()) {
                 issues.push(issue_with(
+                    url,
                     IssueType::BrokenPaginationChain,
                     IssueSeverity::Warning,
                     IssueCategory::Links,
@@ -1135,6 +1261,7 @@ pub fn detect_pagination_issues(data: &PaginationData) -> Vec<SeoIssue> {
     // --- Missing pagination canonical ---
     for (url_id, url) in &data.paginated_without_canonical {
         issues.push(issue_with(
+            url,
             IssueType::MissingPaginationCanonical,
             IssueSeverity::Info,
             IssueCategory::Technical,
@@ -1188,6 +1315,7 @@ pub fn detect_sitemap_comparison_issues(data: &SitemapComparisonData) -> Vec<Seo
 
     for url in &not_crawled {
         issues.push(issue_with(
+            (*url).clone(),
             IssueType::SitemapUrlNotCrawled,
             IssueSeverity::Info,
             IssueCategory::Technical,
@@ -1206,6 +1334,7 @@ pub fn detect_sitemap_comparison_issues(data: &SitemapComparisonData) -> Vec<Seo
     for (id, url) in &data.indexable_pages {
         if !sitemap_lower.contains(&url.to_lowercase()) {
             issues.push(issue_with(
+                url,
                 IssueType::CrawledUrlMissingFromSitemap,
                 IssueSeverity::Warning,
                 IssueCategory::Technical,
@@ -1225,6 +1354,7 @@ pub fn detect_sitemap_comparison_issues(data: &SitemapComparisonData) -> Vec<Seo
     // --- Sitemap URLs returning error status ---
     for (id, url, status_code) in &data.sitemap_error_pages {
         issues.push(issue_with(
+            url,
             IssueType::SitemapUrlErrorStatus,
             IssueSeverity::Critical,
             IssueCategory::Technical,
@@ -1261,6 +1391,7 @@ fn detect_duplicate_titles(seo_data_map: &HashMap<String, SeoData>, issues: &mut
     for (title, urls) in title_map {
         if urls.len() > 1 {
             issues.push(issue_with(
+                urls[0].clone(),
                 IssueType::DuplicateTitle,
                 IssueSeverity::Warning,
                 IssueCategory::Content,
@@ -1293,6 +1424,7 @@ fn detect_duplicate_meta_descriptions(
     for (desc, urls) in desc_map {
         if urls.len() > 1 {
             issues.push(issue_with(
+                urls[0].clone(),
                 IssueType::DuplicateMetaDescription,
                 IssueSeverity::Warning,
                 IssueCategory::Content,
@@ -1320,6 +1452,7 @@ fn detect_content_duplicates(seo_data_map: &HashMap<String, SeoData>, issues: &m
         if urls.len() > 1 {
             let hash_preview = if hash.len() >= 8 { &hash[..8] } else { &hash };
             issues.push(issue_with(
+                urls[0].clone(),
                 IssueType::DuplicateContent,
                 IssueSeverity::Critical,
                 IssueCategory::Content,
@@ -1343,6 +1476,7 @@ fn detect_redirect_chains(seo_data_map: &HashMap<String, SeoData>, issues: &mut 
         if let Some(final_url) = &seo.final_url {
             if !final_url.is_empty() && final_url != url {
                 issues.push(issue_with(
+                    url,
                     IssueType::RedirectChain,
                     IssueSeverity::Warning,
                     IssueCategory::Links,
@@ -1375,6 +1509,7 @@ fn detect_canonical_clusters(seo_data_map: &HashMap<String, SeoData>, issues: &m
     for (canonical, urls) in canonical_map {
         if urls.len() > 2 {
             issues.push(issue_with(
+                urls[0].clone(),
                 IssueType::CanonicalCluster,
                 IssueSeverity::Warning,
                 IssueCategory::Technical,
@@ -1426,6 +1561,7 @@ mod tests {
             structured_data_json: vec![],
             has_schema_org: false,
             hreflang_alternates: vec![],
+            hreflang_links: vec![],
             amp_html_url: None,
             is_amp: false,
             self_referencing_canonical: false,
@@ -1465,6 +1601,98 @@ mod tests {
             html_content: html.map(str::to_string),
             error_message: None,
         }
+    }
+
+    struct DetectorFixture {
+        seo_data_map: HashMap<String, SeoData>,
+        fetch_results: HashMap<String, FetchResult>,
+    }
+
+    impl DetectorFixture {
+        fn from_html(url: &str, html: &str) -> Self {
+            let seo = crate::core::crawler::parser::parse_html(url, html);
+            let fetch = FetchResult {
+                final_url: url.to_string(),
+                requested_url: url.to_string(),
+                html_content: Some(html.to_string()),
+                content_length: Some(html.len()),
+                ..make_fetch_result(&[], Some(html))
+            };
+            Self {
+                seo_data_map: HashMap::from([(url.to_string(), seo)]),
+                fetch_results: HashMap::from([(url.to_string(), fetch)]),
+            }
+        }
+
+        fn with_response_headers(mut self, url: &str, headers: &[(&str, &str)]) -> Self {
+            if let Some(fetch) = self.fetch_results.get_mut(url) {
+                fetch.headers = headers
+                    .iter()
+                    .map(|(name, value)| (name.to_ascii_lowercase(), value.to_string()))
+                    .collect();
+            }
+            self
+        }
+
+        fn with_crawl_page(mut self, url: &str, html: &str) -> Self {
+            let seo = crate::core::crawler::parser::parse_html(url, html);
+            let fetch = FetchResult {
+                final_url: url.to_string(),
+                requested_url: url.to_string(),
+                html_content: Some(html.to_string()),
+                content_length: Some(html.len()),
+                ..make_fetch_result(&[], Some(html))
+            };
+            self.seo_data_map.insert(url.to_string(), seo);
+            self.fetch_results.insert(url.to_string(), fetch);
+            self
+        }
+
+        fn run(&self) -> Vec<SeoIssue> {
+            run_post_crawl_analysis(&[], &self.seo_data_map, &self.fetch_results)
+        }
+    }
+
+    #[test]
+    fn detector_fixture_harness_covers_html_headers_and_crawl_data() {
+        let fixture = DetectorFixture::from_html(
+            "https://example.com/en/",
+            r#"
+            <html>
+              <head>
+                <link rel="alternate" hreflang="de" href="/de/">
+              </head>
+              <body>
+                <h1>English</h1>
+                <img src="/hero.jpg">
+              </body>
+            </html>
+            "#,
+        )
+        .with_response_headers(
+            "https://example.com/en/",
+            &[("content-security-policy", "default-src 'self'")],
+        )
+        .with_crawl_page(
+            "https://example.com/de/",
+            r#"
+            <html>
+              <body><h1>Deutsch</h1></body>
+            </html>
+            "#,
+        );
+
+        let issues = fixture.run();
+
+        assert!(issues
+            .iter()
+            .any(|issue| issue.issue_type == "image_missing_alt_attribute"));
+        assert!(issues
+            .iter()
+            .any(|issue| issue.issue_type == "missing_hsts"));
+        assert!(issues
+            .iter()
+            .any(|issue| issue.issue_type == "hreflang_missing_reciprocal"));
     }
 
     #[test]
@@ -1531,6 +1759,75 @@ mod tests {
         assert!(issues
             .iter()
             .any(|i| i.issue_type == "hreflang_duplicate_lang"));
+    }
+
+    #[test]
+    fn test_hreflang_cross_page_detects_missing_reciprocal() {
+        let mut source = make_seo_data();
+        source.hreflang_alternates = vec!["de".to_string()];
+        source.hreflang_links = vec![super::super::models::HreflangLink {
+            hreflang: "de".to_string(),
+            href: "https://example.com/de/".to_string(),
+        }];
+        let target = make_seo_data();
+        let map = HashMap::from([
+            ("https://example.com/en/".to_string(), source),
+            ("https://example.com/de/".to_string(), target),
+        ]);
+        let fetches = HashMap::new();
+        let mut issues = Vec::new();
+
+        detect_hreflang_cross_page_issues(&map, &fetches, &mut issues);
+
+        assert!(issues
+            .iter()
+            .any(|i| i.issue_type == "hreflang_missing_reciprocal"));
+    }
+
+    #[test]
+    fn test_hreflang_cross_page_allows_reciprocal_pair() {
+        let mut en = make_seo_data();
+        en.hreflang_links = vec![super::super::models::HreflangLink {
+            hreflang: "de".to_string(),
+            href: "https://example.com/de/".to_string(),
+        }];
+        let mut de = make_seo_data();
+        de.hreflang_links = vec![super::super::models::HreflangLink {
+            hreflang: "en".to_string(),
+            href: "https://example.com/en/".to_string(),
+        }];
+        let map = HashMap::from([
+            ("https://example.com/en/".to_string(), en),
+            ("https://example.com/de/".to_string(), de),
+        ]);
+        let fetches = HashMap::new();
+        let mut issues = Vec::new();
+
+        detect_hreflang_cross_page_issues(&map, &fetches, &mut issues);
+
+        assert!(!issues
+            .iter()
+            .any(|i| i.issue_type == "hreflang_missing_reciprocal"));
+    }
+
+    #[test]
+    fn test_hreflang_cross_page_detects_error_target() {
+        let mut source = make_seo_data();
+        source.hreflang_links = vec![super::super::models::HreflangLink {
+            hreflang: "fr".to_string(),
+            href: "https://example.com/fr/".to_string(),
+        }];
+        let mut fetch = make_fetch_result(&[], None);
+        fetch.status_code = 404;
+        let map = HashMap::from([("https://example.com/en/".to_string(), source)]);
+        let fetches = HashMap::from([("https://example.com/fr/".to_string(), fetch)]);
+        let mut issues = Vec::new();
+
+        detect_hreflang_cross_page_issues(&map, &fetches, &mut issues);
+
+        assert!(issues
+            .iter()
+            .any(|i| i.issue_type == "hreflang_invalid_target"));
     }
 
     #[test]

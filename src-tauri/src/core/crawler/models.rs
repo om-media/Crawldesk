@@ -44,6 +44,13 @@ pub struct FetchResult {
     pub error_message: Option<String>,
 }
 
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HreflangLink {
+    pub hreflang: String,
+    pub href: String,
+}
+
 /// SEO data extracted from HTML
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -78,6 +85,8 @@ pub struct SeoData {
     pub structured_data_json: Vec<serde_json::Value>,
     pub has_schema_org: bool,
     pub hreflang_alternates: Vec<String>,
+    #[serde(default)]
+    pub hreflang_links: Vec<HreflangLink>,
     #[serde(default)]
     pub amp_html_url: Option<String>,
     #[serde(default)]
@@ -125,6 +134,7 @@ pub enum LinkType {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SeoIssue {
+    pub url: String,
     pub issue_type: String,
     pub severity: IssueSeverity,
     pub category: IssueCategory,
@@ -151,6 +161,13 @@ pub enum IssueCategory {
     Social,
     Technical,
     Internationalization,
+    Canonical,
+    Hreflang,
+    Image,
+    StructuredData,
+    Amp,
+    Rendering,
+    Sitemap,
 }
 
 /// Crawl session state per PRD §8.1

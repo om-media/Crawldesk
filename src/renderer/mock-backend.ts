@@ -354,6 +354,12 @@ export function setupMockCrawldesk() {
           recommendation: normalizedDetail.recommendation ?? null,
         }
       },
+      /** Mock: returns cross-page issue count (simulates post-crawl analysis). */
+      runPostCrawl: async (_crawlId: string) => {
+        await delay()
+        console.log('[Mock] Post-crawl analysis simulated — returning 7 cross-page issues')
+        return 7
+      },
     },
     links: {
       list: async (input: any) => {

@@ -121,6 +121,8 @@ pub struct SeoData {
     pub has_schema_org: bool,
     pub hreflang_alternates: Option<String>, // JSON array
     #[serde(default)]
+    pub hreflang_links: Option<String>, // JSON array of { hreflang, href }
+    #[serde(default)]
     pub amp_html_url: Option<String>,
     #[serde(default)]
     pub is_amp: bool,
