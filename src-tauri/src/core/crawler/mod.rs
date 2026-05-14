@@ -1,6 +1,7 @@
 pub mod engine;
 pub mod fetcher;
 pub mod frontier;
+pub mod issue_registry;
 pub mod issues;
 pub mod models;
 pub mod normalizer;
