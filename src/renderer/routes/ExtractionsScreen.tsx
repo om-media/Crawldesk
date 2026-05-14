@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useProjectStore } from '../stores/project-store'
 
-declare global { interface Window { crawldesk: any } }
 
 interface ExtractionRule {
   id: string; crawl_id: string; name: string; selector: string

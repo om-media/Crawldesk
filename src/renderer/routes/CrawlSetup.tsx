@@ -3,7 +3,6 @@ import { useProjectStore } from '../stores/project-store'
 import { DEFAULT_CRAWL_SETTINGS } from '@shared/types/crawl'
 
 interface Props { onComplete: () => void }
-declare global { interface Window { crawldesk: any } }
 
 export default function CrawlSetup({ onComplete }: Props) {
   const { selectedProjectId, setActiveCrawlId, projects } = useProjectStore()

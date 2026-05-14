@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react'
 import { useProjectStore } from '../stores/project-store'
+import type { Route } from '@shared/types/route'
 
-interface Props { onNavigate?: (route: string) => void }
+interface Props { onNavigate?: (route: Route) => void }
 
-declare global { interface Window { crawldesk: any } }
 
 export default function ProjectsScreen({ onNavigate }: Props) {
   const { projects, setProjects, setSelectedProjectId, selectedProjectId } = useProjectStore()

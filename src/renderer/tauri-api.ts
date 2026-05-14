@@ -1,18 +1,4 @@
-type TauriGlobal = {
-  core?: {
-    invoke: <T = unknown>(cmd: string, args?: Record<string, unknown>) => Promise<T>
-  }
-  event?: {
-    listen: <T = unknown>(event: string, cb: (event: { payload: T }) => void) => Promise<() => void>
-  }
-}
-
-declare global {
-  interface Window {
-    __TAURI__?: TauriGlobal
-    crawldesk?: any
-  }
-}
+type TauriGlobal = NonNullable<Window['__TAURI__']>
 
 const READY_EVENT = 'crawldesk:ready'
 
@@ -38,9 +24,29 @@ function toId(value: string | number | undefined | null): number {
   return id
 }
 
-function exportPath(kind: string, id: string | number): string {
+function joinPath(base: string, ...parts: string[]): string {
+  const separator = base.includes('\\') ? '\\' : '/'
+  return [base.replace(/[\\/]+$/, ''), ...parts.map((part) => part.replace(/^[\\/]+|[\\/]+$/g, ''))].join(separator)
+}
+
+async function exportPath(kind: string, id: string | number): Promise<string> {
   const safeId = String(id).replace(/[^a-z0-9_-]/gi, '_')
-  return `${kind}-${safeId}.csv`
+  const fileName = `${kind}-${safeId}.csv`
+
+  try {
+    const dataPath = await invoke<string>('get_data_path')
+    return joinPath(dataPath, 'exports', fileName)
+  } catch {
+    return fileName
+  }
+}
+
+function normalizeExportResult(result: any) {
+  return {
+    filePath: result.filePath ?? result.file_path ?? '',
+    rowCount: Number(result.rowCount ?? result.row_count ?? 0),
+    fileSize: Number(result.fileSize ?? result.file_size ?? 0),
+  }
 }
 
 function normalizeCrawlSettings(settings: any) {
@@ -103,11 +109,38 @@ function normalizeLinkRecord(record: any) {
   }
 }
 
+function normalizeIssueSeverity(value: any) {
+  switch (value) {
+    case 'critical':
+      return 'critical'
+    case 'high':
+    case 'medium':
+    case 'warning':
+      return 'warning'
+    case 'low':
+    case 'info':
+      return 'info'
+    default:
+      return value ?? ''
+  }
+}
+
+function normalizeIssueDefinition(record: any) {
+  return {
+    id: record.id ?? record.issueType ?? record.issue_type ?? '',
+    label: record.label ?? '',
+    severity: normalizeIssueSeverity(record.severity),
+    category: record.category ?? '',
+    explanation: record.explanation ?? '',
+    recommendation: record.recommendation ?? '',
+  }
+}
+
 function normalizeIssueRecord(record: any) {
   return {
     id: String(record.id ?? ''),
     issue_type: record.issueType ?? record.issue_type ?? '',
-    severity: record.severity ?? '',
+    severity: normalizeIssueSeverity(record.severity),
     category: record.category ?? '',
     url_id: record.urlId ?? record.url_id ?? 0,
     url: record.url ?? '',
@@ -126,7 +159,7 @@ function normalizeIssueRecord(record: any) {
 function normalizeIssueSummary(record: any) {
   return {
     issue_type: record.issueType ?? record.issue_type ?? '',
-    severity: record.severity ?? '',
+    severity: normalizeIssueSeverity(record.severity),
     category: record.category ?? '',
     count: record.count ?? 0,
     label: record.label ?? null,
@@ -163,7 +196,7 @@ function setupCrawldesk() {
         return normalizeProjectRecord(result)
       },
       list: async () => {
-        const result = await invoke('get_projects')
+        const result = await invoke('get_projects') as unknown[]
         return (result || []).map(normalizeProjectRecord)
       },
       get: async (id: string) => {
@@ -219,7 +252,9 @@ function setupCrawldesk() {
         crawlId: input.crawlId ? toId(input.crawlId) : undefined,
         page: input.page ?? 0,
         pageSize: input.pageSize ?? 50,
-        filterIndexability: input.filters?.indexability,
+        filterIndexability: input.filters?.indexability || undefined,
+        filterStatusCategory: input.filters?.statusCategory || undefined,
+        search: input.filters?.search || undefined,
         sortBy: input.sort?.field,
         sortOrder: input.sort?.direction,
       }),
@@ -227,6 +262,10 @@ function setupCrawldesk() {
       summarize: (projectId: string) => invoke('summarize_urls', { projectId: toId(projectId) }),
     },
     issues: {
+      definitions: async () => {
+        const result = await invoke<Array<any>>('get_issue_definitions')
+        return (result || []).map(normalizeIssueDefinition)
+      },
       summarize: async (crawlId: string) => {
         const result = await invoke<Array<any>>('get_issue_summary', { crawlId: toId(crawlId) })
         return (result || []).map(normalizeIssueSummary)
@@ -238,6 +277,8 @@ function setupCrawldesk() {
           pageSize: input.pageSize ?? 50,
           filterType: input.filters?.issueType,
           filterSeverity: input.filters?.severity,
+          filterCategory: input.filters?.category,
+          search: input.filters?.search,
         })
         const items = (result[0] || []).map(normalizeIssueRecord)
         return { items, total: result[1] ?? 0 }
@@ -261,25 +302,37 @@ function setupCrawldesk() {
     },
     exports: {
       exportUrls: async (input: any) => {
-        const filePath = await invoke<string>('export_urls_to_csv', {
-          crawlId: toId(input.crawlId ?? input.projectId),
-          outputPath: exportPath('urls', input.crawlId ?? input.projectId),
+        const crawlId = input.crawlId ?? input.projectId
+        const result = await invoke('export_urls_csv', {
+          crawlId: toId(crawlId),
+          outputPath: await exportPath('urls', crawlId),
+          filterIndexability: input.filters?.indexability,
+          sortBy: input.sort?.field,
+          sortOrder: input.sort?.direction,
         })
-        return { filePath, rowCount: 0 }
+        return normalizeExportResult(result)
       },
       exportIssues: async (input: any) => {
-        const filePath = await invoke<string>('export_issues_to_csv', {
-          crawlId: toId(input.crawlId ?? input.projectId),
-          outputPath: exportPath('issues', input.crawlId ?? input.projectId),
+        const crawlId = input.crawlId ?? input.projectId
+        const result = await invoke('export_issues_csv', {
+          crawlId: toId(crawlId),
+          outputPath: await exportPath('issues', crawlId),
+          filterType: input.filters?.issueType,
+          filterSeverity: input.filters?.severity,
+          filterCategory: input.filters?.category,
+          search: input.filters?.search,
         })
-        return { filePath, rowCount: 0 }
+        return normalizeExportResult(result)
       },
       exportLinks: async (input: any) => {
-        const filePath = await invoke<string>('export_links_to_csv', {
-          crawlId: toId(input.crawlId ?? input.projectId),
-          outputPath: exportPath('links', input.crawlId ?? input.projectId),
+        const crawlId = input.crawlId ?? input.projectId
+        const result = await invoke('export_links_csv', {
+          crawlId: toId(crawlId),
+          outputPath: await exportPath('links', crawlId),
+          filterRelation: input.filters?.linkRelation,
+          filterIsInternal: input.filters?.isInternal,
         })
-        return { filePath, rowCount: 0 }
+        return normalizeExportResult(result)
       },
     },
     app: {
@@ -287,6 +340,10 @@ function setupCrawldesk() {
       getDataPath: () => invoke('get_data_path'),
       openExternalUrl: (url: string) => invoke('open_external_url', { url }),
       openPath: () => unavailable('Open path'),
+    },
+    settings: {
+      get: () => invoke('get_settings'),
+      update: (settings: Record<string, unknown>) => invoke('update_settings', { settings }),
     },
     keywords: {
       analyze: (crawlId: string | number, gramType: 'unigrams' | 'bigrams' | 'trigrams') =>

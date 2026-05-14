@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { useProjectStore } from '../stores/project-store'
 
-declare global { interface Window { crawldesk: any } }
 
 export default function ExportsScreen() {
   const { activeCrawlId } = useProjectStore()

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useProjectStore } from '../stores/project-store'
+import ErrorBanner from '../components/ErrorBanner'
 
-declare global { interface Window { crawldesk: any } }
 
 export default function LinksScreen() {
   const { activeCrawlId } = useProjectStore()
@@ -51,10 +51,7 @@ export default function LinksScreen() {
   return (
     <div>
       {loadError && (
-        <div className="mb-4 rounded-xl p-3 bg-[#3b171b] border border-red-900 text-red-400 text-sm flex items-center justify-between">
-          <span>⚠ {loadError}</span>
-          <button onClick={retry} className="btn-secondary !py-1.5 !px-3 text-xs ml-4">Retry</button>
-        </div>
+        <ErrorBanner message={loadError} onRetry={retry} />
       )}
       {!hasData && !loadError ? (
         <div className="card py-12 text-center"><p className="text-primary-muted">No links found in this crawl.</p></div>

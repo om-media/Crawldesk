@@ -3,7 +3,6 @@ import { useProjectStore } from '../stores/project-store'
 import { useCrawlStore } from '../stores/crawl-store'
 
 interface Props { onCompleted: () => void }
-declare global { interface Window { crawldesk: any } }
 
 export default function LiveCrawl({ onCompleted }: Props) {
   const { activeCrawlId } = useProjectStore()
@@ -93,7 +92,7 @@ export default function LiveCrawl({ onCompleted }: Props) {
           { label: 'Discovered', value: progress?.total_discovered ?? 0, color: 'text-purple-400' },
           { label: 'Failed', value: progress?.total_failed ?? 0, color: 'text-red-500' },
           { label: 'Blocked', value: progress?.total_blocked ?? 0, color: 'text-amber' },
-          { label: 'Elapsed', value: formatTime((progress?.elapsed_time_seconds ?? progress?.elapsedTimeSeconds) ?? 0), color: 'text-primary-text' },
+          { label: 'Elapsed', value: formatTime(progress?.elapsedTimeSeconds ?? 0), color: 'text-primary-text' },
         ].map(card => (
           <div key={card.label} className="kpi-card text-center">
             <p className="text-xs text-primary-muted uppercase tracking-wider font-semibold">{card.label}</p>

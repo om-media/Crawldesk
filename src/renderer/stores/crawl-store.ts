@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { CrawlProgress as CrawlProgressType } from '../../../shared/types/crawl'
+import type { CrawlProgress as CrawlProgressType } from '@shared/types/crawl'
 
 type BackendCrawlProgress = Partial<CrawlProgressType> & Record<string, any>
 

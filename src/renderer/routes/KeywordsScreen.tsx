@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useProjectStore } from '../stores/project-store'
 
-declare global { interface Window { crawldesk: any } }
 
 type TabKey = 'unigrams' | 'bigrams' | 'trigrams'
 

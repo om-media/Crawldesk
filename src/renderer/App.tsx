@@ -18,7 +18,7 @@ import ClustersScreen from './routes/ClustersScreen'
 import ExtractionsScreen from './routes/ExtractionsScreen'
 import SchedulesScreen from './routes/SchedulesScreen'
 
-type Route = 'projects' | 'overview' | 'setup' | 'live' | 'results' | 'issues' | 'links' | 'exports' | 'settings' | 'performance' | 'client-errors' | 'keywords' | 'clusters' | 'extractions' | 'schedules'
+import type { Route } from '@shared/types/route'
 
 export default function App() {
   const [route, setRoute] = useState<Route>('projects')

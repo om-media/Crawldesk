@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback } from 'react'
 import { useProjectStore } from '../stores/project-store'
 import type { UrlRecord } from '@shared/types/url'
 
-declare global { interface Window { crawldesk: any } }
 
 type StatusCodeFilter = '' | '403' | '404' | '410' | 'other'
 

@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useProjectStore } from '../stores/project-store'
 
-declare global { interface Window { crawldesk: any } }
 
 interface ClusterMember { url: string; score: number }
 interface ContentCluster { id: number; size: number; representativeUrl: string; members: ClusterMember[]; keywords: string[] }

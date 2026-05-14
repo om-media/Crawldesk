@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react'
 import { useProjectStore } from '../stores/project-store'
 import type { Crawl as CrawlType } from '@shared/types/crawl'
+import type { Route } from '@shared/types/route'
 
-interface Props { crawlId?: string | null; onNavigate?: (route: 'setup') => void }
+interface Props { crawlId?: string | null; onNavigate?: (route: Route) => void }
 
-declare global { interface Window { crawldesk: any } }
 
 export default function ProjectOverview({ crawlId, onNavigate }: Props) {
   const { selectedProjectId } = useProjectStore()
@@ -92,7 +92,7 @@ export default function ProjectOverview({ crawlId, onNavigate }: Props) {
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-[30px] font-bold text-primary-text tracking-tight leading-none">
-            {(() => { try { return lastCrawl?.startUrl ? new URL(lastCrawl.startUrl).hostname : selectedProjectId } catch { return selectedProjectId } })()}
+            {(() => { try { return lastCrawl?.start_url ? new URL(lastCrawl.start_url).hostname : selectedProjectId } catch { return selectedProjectId } })()}
           </h1>
           <p className="text-sm text-primary-muted mt-1 font-normal">Technical health and crawl intelligence</p>
         </div>
@@ -101,7 +101,7 @@ export default function ProjectOverview({ crawlId, onNavigate }: Props) {
             <span className="w-2 h-2 rounded-full bg-emerald" />
             <span className="text-xs font-semibold text-emerald">Completed</span>
           </div>
-          <span className="text-xs text-primary-muted">{lastCrawl?.startedAt ? new Date(lastCrawl.startedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) + ' at ' + new Date(lastCrawl.startedAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : '-'}</span>
+          <span className="text-xs text-primary-muted">{lastCrawl?.started_at ? new Date(lastCrawl.started_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) + ' at ' + new Date(lastCrawl.started_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : '-'}</span>
           <button onClick={() => onNavigate?.('setup')} className="btn-secondary py-2 px-3 rounded-lg text-xs">▶ Run Crawl</button>
         </div>
       </div>
@@ -137,7 +137,7 @@ export default function ProjectOverview({ crawlId, onNavigate }: Props) {
         {/* Left column - Chart card + URL table */}
         <div className="space-y-4">
           {/* Crawl Activity chart placeholder */}
-          {lastCrawl?.startedAt && lastCrawl?.finishedAt && (
+          {lastCrawl?.started_at && lastCrawl?.finished_at && (
             <div className="card p-5" style={{ borderRadius: '12px' }}>
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-sm font-semibold text-primary-text">Crawl Activity</h3>
@@ -147,7 +147,7 @@ export default function ProjectOverview({ crawlId, onNavigate }: Props) {
                 <div>
                   <p className="text-[22px] font-bold leading-none" style={{ color: '#14B8A6' }}>{totalUrls.toLocaleString()}</p>
                   <p className="text-xs text-primary-muted mt-1.5 font-medium">Duration</p>
-                  <p className="text-base font-medium text-primary-text">{formatTime(Math.round((new Date(lastCrawl.finishedAt || Date.now()).getTime() - new Date(lastCrawl.startedAt).getTime()) / 1000))}</p>
+                  <p className="text-base font-medium text-primary-text">{formatTime(Math.round((new Date(lastCrawl.finished_at || Date.now()).getTime() - new Date(lastCrawl.started_at).getTime()) / 1000))}</p>
                 </div>
                 {/* Real depth distribution bar chart */}
                 <div className="flex-1 flex items-end gap-[3px]" style={{ height: '60px' }}>
@@ -292,7 +292,7 @@ export default function ProjectOverview({ crawlId, onNavigate }: Props) {
           <span className="text-sm text-primary-text font-semibold">{totalUrls.toLocaleString()}</span>
           <div className="h-5 w-px bg-lumen" />
           <span className="text-xs text-primary-muted">Duration</span>
-          <span className="text-sm text-primary-text font-semibold">{lastCrawl?.startedAt && lastCrawl?.finishedAt ? formatTime(Math.round((new Date(lastCrawl.finishedAt).getTime() - new Date(lastCrawl.startedAt).getTime()) / 1000)) : '-'}</span>
+          <span className="text-sm text-primary-text font-semibold">{lastCrawl?.started_at && lastCrawl?.finished_at ? formatTime(Math.round((new Date(lastCrawl.finished_at).getTime() - new Date(lastCrawl.started_at).getTime()) / 1000)) : '-'}</span>
           <div className="h-5 w-px bg-lumen" />
         </div>
       </div>

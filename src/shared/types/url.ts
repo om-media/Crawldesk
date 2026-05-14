@@ -96,6 +96,11 @@ export interface UrlRecord {
   network_idle_ms?: number | null
   // v2: anchor text over-optimization
   anchor_text_over_optimized?: number
+  // Dedicated DB columns (populated by Rust backend, camelCase via serde)
+  size_bytes?: number | null
+  language?: string | null
+  inlinks_count?: number | null
+  outlinks_count?: number | null
 }
 
 export interface FetchResult {
