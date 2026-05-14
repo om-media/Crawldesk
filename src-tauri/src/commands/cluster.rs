@@ -35,19 +35,17 @@ fn stop_words() -> &'static HashSet<&'static str> {
     static WORDS: std::sync::OnceLock<HashSet<&'static str>> = std::sync::OnceLock::new();
     WORDS.get_or_init(|| {
         [
-            "a", "an", "the", "and", "or", "but", "in", "on", "at", "to", "for",
-            "of", "with", "by", "from", "is", "was", "are", "were", "be", "been",
-            "being", "have", "has", "had", "do", "does", "did", "will", "would",
-            "could", "should", "may", "might", "shall", "can", "need", "dare",
-            "ought", "used", "it", "its", "this", "that", "these", "those",
-            "i", "you", "he", "she", "we", "they", "what", "which", "who",
-            "whom", "whose", "where", "when", "why", "how", "all", "each",
-            "every", "both", "few", "more", "most", "other", "some", "such",
-            "no", "nor", "not", "only", "own", "same", "so", "than", "too",
-            "very", "just", "because", "as", "until", "while", "about", "against",
-            "between", "into", "through", "during", "before", "after", "above",
-            "below", "up", "down", "out", "off", "over", "under", "again",
-            "further", "then", "once", "here", "there", "also", "if", "into",
+            "a", "an", "the", "and", "or", "but", "in", "on", "at", "to", "for", "of", "with",
+            "by", "from", "is", "was", "are", "were", "be", "been", "being", "have", "has", "had",
+            "do", "does", "did", "will", "would", "could", "should", "may", "might", "shall",
+            "can", "need", "dare", "ought", "used", "it", "its", "this", "that", "these", "those",
+            "i", "you", "he", "she", "we", "they", "what", "which", "who", "whom", "whose",
+            "where", "when", "why", "how", "all", "each", "every", "both", "few", "more", "most",
+            "other", "some", "such", "no", "nor", "not", "only", "own", "same", "so", "than",
+            "too", "very", "just", "because", "as", "until", "while", "about", "against",
+            "between", "into", "through", "during", "before", "after", "above", "below", "up",
+            "down", "out", "off", "over", "under", "again", "further", "then", "once", "here",
+            "there", "also", "if", "into",
         ]
         .into_iter()
         .collect()
@@ -88,9 +86,7 @@ fn normalize_vector(vec: &HashMap<String, f64>) -> HashMap<String, f64> {
     if norm == 0.0 {
         return HashMap::new();
     }
-    vec.iter()
-        .map(|(k, v)| (k.clone(), v / norm))
-        .collect()
+    vec.iter().map(|(k, v)| (k.clone(), v / norm)).collect()
 }
 
 /// Cosine similarity between two normalized sparse vectors.
@@ -110,8 +106,7 @@ fn cosine_similarity(a: &HashMap<String, f64>, b: &HashMap<String, f64>) -> f64 
 // ─── TF-IDF Builder ────────────────────────────────────────────────
 
 /// Build TF-IDF vectors for a list of documents.
-fn build_tfidf(
-    docs: &[(i64, String, String)], // (url_id, url, text)
+fn build_tfidf(docs: &[(i64, String, String)], // (url_id, url, text)
 ) -> Vec<TfIdfDoc> {
     let n = docs.len();
     if n == 0 {
@@ -119,10 +114,7 @@ fn build_tfidf(
     }
 
     // Tokenize each document
-    let tokenized: Vec<Vec<String>> = docs
-        .iter()
-        .map(|(_, _, text)| tokenize(text))
-        .collect();
+    let tokenized: Vec<Vec<String>> = docs.iter().map(|(_, _, text)| tokenize(text)).collect();
 
     // Compute IDF: smoothed log(N / (df(t) + 1)) + 1
     // df(t) = number of documents containing term t
@@ -223,10 +215,8 @@ pub fn find_clusters(crawl_id: i64) -> Result<Vec<ContentCluster>, String> {
     }
 
     // Normalize each vector
-    let normalized: Vec<HashMap<String, f64>> = tfidf_docs
-        .iter()
-        .map(|d| normalize_vector(&d.tf))
-        .collect();
+    let normalized: Vec<HashMap<String, f64>> =
+        tfidf_docs.iter().map(|d| normalize_vector(&d.tf)).collect();
 
     // Greedy clustering by cosine similarity
     let similarity_threshold = 0.35;
@@ -296,7 +286,11 @@ pub fn find_clusters(crawl_id: i64) -> Result<Vec<ContentCluster>, String> {
         }
 
         // Sort members by score descending
-        members.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+        members.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
         // Extract top shared keywords per cluster
         let mut term_scores: HashMap<String, f64> = HashMap::new();

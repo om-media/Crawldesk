@@ -44,7 +44,6 @@ pub fn run() {
             commands::project::get_projects,
             commands::project::get_project,
             commands::project::get_project_summary,
-
             // Crawl commands
             commands::crawl::start_crawl,
             commands::crawl::pause_crawl,
@@ -53,36 +52,29 @@ pub fn run() {
             commands::crawl::get_crawl_progress,
             commands::crawl::clear_crawl,
             commands::crawl::list_crawls,
-
             // URL commands
             commands::url::query_urls,
             commands::url::get_url_details,
             commands::url::summarize_urls,
-
             // Keyword analysis commands
             commands::keyword::analyze_keywords,
-
             // Content clustering commands
             commands::cluster::find_clusters,
-
             // Issue commands
             commands::issue::get_issue_summary,
             commands::issue::query_issues,
             commands::issue::get_issue_details,
-
+            commands::issue::get_issue_definitions,
             // Link commands
             commands::link::query_links,
             commands::link::summarize_links,
-
             // Export commands
-            commands::export::export_urls_to_csv,
-            commands::export::export_issues_to_csv,
-            commands::export::export_links_to_csv,
-
+            commands::export::export_urls_csv,
+            commands::export::export_issues_csv,
+            commands::export::export_links_csv,
             // Settings commands
             commands::settings::get_settings,
             commands::settings::update_settings,
-
             // App commands
             commands::app::get_version,
             commands::app::get_data_path,

@@ -7,11 +7,10 @@ use tracing::info;
 #[tauri::command]
 pub fn create_project(name: String, root_url: String) -> Result<models::Project, String> {
     let conn = db::get_connection().map_err(|e| e.to_string())?;
-    
-    let project = queries::create_project(&conn, &name, &root_url)
-        .map_err(|e| e.to_string())?;
+
+    let project = queries::create_project(&conn, &name, &root_url).map_err(|e| e.to_string())?;
     info!("Created project: {} ({})", name, root_url);
-    
+
     Ok(project)
 }
 
@@ -37,28 +36,33 @@ pub fn get_project_summary(id: i64) -> Result<models::ProjectSummary, String> {
 }
 
 #[tauri::command]
-pub fn update_project(id: i64, name: Option<String>, root_url: Option<String>) -> Result<models::Project, String> {
+pub fn update_project(
+    id: i64,
+    name: Option<String>,
+    root_url: Option<String>,
+) -> Result<models::Project, String> {
     let conn = db::get_connection().map_err(|e| e.to_string())?;
-    
+
     // Get existing project
     let mut project = queries::get_project(&conn, id)
         .map_err(|e| e.to_string())?
         .ok_or_else(|| "Project not found".to_string())?;
-    
+
     if let Some(n) = name {
         project.name = n;
     }
     if let Some(u) = root_url {
         project.root_url = u;
     }
-    
+
     // Update in DB
     let now = Utc::now().to_rfc3339();
     conn.execute(
         "UPDATE projects SET name = ?1, root_url = ?2, updated_at = ?3 WHERE id = ?4",
         rusqlite::params![project.name, project.root_url, now, id],
-    ).map_err(|e| e.to_string())?;
-    
+    )
+    .map_err(|e| e.to_string())?;
+
     Ok(project)
 }
 

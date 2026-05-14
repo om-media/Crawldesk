@@ -29,20 +29,16 @@ pub struct KeywordAnalysisResult {
 
 fn stop_words() -> &'static [&'static str] {
     &[
-        "a", "an", "and", "are", "as", "at", "be", "by", "for", "from",
-        "in", "is", "it", "of", "on", "or", "that", "the", "this", "to",
-        "with", "your", "i", "you", "he", "she", "we", "they", "me",
-        "him", "her", "us", "them", "my", "his", "its", "our", "their",
-        "what", "which", "who", "whom", "whose", "where", "when", "why",
-        "how", "all", "each", "every", "both", "few", "more", "most",
-        "other", "some", "such", "no", "nor", "not", "only", "own",
-        "same", "so", "than", "too", "very", "just", "because", "but",
-        "if", "then", "while", "about", "against", "between", "into",
-        "through", "during", "before", "after", "above", "below", "up",
-        "down", "out", "off", "over", "under", "again", "further",
-        "once", "here", "there", "also", "can", "will", "would", "could",
-        "should", "may", "might", "shall", "do", "does", "did", "has",
-        "have", "had", "being", "been", "am",
+        "a", "an", "and", "are", "as", "at", "be", "by", "for", "from", "in", "is", "it", "of",
+        "on", "or", "that", "the", "this", "to", "with", "your", "i", "you", "he", "she", "we",
+        "they", "me", "him", "her", "us", "them", "my", "his", "its", "our", "their", "what",
+        "which", "who", "whom", "whose", "where", "when", "why", "how", "all", "each", "every",
+        "both", "few", "more", "most", "other", "some", "such", "no", "nor", "not", "only", "own",
+        "same", "so", "than", "too", "very", "just", "because", "but", "if", "then", "while",
+        "about", "against", "between", "into", "through", "during", "before", "after", "above",
+        "below", "up", "down", "out", "off", "over", "under", "again", "further", "once", "here",
+        "there", "also", "can", "will", "would", "could", "should", "may", "might", "shall", "do",
+        "does", "did", "has", "have", "had", "being", "been", "am",
     ]
 }
 
@@ -160,16 +156,16 @@ pub fn analyze_keywords(
             } else {
                 0.0
             };
-            KeywordFrequency { phrase, count, frequency }
+            KeywordFrequency {
+                phrase,
+                count,
+                frequency,
+            }
         })
         .collect();
 
     // Sort by count descending, then alphabetically
-    keywords.sort_by(|a, b| {
-        b.count
-            .cmp(&a.count)
-            .then_with(|| a.phrase.cmp(&b.phrase))
-    });
+    keywords.sort_by(|a, b| b.count.cmp(&a.count).then_with(|| a.phrase.cmp(&b.phrase)));
 
     // Limit to top 250 results (matching TypeScript behavior)
     keywords.truncate(250);

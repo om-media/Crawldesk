@@ -10,14 +10,16 @@ pub fn query_urls(
     page: i64,
     page_size: i64,
     filter_indexability: Option<String>,
+    filter_status_category: Option<String>,
+    search: Option<String>,
     sort_by: Option<String>,
     sort_order: Option<String>,
 ) -> Result<models::PaginatedResult<models::UrlRecord>, String> {
     let conn = db::get_connection().map_err(|e| e.to_string())?;
-    
+
     let sort_by = sort_by.unwrap_or_else(|| "id".to_string());
     let sort_order = sort_order.unwrap_or_else(|| "desc".to_string());
-    
+
     let (items, total) = queries::query_urls(
         &conn,
         project_id,
@@ -25,12 +27,19 @@ pub fn query_urls(
         page,
         page_size,
         filter_indexability.as_deref(),
+        filter_status_category.as_deref(),
+        search.as_deref(),
         &sort_by,
         &sort_order,
-    ).map_err(|e| e.to_string())?;
-    
-    let total_pages = (total + page_size - 1) / page_size;
-    
+    )
+    .map_err(|e| e.to_string())?;
+
+    let total_pages = if page_size > 0 {
+        (total + page_size - 1) / page_size
+    } else {
+        0
+    };
+
     Ok(models::PaginatedResult {
         items,
         total,
@@ -50,12 +59,12 @@ pub fn get_url_details(url_id: i64) -> Result<Option<models::UrlRecord>, String>
 #[tauri::command]
 pub fn summarize_urls(project_id: i64) -> Result<models::UrlSummary, String> {
     let conn = db::get_connection().map_err(|e| e.to_string())?;
-    
+
     // Count by indexability
     let mut stmt = conn.prepare(
         "SELECT indexability, COUNT(*) as count FROM urls WHERE project_id = ?1 GROUP BY indexability"
     ).map_err(|e| e.to_string())?;
-    
+
     let mut summary = models::UrlSummary {
         total_urls: 0,
         indexable: 0,
@@ -64,18 +73,20 @@ pub fn summarize_urls(project_id: i64) -> Result<models::UrlSummary, String> {
         non_200_status: 0,
         average_depth: 0.0,
     };
-    
-    let rows = stmt.query_map(rusqlite::params![project_id], |row| {
-        Ok((
-            row.get::<_, String>("indexability")?,
-            row.get::<_, i64>("count")?,
-        ))
-    }).map_err(|e| e.to_string())?;
-    
+
+    let rows = stmt
+        .query_map(rusqlite::params![project_id], |row| {
+            Ok((
+                row.get::<_, String>("indexability")?,
+                row.get::<_, i64>("count")?,
+            ))
+        })
+        .map_err(|e| e.to_string())?;
+
     for row in rows.filter_map(|r| r.ok()) {
         let (indexability, count) = row;
         summary.total_urls += count;
-        
+
         match indexability.as_str() {
             "indexable" => summary.indexable = count,
             "noindex" => summary.noindex = count,
@@ -83,14 +94,16 @@ pub fn summarize_urls(project_id: i64) -> Result<models::UrlSummary, String> {
             _ => {}
         }
     }
-    
+
     // Average depth
-    let avg_depth: f64 = conn.query_row(
-        "SELECT AVG(depth) FROM urls WHERE project_id = ?1",
-        [project_id],
-        |row| row.get(0),
-    ).unwrap_or(0.0);
+    let avg_depth: f64 = conn
+        .query_row(
+            "SELECT AVG(depth) FROM urls WHERE project_id = ?1",
+            [project_id],
+            |row| row.get(0),
+        )
+        .unwrap_or(0.0);
     summary.average_depth = avg_depth;
-    
+
     Ok(summary)
 }
