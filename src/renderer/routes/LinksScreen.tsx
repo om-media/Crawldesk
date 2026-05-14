@@ -21,9 +21,7 @@ export default function LinksScreen() {
     setLoadError(null)
     try {
       const result = await window.crawldesk.links.list({ crawlId: activeCrawlId, page, pageSize, filters: filterInternal !== null ? { isInternal: filterInternal } : {} })
-      console.log('[Links] raw result:', result, 'type:', typeof result, 'isArr:', Array.isArray(result))
       const items = result?.items ?? (Array.isArray(result) ? result[0] ?? [] : [])
-      console.log('[Links] items:', items, 'count:', items.length)
       setLinks(Array.isArray(items) ? items : [])
     } catch (e: any) { console.error('[Links] loadLinks error:', e); setLoadError(e?.message || 'Failed to load links') } finally { setLoading(false) }
   }

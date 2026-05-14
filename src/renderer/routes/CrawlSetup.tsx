@@ -33,12 +33,11 @@ export default function CrawlSetup({ onComplete }: Props) {
 
   async function handleStart(e: React.FormEvent) {
     e.preventDefault()
-    console.log('[UI] handleStart called. selectedProjectId:', selectedProjectId, 'crawldesk API exists:', !!window.crawldesk)
+    setError('')
     if (!selectedProjectId) {
       setError('No project selected. Please create/select a project from the sidebar first.')
       return
     }
-    setError('')
 
     // Validate
     try { new URL(settings.startUrl) } catch { setError('Invalid start URL'); return }
@@ -50,11 +49,8 @@ export default function CrawlSetup({ onComplete }: Props) {
       const includePats = settings.includePatterns.split('\n').filter(Boolean).map(s => s.trim())
       const excludePats = settings.excludePatterns.split('\n').filter(Boolean).map(s => s.trim())
       const payload = { ...settings, startUrl: settings.startUrl, includePatterns: includePats, excludePatterns: excludePats }
-      console.log('[UI] Creating crawl... payload keys:', Object.keys(payload))
      const crawl = await window.crawldesk.crawls.create(selectedProjectId, payload)
-      console.log('[UI] Crawl created:', crawl?.id)
       setActiveCrawlId(crawl.id)
-      console.log('[UI] Crawl started successfully!')
       onComplete()
     } catch (err: any) {
       console.error('[UI] Failed to start crawl:', err, err.stack)
