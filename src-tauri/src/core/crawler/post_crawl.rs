@@ -1409,6 +1409,8 @@ mod tests {
             structured_data_json: vec![],
             has_schema_org: false,
             hreflang_alternates: vec![],
+            amp_html_url: None,
+            is_amp: false,
             self_referencing_canonical: false,
             redirect_chain: vec![],
             final_url: None,
