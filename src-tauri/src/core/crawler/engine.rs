@@ -1,20 +1,23 @@
 //! Main crawl engine — orchestrates fetcher, parser, frontier, scope, and issue detection.
-//! Replaces src/worker/engine/crawl-engine.ts with tokio async tasks.
+//! Wires CrawlResult data through the writer channel to SQLite for persistence.
 
-use std::sync::Arc;
 use futures::stream::{FuturesUnordered, StreamExt};
+use std::sync::Arc;
 use tokio::sync::Mutex;
 use tokio::time::{sleep, timeout, Duration};
 use tracing::{debug, info, warn};
 
-use super::models::*;
 use super::fetcher::{Fetcher, FetcherConfig};
 use super::frontier::UrlFrontier;
-use super::scope::ScopeService;
-use super::normalizer::normalize_url;
-use super::robots::RobotsService;
-use super::parser::{extract_html_links, parse_html};
 use super::issues::detect_issues;
+use super::models::*;
+use super::normalizer::normalize_url;
+use super::parser::{extract_html_links, parse_html};
+use super::robots::RobotsService;
+use super::scope::ScopeService;
+use crate::core::storage::writer::{
+    IssueWriteRecord, LinkWriteRecord, PageCrawledData, WriteHandle,
+};
 
 /// Configuration for the crawl engine.
 #[derive(Debug, Clone)]
@@ -72,6 +75,10 @@ pub struct CrawlEngine {
     robots: Arc<Mutex<RobotsService>>,
     callback: Option<CrawlCallback>,
     stats: Arc<Mutex<CrawlStats>>,
+    writer: Option<WriteHandle>,
+    /// Project ID and crawl ID for SQLite persistence.
+    project_id: i64,
+    crawl_id: i64,
 }
 
 impl Clone for CrawlEngine {
@@ -83,6 +90,9 @@ impl Clone for CrawlEngine {
             robots: Arc::clone(&self.robots),
             callback: None, // callbacks are not cloned
             stats: Arc::clone(&self.stats),
+            writer: self.writer.clone(),
+            project_id: self.project_id,
+            crawl_id: self.crawl_id,
         }
     }
 }
@@ -93,6 +103,106 @@ pub struct CrawlStats {
     pub total_issues: usize,
     pub total_links: usize,
     pub started_at: Option<std::time::Instant>,
+}
+
+/// Determine indexability from SEO data and HTTP status.
+fn determine_indexability(seo_data: &SeoData, status_code: i32) -> String {
+    if seo_data.noindex || status_code >= 400 {
+        "non_indexable"
+    } else {
+        "indexable"
+    }
+    .to_string()
+}
+
+/// Convert a CrawlResult to a PageCrawledData for the writer channel.
+fn result_to_page_data(result: &CrawlResult, project_id: i64, crawl_id: i64) -> PageCrawledData {
+    let indexability = determine_indexability(&result.seo_data, result.fetch_result.status_code);
+
+    // Serialize fetch_result and seo_data to JSON strings
+    let fetch_result_json = serde_json::json!({
+        "statusCode": result.fetch_result.status_code,
+        "finalUrl": result.fetch_result.final_url,
+        "requestedUrl": result.fetch_result.requested_url,
+        "headers": result.fetch_result.headers,
+        "headersJson": serde_json::to_string(&result.fetch_result.headers).ok(),
+        "contentType": result.fetch_result.content_type,
+        "contentLength": result.fetch_result.content_length,
+        "responseTimeMs": result.fetch_result.response_time_ms,
+        "isRedirect": result.fetch_result.is_redirect,
+        "redirectCount": result.fetch_result.redirect_count,
+        "wasJsRendered": result.fetch_result.was_js_rendered,
+        "errorMessage": result.fetch_result.error_message,
+    })
+    .to_string();
+
+    let seo_data_json =
+        serde_json::to_string(&result.seo_data).unwrap_or_else(|_| "{}".to_string());
+
+    // Convert issues to IssueWriteRecords
+    let issues: Vec<IssueWriteRecord> = result
+        .issues
+        .iter()
+        .map(|issue| {
+            let severity = serde_json::to_string(&issue.severity)
+                .unwrap_or_else(|_| format!("{:?}", issue.severity))
+                .trim_matches('"')
+                .to_string();
+            let category = serde_json::to_string(&issue.category)
+                .unwrap_or_else(|_| format!("{:?}", issue.category))
+                .trim_matches('"')
+                .to_string();
+            let details_json =
+                serde_json::to_string(&issue.details).unwrap_or_else(|_| "null".to_string());
+            IssueWriteRecord {
+                issue_type: issue.issue_type.clone(),
+                severity,
+                category,
+                url_id: None, // Will be set by writer after URL insert
+                url: result.url.clone(),
+                message: issue.message.clone(),
+                details_json: Some(details_json),
+            }
+        })
+        .collect();
+
+    // Convert extracted links to LinkWriteRecords
+    let links: Vec<LinkWriteRecord> = result
+        .extracted_links
+        .iter()
+        .map(|link| {
+            let relation = match link.link_type {
+                LinkType::HtmlA => "HtmlA",
+                LinkType::Canonical => "Canonical",
+                LinkType::Image => "Image",
+                LinkType::Script => "Script",
+                LinkType::Css => "Css",
+                LinkType::IFrame => "IFrame",
+            }
+            .to_string();
+            LinkWriteRecord {
+                source_url_id: 0, // Will be set by writer after URL insert
+                source_url: result.url.clone(),
+                target_url: link.href.clone(),
+                link_relation: relation,
+                anchor_text: link.anchor_text.clone(),
+                is_internal: link.is_internal,
+                is_no_follow: link.is_no_follow,
+            }
+        })
+        .collect();
+
+    PageCrawledData {
+        project_id,
+        crawl_id,
+        url: result.url.clone(),
+        depth: result.depth,
+        indexability,
+        fetch_result_json,
+        seo_data_json,
+        issues,
+        links,
+    }
 }
 
 impl CrawlEngine {
@@ -107,7 +217,21 @@ impl CrawlEngine {
             robots: Arc::new(Mutex::new(RobotsService::new())),
             callback: None,
             stats: Arc::new(Mutex::new(CrawlStats::default())),
+            writer: None,
+            project_id: 0,
+            crawl_id: 0,
         }
+    }
+
+    /// Set the writer handle for persisting crawl data to SQLite.
+    pub fn set_writer(&mut self, writer: WriteHandle) {
+        self.writer = Some(writer);
+    }
+
+    /// Set the project_id and crawl_id for database persistence.
+    pub fn set_project_context(&mut self, project_id: i64, crawl_id: i64) {
+        self.project_id = project_id;
+        self.crawl_id = crawl_id;
     }
 
     /// Set the event callback for progress reporting.
@@ -143,8 +267,10 @@ impl CrawlEngine {
             stats.started_at = Some(start);
         }
 
-        info!("Starting crawl: {} (max_urls={}, concurrency={})", 
-              self.config.root_url, self.config.max_urls, self.config.concurrency);
+        info!(
+            "Starting crawl: {} (max_urls={}, concurrency={})",
+            self.config.root_url, self.config.max_urls, self.config.concurrency
+        );
 
         if let Some(root_url) = normalize_url(&self.config.root_url) {
             let mut frontier = self.frontier.lock().await;
@@ -165,7 +291,12 @@ impl CrawlEngine {
             ..self.config.fetcher_config.clone()
         }));
         let concurrency = self.config.concurrency.max(1);
-        let timeout_seconds = self.config.fetcher_config.timeout_seconds.saturating_add(5).max(1);
+        let timeout_seconds = self
+            .config
+            .fetcher_config
+            .timeout_seconds
+            .saturating_add(5)
+            .max(1);
         let mut in_flight = FuturesUnordered::new();
 
         // Crawl loop — keep up to `concurrency` URL fetches active until frontier is empty or max reached.
@@ -221,6 +352,15 @@ impl CrawlEngine {
                 continue;
             };
 
+            // Persist to SQLite via writer channel (awaited directly, not
+            // spawned, so that flush() later guarantees all writes landed)
+            if let Some(ref writer) = self.writer {
+                let page_data = result_to_page_data(&result, self.project_id, self.crawl_id);
+                if let Err(e) = writer.page_crawled(page_data).await {
+                    warn!("Failed to send page data to writer: {}", e);
+                }
+            }
+
             // Emit event
             if let Some(ref callback) = self.callback {
                 callback(&CrawlEvent::UrlFetched(result.clone()));
@@ -241,7 +381,10 @@ impl CrawlEngine {
                     let normalized = normalize_url(&link.href);
                     if let Some(ref norm_url) = normalized {
                         if self.scope.is_in_scope(norm_url) {
-                            self.frontier.lock().await.enqueue(norm_url.clone(), result.depth + 1);
+                            self.frontier
+                                .lock()
+                                .await
+                                .enqueue(norm_url.clone(), result.depth + 1);
                         }
                     }
                 }
@@ -259,13 +402,25 @@ impl CrawlEngine {
             }
         }
 
+        // Flush remaining data: wait for all pending writes to be committed
+        // before declaring crawl complete. This guarantees every
+        // PageCrawled message has been persisted to SQLite.
+        if let Some(ref writer) = self.writer {
+            if let Err(e) = writer.flush().await {
+                warn!("Failed to flush writer: {}", e);
+            }
+        }
+
         // Final stats
         let elapsed = start.elapsed().as_millis() as u64;
         let mut s = self.stats.lock().await;
-        
+
         info!(
             "Crawl completed: {} URLs crawled, {} issues, {} links, {:.0}s",
-            s.total_crawled, s.total_issues, s.total_links, elapsed as f64 / 1000.0
+            s.total_crawled,
+            s.total_issues,
+            s.total_links,
+            elapsed as f64 / 1000.0
         );
 
         // Emit completion event
@@ -281,28 +436,37 @@ impl CrawlEngine {
         std::mem::take(&mut *s)
     }
 
-    async fn crawl_entry(entry: FrontierEntry, fetcher: Arc<Fetcher>, timeout_seconds: u64) -> CrawlResult {
+    async fn crawl_entry(
+        entry: FrontierEntry,
+        fetcher: Arc<Fetcher>,
+        timeout_seconds: u64,
+    ) -> CrawlResult {
         let url = entry.url;
         let depth = entry.depth;
-        let fetch_result = match timeout(Duration::from_secs(timeout_seconds), fetcher.fetch(&url)).await {
-            Ok(result) => result,
-            Err(_) => {
-                warn!("Fetch timed out after {}s for {}", timeout_seconds, url);
-                FetchResult {
-                    status_code: 0,
-                    final_url: url.clone(),
-                    requested_url: url.clone(),
-                    content_type: None,
-                    content_length: None,
-                    response_time_ms: timeout_seconds as f64 * 1000.0,
-                    is_redirect: false,
-                    redirect_count: 0,
-                    was_js_rendered: false,
-                    html_content: None,
-                    error_message: Some(format!("Fetch timed out after {} seconds", timeout_seconds)),
+        let fetch_result =
+            match timeout(Duration::from_secs(timeout_seconds), fetcher.fetch(&url)).await {
+                Ok(result) => result,
+                Err(_) => {
+                    warn!("Fetch timed out after {}s for {}", timeout_seconds, url);
+                    FetchResult {
+                        status_code: 0,
+                        final_url: url.clone(),
+                        requested_url: url.clone(),
+                        headers: std::collections::HashMap::new(),
+                        content_type: None,
+                        content_length: None,
+                        response_time_ms: timeout_seconds as f64 * 1000.0,
+                        is_redirect: false,
+                        redirect_count: 0,
+                        was_js_rendered: false,
+                        html_content: None,
+                        error_message: Some(format!(
+                            "Fetch timed out after {} seconds",
+                            timeout_seconds
+                        )),
+                    }
                 }
-            }
-        };
+            };
 
         // Parse crawlable HTML; still record failed/non-HTML attempts so progress never goes silent.
         let (seo_data, extracted_links) = if Self::is_crawlable(&fetch_result) {
@@ -314,7 +478,10 @@ impl CrawlEngine {
                 }
             }
         } else {
-            debug!("Recording non-crawlable attempt: {} ({})", url, fetch_result.status_code);
+            debug!(
+                "Recording non-crawlable attempt: {} ({})",
+                url, fetch_result.status_code
+            );
             (SeoData::default(), Vec::new())
         };
 
@@ -335,7 +502,7 @@ impl CrawlEngine {
         let base_url = url::Url::parse(&self.config.root_url)?;
         let hostname = base_url.host_str().unwrap_or("");
         let scheme = base_url.scheme();
-        
+
         let robots_url = format!("{}://{}/robots.txt", scheme, hostname);
         let fetcher = Fetcher::new(self.config.fetcher_config.clone());
         let result = fetcher.fetch(&robots_url).await;
@@ -355,11 +522,119 @@ impl CrawlEngine {
 
     /// Check if a fetch result is crawlable.
     fn is_crawlable(result: &FetchResult) -> bool {
-        result.status_code >= 200 && result.status_code < 400
+        result.status_code >= 200
+            && result.status_code < 400
             && result.html_content.is_some()
             && Fetcher::is_crawlable_content_type(
-                result.content_type.as_deref().unwrap_or("text/html")
+                result.content_type.as_deref().unwrap_or("text/html"),
             )
     }
+}
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_determine_indexability_indexable() {
+        let seo_data = SeoData::default();
+        assert_eq!(determine_indexability(&seo_data, 200), "indexable");
+    }
+
+    #[test]
+    fn test_determine_indexability_noindex() {
+        let mut seo_data = SeoData::default();
+        seo_data.noindex = true;
+        assert_eq!(determine_indexability(&seo_data, 200), "non_indexable");
+    }
+
+    #[test]
+    fn test_determine_indexability_404() {
+        let seo_data = SeoData::default();
+        assert_eq!(determine_indexability(&seo_data, 404), "non_indexable");
+    }
+
+    #[test]
+    fn test_result_to_page_data_basic() {
+        let result = CrawlResult {
+            url: "https://example.com/".to_string(),
+            fetch_result: FetchResult {
+                status_code: 200,
+                final_url: "https://example.com/".to_string(),
+                requested_url: "https://example.com/".to_string(),
+                headers: std::collections::HashMap::new(),
+                content_type: Some("text/html".to_string()),
+                content_length: Some(1234),
+                response_time_ms: 150.0,
+                is_redirect: false,
+                redirect_count: 0,
+                was_js_rendered: false,
+                html_content: Some("<html></html>".to_string()),
+                error_message: None,
+            },
+            seo_data: SeoData::default(),
+            extracted_links: vec![],
+            issues: vec![],
+            depth: 0,
+        };
+
+        let page_data = result_to_page_data(&result, 1, 42);
+        assert_eq!(page_data.project_id, 1);
+        assert_eq!(page_data.crawl_id, 42);
+        assert_eq!(page_data.url, "https://example.com/");
+        assert_eq!(page_data.indexability, "indexable");
+        assert!(page_data.issues.is_empty());
+        assert!(page_data.links.is_empty());
+    }
+
+    #[test]
+    fn test_result_to_page_data_with_issues_and_links() {
+        let result = CrawlResult {
+            url: "https://example.com/page".to_string(),
+            fetch_result: FetchResult {
+                status_code: 200,
+                final_url: "https://example.com/page".to_string(),
+                requested_url: "https://example.com/page".to_string(),
+                headers: std::collections::HashMap::new(),
+                content_type: Some("text/html".to_string()),
+                content_length: Some(5678),
+                response_time_ms: 300.0,
+                is_redirect: false,
+                redirect_count: 0,
+                was_js_rendered: false,
+                html_content: Some("<html><head><title>Test</title></head><body><a href='/'>Home</a></body></html>".to_string()),
+                error_message: None,
+            },
+            seo_data: SeoData::default(),
+            extracted_links: vec![
+                ExtractedLink {
+                    href: "https://example.com/".to_string(),
+                    anchor_text: Some("Home".to_string()),
+                    rel: None,
+                    is_internal: true,
+                    is_no_follow: false,
+                    link_type: LinkType::HtmlA,
+                },
+            ],
+            issues: vec![
+                SeoIssue {
+                    issue_type: "missing_meta_description".to_string(),
+                    severity: IssueSeverity::Warning,
+                    category: IssueCategory::Content,
+                    message: "Page is missing a meta description".to_string(),
+                    details: serde_json::json!({}),
+                },
+            ],
+            depth: 1,
+        };
+
+        let page_data = result_to_page_data(&result, 10, 99);
+        assert_eq!(page_data.issues.len(), 1);
+        assert_eq!(page_data.issues[0].issue_type, "missing_meta_description");
+        assert_eq!(page_data.issues[0].severity, "warning");
+        assert_eq!(page_data.issues[0].category, "content");
+        assert_eq!(page_data.links.len(), 1);
+        assert_eq!(page_data.links[0].link_relation, "HtmlA");
+        assert_eq!(page_data.links[0].target_url, "https://example.com/");
+    }
 }

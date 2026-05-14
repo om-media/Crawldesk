@@ -83,9 +83,8 @@ impl CrawlState {
     }
 
     pub fn to_progress_event(&self) -> CrawlProgressEvent {
-        let elapsed = self.started_at
-            .map(|s| s.elapsed().as_secs_f64());
-        
+        let elapsed = self.started_at.map(|s| s.elapsed().as_secs_f64());
+
         CrawlProgressEvent {
             status: self.status.clone(),
             total_urls: self.total_urls,

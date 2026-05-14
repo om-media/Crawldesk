@@ -1,8 +1,8 @@
 //! Rust types matching TypeScript interfaces in src/shared/types/
 //! All serializable models use `#[serde(rename_all = "camelCase")]` to match frontend.
 
-use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 
 // ─── Project Types ───────────────────────────────────────────────
 
@@ -61,7 +61,7 @@ pub enum CrawlStatus {
 pub struct Crawl {
     pub id: i64,
     pub project_id: i64,
-    pub status: String, // stored as string for DB compatibility
+    pub status: String,                // stored as string for DB compatibility
     pub settings_json: Option<String>, // JSON-serialized CrawlSettings
     pub started_at: Option<DateTime<Utc>>,
     pub completed_at: Option<DateTime<Utc>>,
@@ -111,16 +111,18 @@ pub struct SeoData {
     pub image_count: i32,
     pub images_without_alt: i32,
     pub images_with_alt: i32,
+    #[serde(default)]
+    pub images_missing_dimensions: i32,
     pub total_image_size_kb: f64,
     pub social_meta_open_graph: Option<String>, // JSON object
     pub social_meta_twitter_card: Option<String>,
-    pub structured_data_json: Option<String>,   // JSON-LD blocks
+    pub structured_data_json: Option<String>, // JSON-LD blocks
     pub has_schema_org: bool,
-    pub hreflang_alternates: Option<String>,    // JSON array
+    pub hreflang_alternates: Option<String>, // JSON array
     pub self_referencing_canonical: bool,
-    pub redirect_chain: Option<String>,         // JSON array of URLs
+    pub redirect_chain: Option<String>, // JSON array of URLs
     pub final_url: Option<String>,
-    pub js_rendered_html: Option<String>,       // Only for JS-rendered pages
+    pub js_rendered_html: Option<String>, // Only for JS-rendered pages
     pub carbon_footprint_grams: Option<f64>,
     pub anchor_text_distribution: Option<String>, // JSON object
     pub internal_link_count: i32,
@@ -129,10 +131,10 @@ pub struct SeoData {
     pub pagination_next: Option<String>,
     pub pagination_prev: Option<String>,
     pub is_paged: bool,
-    pub content_hash: Option<String>,           // SHA-256 hex
-    pub extractable_text: Option<String>,       // Plain text extraction
-    pub extraction_results: Option<String>,     // JSON array of ExtractionResult
-    pub keyword_density: Option<String>,        // JSON object from N-gram analysis
+    pub content_hash: Option<String>,       // SHA-256 hex
+    pub extractable_text: Option<String>,   // Plain text extraction
+    pub extraction_results: Option<String>, // JSON array of ExtractionResult
+    pub keyword_density: Option<String>,    // JSON object from N-gram analysis
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -142,10 +144,31 @@ pub struct UrlRecord {
     pub url: String,
     pub project_id: i64,
     pub crawl_id: Option<i64>,
-    pub fetch_result_json: Option<String>, // JSON-serialized FetchResult
-    pub seo_data_json: Option<String>,     // JSON-serialized SeoData
-    pub indexability: String,              // indexable, noindex, blocked_by_robots, etc.
+    // Direct columns for fast filtering/display (avoid JSON parsing)
+    pub normalized_url: Option<String>,
+    pub final_url: Option<String>,
+    pub status_code: Option<i32>,
+    pub content_type: Option<String>,
+    pub title: Option<String>,
+    pub title_length: Option<i32>,
+    pub meta_description: Option<String>,
+    pub meta_description_length: Option<i32>,
+    pub h1: Option<String>,
+    pub h1_count: Option<i32>,
+    pub word_count: Option<i32>,
+    pub canonical_url: Option<String>,
+    pub meta_robots: Option<String>,
+    pub response_time_ms: Option<f64>,
+    pub size_bytes: Option<i32>,
+    pub language: Option<String>,
+    pub inlinks_count: Option<i32>,
+    pub outlinks_count: Option<i32>,
+    pub content_hash: Option<String>,
+    pub indexability: String,
     pub depth: i32,
+    // Full JSON blobs for inspector panel detail
+    pub fetch_result_json: Option<String>,
+    pub seo_data_json: Option<String>,
     pub discovered_at: Option<DateTime<Utc>>,
     pub fetched_at: Option<DateTime<Utc>>,
     pub last_crawled_at: Option<DateTime<Utc>>,
@@ -164,7 +187,7 @@ pub struct FetchResult {
     pub is_redirect: bool,
     pub redirect_count: i32,
     pub was_js_rendered: bool,
-    pub html_content: Option<String>,     // Full HTML for parsing
+    pub html_content: Option<String>, // Full HTML for parsing
     pub error_message: Option<String>,
 }
 
@@ -459,9 +482,13 @@ mod tests {
             "customHeaders": null
         }"#;
 
-        let settings: CrawlSettings = serde_json::from_str(json).expect("Failed to deserialize CrawlSettings");
-        assert_eq!(settings.start_url, Some("https://silentjamzone.com".to_string()),
-            "startUrl should be deserialized to start_url with the correct value");
+        let settings: CrawlSettings =
+            serde_json::from_str(json).expect("Failed to deserialize CrawlSettings");
+        assert_eq!(
+            settings.start_url,
+            Some("https://silentjamzone.com".to_string()),
+            "startUrl should be deserialized to start_url with the correct value"
+        );
         assert_eq!(settings.max_urls, 10000);
         assert_eq!(settings.max_depth, 10);
     }
@@ -492,9 +519,12 @@ mod tests {
             "customHeaders": null
         }"#;
 
-        let settings: CrawlSettings = serde_json::from_str(json).expect("Failed to deserialize CrawlSettings");
-        assert_eq!(settings.start_url, None,
-            "startUrl=null should deserialize to None");
+        let settings: CrawlSettings =
+            serde_json::from_str(json).expect("Failed to deserialize CrawlSettings");
+        assert_eq!(
+            settings.start_url, None,
+            "startUrl=null should deserialize to None"
+        );
     }
 
     #[test]
@@ -523,10 +553,14 @@ mod tests {
         }"#;
 
         // When startUrl is missing from JSON, serde should use the Default value (None)
-        let settings: CrawlSettings = serde_json::from_str(json).expect("Failed to deserialize without startUrl");
+        let settings: CrawlSettings =
+            serde_json::from_str(json).expect("Failed to deserialize without startUrl");
         // Note: missing field with no default will fail deserialization unless #[serde(default)]
         // CrawlSettings needs #[serde(default)] or each field needs a default
         // Let's verify what actually happens:
-        assert!(settings.start_url.is_none(), "Missing startUrl should result in None");
+        assert!(
+            settings.start_url.is_none(),
+            "Missing startUrl should result in None"
+        );
     }
 }

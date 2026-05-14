@@ -1,27 +1,27 @@
 //! Repository queries matching the TypeScript repository layer.
 //! Each method maps to one SQL query — direct port from src/main/db/repositories/*.ts
 
+use crate::core::crawler::issue_registry;
 use crate::core::storage::models::*;
 pub use crate::core::storage::models::{IssueRecord, IssueSummary, LinkRecord, LinkSummary};
 use chrono::{DateTime, NaiveDateTime, Utc};
 use rusqlite::types::Value;
 use rusqlite::{params, params_from_iter, Connection, OptionalExtension, Result};
-use serde::{Deserialize, Serialize};
 
 fn parse_sqlite_datetime(s: &str) -> std::result::Result<DateTime<Utc>, chrono::ParseError> {
     if let Ok(dt) = DateTime::parse_from_rfc3339(s) {
         return Ok(dt.with_timezone(&Utc));
     }
 
-    NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S")
-        .map(|dt| dt.and_utc())
+    NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S").map(|dt| dt.and_utc())
 }
 
 /// Helper to get a non-optional DateTime<Utc> from a row (SQLite stores dates as strings).
 fn get_datetime(row: &rusqlite::Row, idx: &str) -> Result<DateTime<Utc>> {
     let s: String = row.get(idx)?;
-    let dt = parse_sqlite_datetime(&s)
-        .map_err(|e| rusqlite::Error::FromSqlConversionFailure(0, rusqlite::types::Type::Text, Box::new(e)))?;
+    let dt = parse_sqlite_datetime(&s).map_err(|e| {
+        rusqlite::Error::FromSqlConversionFailure(0, rusqlite::types::Type::Text, Box::new(e))
+    })?;
     Ok(dt)
 }
 
@@ -33,13 +33,26 @@ fn get_datetime_opt(row: &rusqlite::Row, idx: &str) -> Result<Option<DateTime<Ut
 
 fn get_datetime_col(row: &rusqlite::Row, idx: usize) -> Result<DateTime<Utc>> {
     let s: String = row.get(idx)?;
-    let dt = parse_sqlite_datetime(&s)
-        .map_err(|e| rusqlite::Error::FromSqlConversionFailure(0, rusqlite::types::Type::Text, Box::new(e)))?;
+    let dt = parse_sqlite_datetime(&s).map_err(|e| {
+        rusqlite::Error::FromSqlConversionFailure(0, rusqlite::types::Type::Text, Box::new(e))
+    })?;
     Ok(dt)
 }
 
 /// Derive human-readable label, explanation, and recommendation from issue metadata.
-fn derive_issue_context(issue_type: &str, severity: &str, category: &str) -> (String, String, String) {
+fn derive_issue_context(
+    issue_type: &str,
+    _severity: &str,
+    _category: &str,
+) -> (String, String, String) {
+    if let Some(definition) = issue_registry::definition_for_id(issue_type) {
+        return (
+            definition.label.to_string(),
+            definition.explanation.to_string(),
+            definition.recommendation.to_string(),
+        );
+    }
+
     let label = match issue_type {
         "missing_title" => "Missing Title Tag".to_string(),
         "duplicate_title" => "Duplicate Title Tag".to_string(),
@@ -63,7 +76,17 @@ fn derive_issue_context(issue_type: &str, severity: &str, category: &str) -> (St
         "missing_schema_org" => "Missing Schema.org Markup".to_string(),
         "mixed_content" => "Mixed HTTP/HTTPS Content".to_string(),
         "missing_hreflang" => "Missing Hreflang Tags".to_string(),
-        _ => format!("{} Issue", issue_type.replace('_', " ").replace(' ', " ").chars().next().map(|c| c.to_uppercase().to_string()).unwrap_or_default() + &issue_type.replace('_', " ")[1..]),
+        _ => format!(
+            "{} Issue",
+            issue_type
+                .replace('_', " ")
+                .replace(' ', " ")
+                .chars()
+                .next()
+                .map(|c| c.to_uppercase().to_string())
+                .unwrap_or_default()
+                + &issue_type.replace('_', " ")[1..]
+        ),
     };
 
     let explanation = match issue_type {
@@ -130,7 +153,7 @@ pub fn create_project(conn: &Connection, name: &str, root_url: &str) -> Result<P
         "INSERT INTO projects (name, root_url, created_at, updated_at) VALUES (?1, ?2, ?3, ?3)",
         params![name, root_url, now],
     )?;
-    
+
     let last_id = conn.last_insert_rowid();
     Ok(Project {
         id: last_id,
@@ -143,9 +166,9 @@ pub fn create_project(conn: &Connection, name: &str, root_url: &str) -> Result<P
 
 pub fn get_projects(conn: &Connection) -> Result<Vec<Project>> {
     let mut stmt = conn.prepare(
-        "SELECT id, name, root_url, created_at, updated_at FROM projects ORDER BY created_at DESC"
+        "SELECT id, name, root_url, created_at, updated_at FROM projects ORDER BY created_at DESC",
     )?;
-    
+
     let projects = stmt.query_map([], |row| {
         Ok(Project {
             id: row.get("id")?,
@@ -155,15 +178,14 @@ pub fn get_projects(conn: &Connection) -> Result<Vec<Project>> {
             updated_at: get_datetime(row, "updated_at")?,
         })
     })?;
-    
+
     projects.collect()
 }
 
 pub fn get_project(conn: &Connection, id: i64) -> Result<Option<Project>> {
-    let mut stmt = conn.prepare(
-        "SELECT id, name, root_url, created_at, updated_at FROM projects WHERE id = ?1"
-    )?;
-    
+    let mut stmt = conn
+        .prepare("SELECT id, name, root_url, created_at, updated_at FROM projects WHERE id = ?1")?;
+
     stmt.query_row(params![id], |row| {
         Ok(Project {
             id: row.get("id")?,
@@ -172,7 +194,8 @@ pub fn get_project(conn: &Connection, id: i64) -> Result<Option<Project>> {
             created_at: get_datetime(row, "created_at")?,
             updated_at: get_datetime(row, "updated_at")?,
         })
-    }).optional()
+    })
+    .optional()
 }
 
 pub fn get_project_summary(conn: &Connection, id: i64) -> Result<ProjectSummary> {
@@ -186,9 +209,9 @@ pub fn get_project_summary(conn: &Connection, id: i64) -> Result<ProjectSummary>
          LEFT JOIN crawls c ON c.project_id = p.id
          LEFT JOIN issues i ON i.url_id IN (SELECT id FROM urls WHERE project_id = p.id)
          WHERE p.id = ?1
-         GROUP BY p.id"
+         GROUP BY p.id",
     )?;
-    
+
     stmt.query_row(params![id], |row| {
         Ok(ProjectSummary {
             project: Project {
@@ -207,14 +230,18 @@ pub fn get_project_summary(conn: &Connection, id: i64) -> Result<ProjectSummary>
 
 // ─── Crawls ──────────────────────────────────────────────────────
 
-pub fn create_crawl(conn: &Connection, project_id: i64, settings_json: Option<&str>) -> Result<Crawl> {
+pub fn create_crawl(
+    conn: &Connection,
+    project_id: i64,
+    settings_json: Option<&str>,
+) -> Result<Crawl> {
     let now = Utc::now().to_rfc3339();
-    
+
     conn.execute(
         "INSERT INTO crawls (project_id, status, settings_json, created_at) VALUES (?1, 'created', ?2, ?3)",
         params![project_id, settings_json.unwrap_or("null"), now],
     )?;
-    
+
     let last_id = conn.last_insert_rowid();
     Ok(Crawl {
         id: last_id,
@@ -245,7 +272,7 @@ pub fn update_crawl_status(conn: &Connection, id: i64, status: &str) -> Result<(
             params![status, &now, id],
         )?;
     }
-    
+
     Ok(())
 }
 
@@ -300,26 +327,250 @@ mod tests {
             );
             INSERT INTO crawls (project_id) VALUES (1);
             ",
-        ).unwrap();
+        )
+        .unwrap();
 
         update_crawl_status(&conn, 1, "crawling").unwrap();
         let started_at: Option<String> = conn
-            .query_row("SELECT started_at FROM crawls WHERE id = 1", [], |row| row.get(0))
+            .query_row("SELECT started_at FROM crawls WHERE id = 1", [], |row| {
+                row.get(0)
+            })
             .unwrap();
         assert!(started_at.is_some());
 
         update_crawl_status(&conn, 1, "completed").unwrap();
         let completed_at: Option<String> = conn
-            .query_row("SELECT completed_at FROM crawls WHERE id = 1", [], |row| row.get(0))
+            .query_row("SELECT completed_at FROM crawls WHERE id = 1", [], |row| {
+                row.get(0)
+            })
             .unwrap();
         assert!(completed_at.is_some());
     }
+
+    #[test]
+    fn update_inlinks_counts_sets_inlinks_per_url() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(
+            "
+            CREATE TABLE projects (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                root_url TEXT NOT NULL,
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+            CREATE TABLE crawls (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                project_id INTEGER NOT NULL,
+                status TEXT NOT NULL DEFAULT 'created',
+                settings_json TEXT,
+                started_at TEXT,
+                completed_at TEXT,
+                error_message TEXT,
+                url_count INTEGER NOT NULL DEFAULT 0,
+                issue_count INTEGER NOT NULL DEFAULT 0,
+                link_count INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+            CREATE TABLE urls (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                url TEXT NOT NULL,
+                project_id INTEGER NOT NULL,
+                crawl_id INTEGER,
+                normalized_url TEXT,
+                final_url TEXT,
+                status_code INTEGER,
+                content_type TEXT,
+                title TEXT,
+                title_length INTEGER,
+                meta_description TEXT,
+                meta_description_length INTEGER,
+                h1 TEXT,
+                h1_count INTEGER DEFAULT 0,
+                word_count INTEGER,
+                canonical_url TEXT,
+                meta_robots TEXT,
+                response_time_ms REAL,
+                size_bytes INTEGER,
+                language TEXT,
+                inlinks_count INTEGER DEFAULT 0,
+                outlinks_count INTEGER DEFAULT 0,
+                content_hash TEXT,
+                indexability TEXT NOT NULL DEFAULT 'unknown',
+                depth INTEGER NOT NULL DEFAULT 0,
+                fetch_result_json TEXT,
+                seo_data_json TEXT,
+                discovered_at TEXT,
+                fetched_at TEXT,
+                last_crawled_at TEXT
+            );
+            CREATE TABLE links (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                source_url_id INTEGER NOT NULL,
+                source_url TEXT NOT NULL,
+                target_url TEXT NOT NULL,
+                target_normalized_url TEXT,
+                link_relation TEXT NOT NULL DEFAULT 'html_a',
+                anchor_text TEXT,
+                is_internal INTEGER NOT NULL DEFAULT 1,
+                is_no_follow INTEGER NOT NULL DEFAULT 0,
+                detected_at TEXT NOT NULL DEFAULT (datetime('now')),
+                crawl_id INTEGER
+            );
+            ",
+        )
+        .unwrap();
+
+        // Insert project + crawl + 3 URLs
+        conn.execute(
+            "INSERT INTO projects (name, root_url) VALUES ('Test', 'https://example.com/')",
+            [],
+        )
+        .unwrap();
+        conn.execute("INSERT INTO crawls (project_id) VALUES (1)", [])
+            .unwrap();
+
+        // URL id=1 (normalized: /a), id=2 (/b), id=3 (/c)
+        conn.execute(
+            "INSERT INTO urls (url, project_id, crawl_id, normalized_url) VALUES ('https://example.com/a', 1, 1, '/a')",
+            [],
+        ).unwrap();
+        conn.execute(
+            "INSERT INTO urls (url, project_id, crawl_id, normalized_url) VALUES ('https://example.com/b', 1, 1, '/b')",
+            [],
+        ).unwrap();
+        conn.execute(
+            "INSERT INTO urls (url, project_id, crawl_id, normalized_url) VALUES ('https://example.com/c', 1, 1, '/c')",
+            [],
+        ).unwrap();
+
+        // Insert links: 2 links point to /a, 1 link points to /b, 0 to /c
+        conn.execute(
+            "INSERT INTO links (source_url_id, source_url, target_url, target_normalized_url, crawl_id) VALUES (2, 'https://example.com/b', 'https://example.com/a', '/a', 1)",
+            [],
+        ).unwrap();
+        conn.execute(
+            "INSERT INTO links (source_url_id, source_url, target_url, target_normalized_url, crawl_id) VALUES (3, 'https://example.com/c', 'https://example.com/a', '/a', 1)",
+            [],
+        ).unwrap();
+        conn.execute(
+            "INSERT INTO links (source_url_id, source_url, target_url, target_normalized_url, crawl_id) VALUES (1, 'https://example.com/a', 'https://example.com/b', '/b', 1)",
+            [],
+        ).unwrap();
+
+        // Before aggregation, inlinks_count should be 0
+        let count_before: i64 = conn
+            .query_row(
+                "SELECT inlinks_count FROM urls WHERE normalized_url = '/a'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(count_before, 0, "inlinks_count should default to 0");
+
+        // Run aggregation
+        update_inlinks_counts(&conn, 1).unwrap();
+
+        // Verify: /a has 2 inlinks, /b has 1, /c has 0
+        let inlinks_a: i64 = conn
+            .query_row(
+                "SELECT inlinks_count FROM urls WHERE normalized_url = '/a'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        let inlinks_b: i64 = conn
+            .query_row(
+                "SELECT inlinks_count FROM urls WHERE normalized_url = '/b'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        let inlinks_c: i64 = conn
+            .query_row(
+                "SELECT inlinks_count FROM urls WHERE normalized_url = '/c'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(inlinks_a, 2, "URL /a should have 2 inlinks");
+        assert_eq!(inlinks_b, 1, "URL /b should have 1 inlink");
+        assert_eq!(inlinks_c, 0, "URL /c should have 0 inlinks");
+    }
+
+    #[test]
+    fn query_issues_by_crawl_filters_category_and_search() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(
+            "
+            CREATE TABLE urls (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                url TEXT NOT NULL,
+                crawl_id INTEGER
+            );
+            CREATE TABLE issues (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                url_id INTEGER,
+                url TEXT NOT NULL,
+                issue_type TEXT NOT NULL,
+                severity TEXT NOT NULL,
+                category TEXT NOT NULL,
+                message TEXT NOT NULL,
+                details_json TEXT,
+                detected_at TEXT NOT NULL,
+                is_fixed INTEGER NOT NULL DEFAULT 0
+            );
+            INSERT INTO urls (id, url, crawl_id) VALUES
+                (1, 'https://example.com/', 7),
+                (2, 'https://example.com/about', 7),
+                (3, 'https://example.com/private', 7);
+            INSERT INTO issues (url_id, url, issue_type, severity, category, message, detected_at) VALUES
+                (1, 'https://example.com/', 'missing_title', 'critical', 'content', 'Title tag is missing', '2026-05-14T08:00:00Z'),
+                (2, 'https://example.com/about', 'missing_meta_description', 'warning', 'content', 'Meta description is missing', '2026-05-14T08:01:00Z'),
+                (3, 'https://example.com/private', 'missing_hsts', 'warning', 'security', 'HSTS header is missing', '2026-05-14T08:02:00Z');
+            ",
+        )
+        .unwrap();
+
+        let (records, total) = query_issues_by_crawl(
+            &conn,
+            Some(7),
+            0,
+            50,
+            None,
+            Some("warning"),
+            Some("content"),
+            Some("meta"),
+        )
+        .unwrap();
+
+        assert_eq!(total, 1);
+        assert_eq!(records.len(), 1);
+        assert_eq!(records[0].issue_type, "missing_meta_description");
+        assert_eq!(records[0].category, "content");
+    }
 }
 
-pub fn update_crawl_counters(conn: &Connection, id: i64, url_count: i64, issue_count: i64, link_count: i64) -> Result<()> {
+pub fn update_crawl_counters(
+    conn: &Connection,
+    id: i64,
+    url_count: i64,
+    issue_count: i64,
+    link_count: i64,
+) -> Result<()> {
     conn.execute(
         "UPDATE crawls SET url_count = ?1, issue_count = ?2, link_count = ?3 WHERE id = ?4",
         params![url_count, issue_count, link_count, id],
+    )?;
+    Ok(())
+}
+
+/// After a crawl completes, aggregate inlinks_count for every URL in the crawl
+/// by counting how many links point to each URL's normalized_url.
+pub fn update_inlinks_counts(conn: &Connection, crawl_id: i64) -> Result<()> {
+    conn.execute(
+        "UPDATE urls SET inlinks_count = (SELECT COUNT(*) FROM links WHERE target_normalized_url = urls.normalized_url AND crawl_id = urls.crawl_id) WHERE crawl_id = ?1",
+        params![crawl_id],
     )?;
     Ok(())
 }
@@ -328,7 +579,7 @@ pub fn get_crawl(conn: &Connection, id: i64) -> Result<Option<Crawl>> {
     let mut stmt = conn.prepare(
         "SELECT id, project_id, status, settings_json, started_at, completed_at, error_message, url_count, issue_count, link_count, created_at FROM crawls WHERE id = ?1"
     )?;
-    
+
     stmt.query_row(params![id], |row| {
         Ok(Crawl {
             id: row.get("id")?,
@@ -343,7 +594,8 @@ pub fn get_crawl(conn: &Connection, id: i64) -> Result<Option<Crawl>> {
             link_count: row.get("link_count")?,
             created_at: get_datetime(row, "created_at")?,
         })
-    }).optional()
+    })
+    .optional()
 }
 
 // ─── URLs ────────────────────────────────────────────────────────
@@ -355,42 +607,84 @@ pub fn query_urls(
     page: i64,
     page_size: i64,
     filter_indexability: Option<&str>,
+    filter_status_category: Option<&str>,
+    search: Option<&str>,
     sort_by: &str,
     sort_order: &str,
 ) -> Result<(Vec<UrlRecord>, i64)> {
-    let mut where_parts = vec!["project_id = ?".to_string()];
-    let mut count_params = vec![Value::Integer(project_id)];
+    let mut where_parts = vec!["u.project_id = ?".to_string()];
+    let mut params = vec![Value::Integer(project_id)];
 
     if let Some(crawl_id) = crawl_id {
-        where_parts.push("crawl_id = ?".to_string());
-        count_params.push(Value::Integer(crawl_id));
+        where_parts.push("u.crawl_id = ?".to_string());
+        params.push(Value::Integer(crawl_id));
     }
 
     if let Some(filter) = filter_indexability {
-        where_parts.push("indexability = ?".to_string());
-        count_params.push(Value::Text(filter.to_string()));
+        where_parts.push("u.indexability = ?".to_string());
+        params.push(Value::Text(filter.to_string()));
+    }
+
+    // Filter by status code category (2xx, 3xx, 4xx, 5xx) — dedicated column instead of JSON extract
+    if let Some(cat) = filter_status_category {
+        match cat {
+            "2xx" => {
+                where_parts.push("u.status_code BETWEEN 200 AND 299".to_string());
+            }
+            "3xx" => {
+                where_parts.push("u.status_code BETWEEN 300 AND 399".to_string());
+            }
+            "4xx" => {
+                where_parts.push("u.status_code BETWEEN 400 AND 499".to_string());
+            }
+            "5xx" => {
+                where_parts.push("u.status_code >= 500".to_string());
+            }
+            _ => {}
+        }
+    }
+
+    // Search filter: match against url, title, meta_description — use dedicated columns
+    if let Some(search_term) = search {
+        if !search_term.is_empty() {
+            let like_pattern = format!("%{}%", search_term.replace('%', "\\%").replace('_', "\\_"));
+            where_parts.push("(u.url LIKE ? ESCAPE '\\' OR u.title LIKE ? ESCAPE '\\' OR u.meta_description LIKE ? ESCAPE '\\')".to_string());
+            params.push(Value::Text(like_pattern.clone()));
+            params.push(Value::Text(like_pattern.clone()));
+            params.push(Value::Text(like_pattern));
+        }
     }
 
     let where_clause = where_parts.join(" AND ");
-    let count_query = format!("SELECT COUNT(*) FROM urls WHERE {}", where_clause);
-    let total: i64 = conn.query_row(&count_query, params_from_iter(count_params.iter()), |row| row.get(0))?;
+    let count_query = format!("SELECT COUNT(*) FROM urls u WHERE {}", where_clause);
+    let total: i64 = conn.query_row(&count_query, params_from_iter(params.iter()), |row| {
+        row.get(0)
+    })?;
 
     let skip = page.max(0) * page_size;
     let order_field = match sort_by {
-        "fetched_at" => "u.fetched_at",
+        "fetched_at" | "fetchedAt" => "u.fetched_at",
         "depth" => "u.depth",
         "url" => "u.url",
         "indexability" => "u.indexability",
+        "statusCode" | "status_code" => "u.status_code",
+        "responseTimeMs" | "response_time_ms" => "u.response_time_ms",
+        "title" => "u.title",
         _ => "u.id",
     };
     let order_dir = if sort_order == "desc" { "DESC" } else { "ASC" };
 
-    let mut query_params = count_params;
+    let mut query_params = params;
     query_params.push(Value::Integer(page_size));
     query_params.push(Value::Integer(skip));
 
+    // Select all dedicated columns for fast display, plus JSON blobs for inspector detail
     let mut stmt = conn.prepare(&format!(
-        "SELECT id, url, project_id, crawl_id, fetch_result_json, seo_data_json, indexability, depth, discovered_at, fetched_at, last_crawled_at
+        "SELECT id, url, project_id, crawl_id, normalized_url, final_url, status_code,
+                content_type, title, title_length, meta_description, meta_description_length,
+                h1, h1_count, word_count, canonical_url, meta_robots, response_time_ms,
+                size_bytes, language, inlinks_count, outlinks_count, content_hash,
+                indexability, depth, fetch_result_json, seo_data_json, discovered_at, fetched_at, last_crawled_at
          FROM urls u WHERE {}
          ORDER BY {} {} LIMIT ? OFFSET ?",
         where_clause, order_field, order_dir,
@@ -398,7 +692,7 @@ pub fn query_urls(
 
     let rows = stmt.query_map(params_from_iter(query_params.iter()), map_url_row)?;
     let records: Vec<UrlRecord> = rows.filter_map(|r| r.ok()).collect();
-    
+
     Ok((records, total))
 }
 
@@ -408,10 +702,29 @@ fn map_url_row(row: &rusqlite::Row) -> rusqlite::Result<UrlRecord> {
         url: row.get("url")?,
         project_id: row.get("project_id")?,
         crawl_id: row.get("crawl_id")?,
-        fetch_result_json: row.get("fetch_result_json")?,
-        seo_data_json: row.get("seo_data_json")?,
+        normalized_url: row.get("normalized_url")?,
+        final_url: row.get("final_url")?,
+        status_code: row.get("status_code")?,
+        content_type: row.get("content_type")?,
+        title: row.get("title")?,
+        title_length: row.get("title_length")?,
+        meta_description: row.get("meta_description")?,
+        meta_description_length: row.get("meta_description_length")?,
+        h1: row.get("h1")?,
+        h1_count: row.get("h1_count")?,
+        word_count: row.get("word_count")?,
+        canonical_url: row.get("canonical_url")?,
+        meta_robots: row.get("meta_robots")?,
+        response_time_ms: row.get("response_time_ms")?,
+        size_bytes: row.get("size_bytes")?,
+        language: row.get("language")?,
+        inlinks_count: row.get("inlinks_count")?,
+        outlinks_count: row.get("outlinks_count")?,
+        content_hash: row.get("content_hash")?,
         indexability: row.get("indexability")?,
         depth: row.get("depth")?,
+        fetch_result_json: row.get("fetch_result_json")?,
+        seo_data_json: row.get("seo_data_json")?,
         discovered_at: get_datetime_opt(row, "discovered_at")?,
         fetched_at: get_datetime_opt(row, "fetched_at")?,
         last_crawled_at: get_datetime_opt(row, "last_crawled_at")?,
@@ -420,24 +733,44 @@ fn map_url_row(row: &rusqlite::Row) -> rusqlite::Result<UrlRecord> {
 
 pub fn get_url_details(conn: &Connection, url_id: i64) -> Result<Option<UrlRecord>> {
     let mut stmt = conn.prepare(
-        "SELECT id, url, project_id, crawl_id, fetch_result_json, seo_data_json, indexability, depth, discovered_at, fetched_at, last_crawled_at FROM urls WHERE id = ?1"
+        "SELECT id, url, project_id, crawl_id, normalized_url, final_url, status_code, content_type, title, title_length, meta_description, meta_description_length, h1, h1_count, word_count, canonical_url, meta_robots, response_time_ms, size_bytes, language, inlinks_count, outlinks_count, content_hash, indexability, depth, fetch_result_json, seo_data_json, discovered_at, fetched_at, last_crawled_at FROM urls WHERE id = ?1"
     )?;
-    
+
     stmt.query_row(params![url_id], |row| {
         Ok(UrlRecord {
             id: row.get("id")?,
             url: row.get("url")?,
             project_id: row.get("project_id")?,
             crawl_id: row.get("crawl_id")?,
-            fetch_result_json: row.get("fetch_result_json")?,
-            seo_data_json: row.get("seo_data_json")?,
+            normalized_url: row.get("normalized_url")?,
+            final_url: row.get("final_url")?,
+            status_code: row.get("status_code")?,
+            content_type: row.get("content_type")?,
+            title: row.get("title")?,
+            title_length: row.get("title_length")?,
+            meta_description: row.get("meta_description")?,
+            meta_description_length: row.get("meta_description_length")?,
+            h1: row.get("h1")?,
+            h1_count: row.get("h1_count")?,
+            word_count: row.get("word_count")?,
+            canonical_url: row.get("canonical_url")?,
+            meta_robots: row.get("meta_robots")?,
+            response_time_ms: row.get("response_time_ms")?,
+            size_bytes: row.get("size_bytes")?,
+            language: row.get("language")?,
+            inlinks_count: row.get("inlinks_count")?,
+            outlinks_count: row.get("outlinks_count")?,
+            content_hash: row.get("content_hash")?,
             indexability: row.get("indexability")?,
             depth: row.get("depth")?,
+            fetch_result_json: row.get("fetch_result_json")?,
+            seo_data_json: row.get("seo_data_json")?,
             discovered_at: get_datetime_opt(row, "discovered_at")?,
             fetched_at: get_datetime_opt(row, "fetched_at")?,
             last_crawled_at: get_datetime_opt(row, "last_crawled_at")?,
         })
-    }).optional()
+    })
+    .optional()
 }
 
 // ─── Issues ──────────────────────────────────────────────────────
@@ -449,25 +782,29 @@ pub fn get_issue_summary(conn: &Connection, project_id: i64) -> Result<Vec<Issue
          JOIN urls u ON i.url_id = u.id
          WHERE u.project_id = ?1
          GROUP BY i.issue_type, i.severity, i.category
-         ORDER BY count DESC"
+         ORDER BY count DESC",
     )?;
-    
-    let summaries: Vec<IssueSummary> = stmt.query_map(params![project_id], |row| {
-        let issue_type: String = row.get("issue_type")?;
-        let severity: String = row.get("severity")?;
-        let category: String = row.get("category")?;
-        let count: i64 = row.get("count")?;
-        let (label, explanation, recommendation) = derive_issue_context(&issue_type, &severity, &category);
-        Ok(IssueSummary {
-            issue_type,
-            severity,
-            category,
-            count,
-            label: Some(label),
-            explanation: Some(explanation),
-            recommendation: Some(recommendation),
-        })
-    })?.filter_map(|r| r.ok()).collect();
+
+    let summaries: Vec<IssueSummary> = stmt
+        .query_map(params![project_id], |row| {
+            let issue_type: String = row.get("issue_type")?;
+            let severity: String = row.get("severity")?;
+            let category: String = row.get("category")?;
+            let count: i64 = row.get("count")?;
+            let (label, explanation, recommendation) =
+                derive_issue_context(&issue_type, &severity, &category);
+            Ok(IssueSummary {
+                issue_type,
+                severity,
+                category,
+                count,
+                label: Some(label),
+                explanation: Some(explanation),
+                recommendation: Some(recommendation),
+            })
+        })?
+        .filter_map(|r| r.ok())
+        .collect();
 
     Ok(summaries)
 }
@@ -486,7 +823,7 @@ pub fn query_issues(
         filter_type.map(|t| "AND i.issue_type = ?2").unwrap_or_default(),
         filter_severity.map(|s| "AND i.severity = ?3").unwrap_or_default()
     );
-    
+
     let total: i64 = match (filter_type, filter_severity) {
         (Some(t), Some(s)) => conn.query_row(
             "SELECT COUNT(*) FROM issues i JOIN urls u ON i.url_id = u.id WHERE u.project_id = ?1 AND i.issue_type = ?2 AND i.severity = ?3",
@@ -509,30 +846,34 @@ pub fn query_issues(
             |row| row.get(0),
         )?,
     };
-    
+
     // Get paginated results — use positional ? placeholders
     let skip = page.max(0) * page_size;
-    
+
     let filter_where = match (filter_type, filter_severity) {
         (Some(_), Some(_)) => "AND i.issue_type = ? AND i.severity = ?",
         (Some(_), None) => "AND i.issue_type = ?",
         (None, Some(_)) => "AND i.severity = ?",
         (None, None) => "",
     };
-    
+
     let mut stmt = conn.prepare(&format!(
         "SELECT i.id, i.issue_type, i.severity, i.category, i.url_id, i.url, i.message, i.details_json, i.detected_at, i.is_fixed
          FROM issues i JOIN urls u ON i.url_id = u.id WHERE u.project_id = ?1 {}
          ORDER BY i.detected_at DESC LIMIT ? OFFSET ?",
         filter_where
     ))?;
-    
+
     let mut issue_params: Vec<Value> = vec![Value::Integer(project_id)];
-    if let Some(t) = filter_type { issue_params.push(Value::Text(t.to_string())); }
-    if let Some(s) = filter_severity { issue_params.push(Value::Text(s.to_string())); }
+    if let Some(t) = filter_type {
+        issue_params.push(Value::Text(t.to_string()));
+    }
+    if let Some(s) = filter_severity {
+        issue_params.push(Value::Text(s.to_string()));
+    }
     issue_params.push(Value::Integer(page_size));
     issue_params.push(Value::Integer(skip));
-    
+
     let records: Vec<IssueRecord> = stmt
         .query_map(params_from_iter(issue_params.iter()), |row| {
             Ok(IssueRecord {
@@ -550,7 +891,7 @@ pub fn query_issues(
         })?
         .filter_map(|r| r.ok())
         .collect();
-    
+
     Ok((records, total))
 }
 
@@ -582,7 +923,7 @@ pub fn query_links(
         "SELECT COUNT(*) FROM links l JOIN urls u ON l.source_url_id = u.id WHERE u.project_id = ?1 {}",
         filter_relation.map(|r| "AND l.link_relation = ?2").unwrap_or_default()
     );
-    
+
     let total: i64 = if let Some(rel) = filter_relation {
         conn.query_row(
             "SELECT COUNT(*) FROM links l JOIN urls u ON l.source_url_id = u.id WHERE u.project_id = ?1 AND l.link_relation = ?2",
@@ -596,26 +937,28 @@ pub fn query_links(
             |row| row.get(0),
         )?
     };
-    
+
     let skip = page.max(0) * page_size;
-    
+
     let filter_where = match filter_relation {
         Some(_) => "AND l.link_relation = ?",
         None => "",
     };
-    
+
     let mut stmt = conn.prepare(&format!(
         "SELECT l.id, l.source_url_id, l.source_url, l.target_url, l.link_relation, l.anchor_text, l.is_internal, l.is_no_follow, l.detected_at
          FROM links l JOIN urls u ON l.source_url_id = u.id WHERE u.project_id = ?1 {}
          ORDER BY l.detected_at DESC LIMIT ? OFFSET ?",
         filter_where
     ))?;
-    
+
     let mut link_params: Vec<Value> = vec![Value::Integer(project_id)];
-    if let Some(rel) = filter_relation { link_params.push(Value::Text(rel.to_string())); }
+    if let Some(rel) = filter_relation {
+        link_params.push(Value::Text(rel.to_string()));
+    }
     link_params.push(Value::Integer(page_size));
     link_params.push(Value::Integer(skip));
-    
+
     let records: Vec<LinkRecord> = stmt
         .query_map(params_from_iter(link_params.iter()), |row| {
             Ok(LinkRecord {
@@ -632,7 +975,7 @@ pub fn query_links(
         })?
         .filter_map(|r| r.ok())
         .collect();
-    
+
     Ok((records, total))
 }
 
@@ -643,30 +986,29 @@ pub fn summarize_links(conn: &Connection, project_id: i64) -> Result<LinkSummary
             SUM(CASE WHEN is_internal = 1 THEN 1 ELSE 0 END) as internal_links,
             SUM(CASE WHEN is_internal = 0 THEN 1 ELSE 0 END) as external_links,
             SUM(CASE WHEN is_no_follow = 1 THEN 1 ELSE 0 END) as nofollow_links
-         FROM links l JOIN urls u ON l.source_url_id = u.id WHERE u.project_id = ?1"
+         FROM links l JOIN urls u ON l.source_url_id = u.id WHERE u.project_id = ?1",
     )?;
-    
-    let (total, internal, external, nofollow): (i64, i64, i64, i64) = stmt.query_row(params![project_id], |row| {
-        Ok((
-            row.get(0)?,
-            row.get(1)?,
-            row.get(2)?,
-            row.get(3)?,
-        ))
-    })?;
-    
+
+    let (total, internal, external, nofollow): (i64, i64, i64, i64) = stmt
+        .query_row(params![project_id], |row| {
+            Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?))
+        })?;
+
     // Get relation counts
     let mut rel_stmt = conn.prepare(
         "SELECT link_relation, COUNT(*) as count FROM links l JOIN urls u ON l.source_url_id = u.id WHERE u.project_id = ?1 GROUP BY link_relation ORDER BY count DESC"
     )?;
-    
-    let relation_counts: Vec<LinkRelationCount> = rel_stmt.query_map(params![project_id], |row| {
-        Ok(LinkRelationCount {
-            relation: row.get("link_relation")?,
-            count: row.get("count")?,
-        })
-    })?.filter_map(|r| r.ok()).collect();
-    
+
+    let relation_counts: Vec<LinkRelationCount> = rel_stmt
+        .query_map(params![project_id], |row| {
+            Ok(LinkRelationCount {
+                relation: row.get("link_relation")?,
+                count: row.get("count")?,
+            })
+        })?
+        .filter_map(|r| r.ok())
+        .collect();
+
     Ok(LinkSummary {
         total_links: total,
         total_internal: internal,
@@ -769,7 +1111,7 @@ pub fn list_crawls(conn: &Connection, project_id: i64) -> Result<Vec<Crawl>> {
     let mut stmt = conn.prepare(
         "SELECT id, project_id, status, settings_json, started_at, completed_at, error_message, url_count, issue_count, link_count, created_at FROM crawls WHERE project_id = ?1 ORDER BY created_at DESC"
     )?;
-    
+
     let crawls = stmt.query_map(params![project_id], |row| {
         Ok(Crawl {
             id: row.get("id")?,
@@ -798,25 +1140,29 @@ pub fn get_issue_summary_by_crawl(conn: &Connection, crawl_id: i64) -> Result<Ve
          JOIN urls u ON i.url_id = u.id
          WHERE u.crawl_id = ?1
          GROUP BY i.issue_type, i.severity, i.category
-         ORDER BY count DESC"
+         ORDER BY count DESC",
     )?;
-    
-    let summaries: Vec<IssueSummary> = stmt.query_map(params![crawl_id], |row| {
-        let issue_type: String = row.get("issue_type")?;
-        let severity: String = row.get("severity")?;
-        let category: String = row.get("category")?;
-        let count: i64 = row.get("count")?;
-        let (label, explanation, recommendation) = derive_issue_context(&issue_type, &severity, &category);
-        Ok(IssueSummary {
-            issue_type,
-            severity,
-            category,
-            count,
-            label: Some(label),
-            explanation: Some(explanation),
-            recommendation: Some(recommendation),
-        })
-    })?.filter_map(|r| r.ok()).collect();
+
+    let summaries: Vec<IssueSummary> = stmt
+        .query_map(params![crawl_id], |row| {
+            let issue_type: String = row.get("issue_type")?;
+            let severity: String = row.get("severity")?;
+            let category: String = row.get("category")?;
+            let count: i64 = row.get("count")?;
+            let (label, explanation, recommendation) =
+                derive_issue_context(&issue_type, &severity, &category);
+            Ok(IssueSummary {
+                issue_type,
+                severity,
+                category,
+                count,
+                label: Some(label),
+                explanation: Some(explanation),
+                recommendation: Some(recommendation),
+            })
+        })?
+        .filter_map(|r| r.ok())
+        .collect();
 
     Ok(summaries)
 }
@@ -829,79 +1175,87 @@ pub fn query_issues_by_crawl(
     page_size: i64,
     filter_type: Option<&str>,
     filter_severity: Option<&str>,
+    filter_category: Option<&str>,
+    search: Option<&str>,
 ) -> Result<(Vec<IssueRecord>, i64)> {
-    let where_parts = match crawl_id {
-        Some(_cid) => vec!["u.crawl_id = ?1".to_string()],
-        None => vec![],
-    };
-    
-    let mut all_params: Vec<Value> = crawl_id.map(|c| Value::Integer(c)).into_iter().collect();
-    
-    // Build WHERE clause for filters
-    let mut filter_clauses: Vec<String> = Vec::new();
-    if let Some(t) = filter_type {
-        filter_clauses.push("i.issue_type = ?".to_string());
+    let mut where_parts: Vec<String> = Vec::new();
+    let mut all_params: Vec<Value> = Vec::new();
+
+    if let Some(cid) = crawl_id {
+        where_parts.push("u.crawl_id = ?".to_string());
+        all_params.push(Value::Integer(cid));
+    }
+
+    if let Some(t) = filter_type.filter(|value| !value.trim().is_empty() && *value != "all") {
+        where_parts.push("i.issue_type = ?".to_string());
         all_params.push(Value::Text(t.to_string()));
     }
-    if let Some(s) = filter_severity {
-        filter_clauses.push("i.severity = ?".to_string());
+    if let Some(s) = filter_severity.filter(|value| !value.trim().is_empty() && *value != "all") {
+        where_parts.push("i.severity = ?".to_string());
         all_params.push(Value::Text(s.to_string()));
     }
-    
-    let mut base_where = where_parts.clone();
-    base_where.extend(filter_clauses);
-    let where_clause = if base_where.is_empty() { "1=1" } else { &base_where.join(" AND ") };
-    
-    // Count total
+    if let Some(c) = filter_category.filter(|value| !value.trim().is_empty() && *value != "all") {
+        where_parts.push("i.category = ?".to_string());
+        all_params.push(Value::Text(c.to_string()));
+    }
+    if let Some(term) = search.map(str::trim).filter(|value| !value.is_empty()) {
+        let pattern = format!("%{}%", term);
+        where_parts.push(
+            "(i.url LIKE ? OR i.message LIKE ? OR i.issue_type LIKE ? OR i.category LIKE ?)"
+                .to_string(),
+        );
+        for _ in 0..4 {
+            all_params.push(Value::Text(pattern.clone()));
+        }
+    }
+
+    let where_clause = if where_parts.is_empty() {
+        "1=1".to_string()
+    } else {
+        where_parts.join(" AND ")
+    };
+
     let count_query = format!(
         "SELECT COUNT(*) FROM issues i JOIN urls u ON i.url_id = u.id WHERE {}",
         where_clause
     );
-    let total: i64 = conn.query_row(&count_query, params_from_iter(all_params.iter()), |row| row.get(0))?;
-    
-    // Get paginated results
+    let total: i64 = conn.query_row(&count_query, params_from_iter(all_params.iter()), |row| {
+        row.get(0)
+    })?;
+
     let skip = page.max(0) * page_size;
-    
-    // Build the SELECT query — use positional ? placeholders
-    // ( rusqlite params_from_iter assigns parameters in order regardless of number )
-    let mut select_where = where_parts.clone();
-    if filter_type.is_some() {
-        select_where.push("i.issue_type = ?".to_string());
-    }
-    if filter_severity.is_some() {
-        select_where.push("i.severity = ?".to_string());
-    }
-    let select_clause = if select_where.is_empty() { "1=1" } else { &select_where.join(" AND ") };
-    
+
     let query = format!(
         "SELECT i.id, i.issue_type, i.severity, i.category, i.url_id, i.url, i.message, i.details_json, i.detected_at, i.is_fixed
          FROM issues i JOIN urls u ON i.url_id = u.id WHERE {}
          ORDER BY i.detected_at DESC LIMIT ? OFFSET ?",
-        select_clause
+        where_clause
     );
-    
-    // Build params: all_params already has base + filter values; just add pagination
+
     let mut query_params: Vec<Value> = all_params.clone();
     query_params.push(Value::Integer(page_size));
     query_params.push(Value::Integer(skip));
-    
+
     let mut stmt = conn.prepare(&query)?;
-    
-    let records: Vec<IssueRecord> = stmt.query_map(params_from_iter(query_params.iter()), |row| {
-        Ok(IssueRecord {
-            id: row.get("id")?,
-            issue_type: row.get("issue_type")?,
-            severity: row.get("severity")?,
-            category: row.get("category")?,
-            url_id: row.get("url_id")?,
-            url: row.get("url")?,
-            message: row.get("message")?,
-            details_json: row.get("details_json")?,
-            detected_at: get_datetime(row, "detected_at")?,
-            is_fixed: row.get("is_fixed")?,
-        })
-    })?.filter_map(|r| r.ok()).collect();
-    
+
+    let records: Vec<IssueRecord> = stmt
+        .query_map(params_from_iter(query_params.iter()), |row| {
+            Ok(IssueRecord {
+                id: row.get("id")?,
+                issue_type: row.get("issue_type")?,
+                severity: row.get("severity")?,
+                category: row.get("category")?,
+                url_id: row.get("url_id")?,
+                url: row.get("url")?,
+                message: row.get("message")?,
+                details_json: row.get("details_json")?,
+                detected_at: get_datetime(row, "detected_at")?,
+                is_fixed: row.get("is_fixed")?,
+            })
+        })?
+        .filter_map(|r| r.ok())
+        .collect();
+
     Ok((records, total))
 }
 
@@ -910,7 +1264,7 @@ pub fn get_issue_by_id(conn: &Connection, issue_id: i64) -> Result<Option<IssueR
         "SELECT i.id, i.issue_type, i.severity, i.category, i.url_id, i.url, i.message, i.details_json, i.detected_at, i.is_fixed
          FROM issues i WHERE i.id = ?1"
     )?;
-    
+
     stmt.query_row(params![issue_id], |row| {
         Ok(IssueRecord {
             id: row.get("id")?,
@@ -924,7 +1278,8 @@ pub fn get_issue_by_id(conn: &Connection, issue_id: i64) -> Result<Option<IssueR
             detected_at: get_datetime(row, "detected_at")?,
             is_fixed: row.get("is_fixed")?,
         })
-    }).optional()
+    })
+    .optional()
 }
 
 // ─── Crawl-level Link Queries ───────────────────────────────────
@@ -941,9 +1296,9 @@ pub fn query_links_by_crawl(
         Some(_cid) => vec!["u.crawl_id = ?1".to_string()],
         None => vec![],
     };
-    
+
     let mut all_params: Vec<Value> = crawl_id.map(|c| Value::Integer(c)).into_iter().collect();
-    
+
     let mut filter_clauses: Vec<String> = Vec::new();
     if let Some(rel) = filter_relation {
         filter_clauses.push("l.link_relation = ?".to_string());
@@ -952,22 +1307,28 @@ pub fn query_links_by_crawl(
     if let Some(internal) = filter_is_internal {
         filter_clauses.push(format!("l.is_internal = {}", if internal { 1 } else { 0 }));
     }
-    
+
     let mut base_where = where_parts.clone();
     base_where.extend(filter_clauses);
-    let where_clause = if base_where.is_empty() { "1=1" } else { &base_where.join(" AND ") };
-    
+    let where_clause = if base_where.is_empty() {
+        "1=1"
+    } else {
+        &base_where.join(" AND ")
+    };
+
     // Count total
     let count_query = format!(
         "SELECT COUNT(*) FROM links l JOIN urls u ON l.source_url_id = u.id WHERE {}",
         where_clause
     );
-    let total: i64 = conn.query_row(&count_query, params_from_iter(all_params.iter()), |row| row.get(0))?;
-    
+    let total: i64 = conn.query_row(&count_query, params_from_iter(all_params.iter()), |row| {
+        row.get(0)
+    })?;
+
     // Get paginated results — use positional ? placeholders
     // (rusqlite params_from_iter assigns parameters in order regardless of number)
     let skip = page.max(0) * page_size;
-    
+
     let mut select_where = where_parts.clone();
     if filter_relation.is_some() {
         select_where.push("l.link_relation = ?".to_string());
@@ -975,36 +1336,43 @@ pub fn query_links_by_crawl(
     if let Some(internal) = filter_is_internal {
         select_where.push(format!("l.is_internal = {}", if internal { 1 } else { 0 }));
     }
-    let select_clause = if select_where.is_empty() { "1=1" } else { &select_where.join(" AND ") };
-    
+    let select_clause = if select_where.is_empty() {
+        "1=1"
+    } else {
+        &select_where.join(" AND ")
+    };
+
     let query = format!(
         "SELECT l.id, l.source_url_id, l.source_url, l.target_url, l.link_relation, l.anchor_text, l.is_internal, l.is_no_follow, l.detected_at
          FROM links l JOIN urls u ON l.source_url_id = u.id WHERE {}
          ORDER BY l.detected_at DESC LIMIT ? OFFSET ?",
         select_clause
     );
-    
+
     // Build params: all_params already has base + filter values; just add pagination
     let mut query_params: Vec<Value> = all_params.clone();
     query_params.push(Value::Integer(page_size));
     query_params.push(Value::Integer(skip));
-    
+
     let mut stmt = conn.prepare(&query)?;
-    
-    let records: Vec<LinkRecord> = stmt.query_map(params_from_iter(query_params.iter()), |row| {
-        Ok(LinkRecord {
-            id: row.get("id")?,
-            source_url_id: row.get("source_url_id")?,
-            source_url: row.get("source_url")?,
-            target_url: row.get("target_url")?,
-            link_relation: row.get("link_relation")?,
-            anchor_text: row.get("anchor_text")?,
-            is_internal: row.get("is_internal")?,
-            is_no_follow: row.get("is_no_follow")?,
-            detected_at: get_datetime(row, "detected_at")?,
-        })
-    })?.filter_map(|r| r.ok()).collect();
-    
+
+    let records: Vec<LinkRecord> = stmt
+        .query_map(params_from_iter(query_params.iter()), |row| {
+            Ok(LinkRecord {
+                id: row.get("id")?,
+                source_url_id: row.get("source_url_id")?,
+                source_url: row.get("source_url")?,
+                target_url: row.get("target_url")?,
+                link_relation: row.get("link_relation")?,
+                anchor_text: row.get("anchor_text")?,
+                is_internal: row.get("is_internal")?,
+                is_no_follow: row.get("is_no_follow")?,
+                detected_at: get_datetime(row, "detected_at")?,
+            })
+        })?
+        .filter_map(|r| r.ok())
+        .collect();
+
     Ok((records, total))
 }
 
@@ -1015,30 +1383,29 @@ pub fn summarize_links_by_crawl(conn: &Connection, crawl_id: i64) -> Result<Link
             SUM(CASE WHEN is_internal = 1 THEN 1 ELSE 0 END) as internal_links,
             SUM(CASE WHEN is_internal = 0 THEN 1 ELSE 0 END) as external_links,
             SUM(CASE WHEN is_no_follow = 1 THEN 1 ELSE 0 END) as nofollow_links
-         FROM links l JOIN urls u ON l.source_url_id = u.id WHERE u.crawl_id = ?1"
+         FROM links l JOIN urls u ON l.source_url_id = u.id WHERE u.crawl_id = ?1",
     )?;
-    
-    let (total, internal, external, nofollow): (i64, i64, i64, i64) = stmt.query_row(params![crawl_id], |row| {
-        Ok((
-            row.get(0)?,
-            row.get(1)?,
-            row.get(2)?,
-            row.get(3)?,
-        ))
-    })?;
-    
+
+    let (total, internal, external, nofollow): (i64, i64, i64, i64) = stmt
+        .query_row(params![crawl_id], |row| {
+            Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?))
+        })?;
+
     // Get relation counts
     let mut rel_stmt = conn.prepare(
         "SELECT link_relation, COUNT(*) as count FROM links l JOIN urls u ON l.source_url_id = u.id WHERE u.crawl_id = ?1 GROUP BY link_relation ORDER BY count DESC"
     )?;
-    
-    let relation_counts: Vec<LinkRelationCount> = rel_stmt.query_map(params![crawl_id], |row| {
-        Ok(LinkRelationCount {
-            relation: row.get("link_relation")?,
-            count: row.get("count")?,
-        })
-    })?.filter_map(|r| r.ok()).collect();
-    
+
+    let relation_counts: Vec<LinkRelationCount> = rel_stmt
+        .query_map(params![crawl_id], |row| {
+            Ok(LinkRelationCount {
+                relation: row.get("link_relation")?,
+                count: row.get("count")?,
+            })
+        })?
+        .filter_map(|r| r.ok())
+        .collect();
+
     Ok(LinkSummary {
         total_links: total,
         total_internal: internal,
@@ -1070,7 +1437,10 @@ pub fn query_urls_by_crawl(
 
     let where_clause = where_parts.join(" AND ");
     let count_query = format!("SELECT COUNT(*) FROM urls u WHERE {}", where_clause);
-    let total: i64 = conn.query_row(&count_query, params_from_iter(count_params.iter()), |row| row.get(0))?;
+    let total: i64 =
+        conn.query_row(&count_query, params_from_iter(count_params.iter()), |row| {
+            row.get(0)
+        })?;
 
     let skip = page.max(0) * page_size;
     let order_field = match sort_by {
@@ -1095,6 +1465,6 @@ pub fn query_urls_by_crawl(
 
     let rows = stmt.query_map(params_from_iter(query_params.iter()), map_url_row)?;
     let records: Vec<UrlRecord> = rows.filter_map(|r| r.ok()).collect();
-    
+
     Ok((records, total))
 }

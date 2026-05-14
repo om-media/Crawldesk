@@ -1,6 +1,7 @@
-//! Crawl engine models — replaces src/worker/engine types.
+//! Crawl engine models — core data types for URLs, SEO data, fetch results, and issues.
 
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 /// URL frontier states per PRD §8.4
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -31,6 +32,8 @@ pub struct FetchResult {
     pub status_code: i32,
     pub final_url: String,
     pub requested_url: String,
+    #[serde(default)]
+    pub headers: HashMap<String, String>,
     pub content_type: Option<String>,
     pub content_length: Option<usize>,
     pub response_time_ms: f64,
@@ -65,6 +68,8 @@ pub struct SeoData {
     pub image_count: i32,
     pub images_without_alt: i32,
     pub images_with_alt: i32,
+    #[serde(default)]
+    pub images_missing_dimensions: i32,
     pub total_image_size_kb: f64,
     pub social_meta_open_graph: serde_json::Value,
     pub social_meta_twitter_card: serde_json::Value,
