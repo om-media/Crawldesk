@@ -102,6 +102,15 @@ const MOCK_LINK_SUMMARY = {
   totalInternal: 1200,
   totalExternal: 634,
   brokenCount: 12,
+  link_type_distribution: { internal: 1200, external: 634 },
+  anchor_text_distribution: { 'click here': 89, 'read more': 67, 'learn more': 52, 'home': 41, 'contact': 38 },
+  top_external_domains: [
+    { domain: 'facebook.com', count: 45 },
+    { domain: 'instagram.com', count: 38 },
+    { domain: 'twitter.com', count: 22 },
+    { domain: 'youtube.com', count: 18 },
+    { domain: 'maps.google.com', count: 12 },
+  ],
 }
 
 // ── Mock API ────────────────────────────────────────────────────
@@ -388,8 +397,81 @@ export function setupMockCrawldesk() {
       openExternalUrl: async () => { console.log('[Mock] Open external URL') },
       openPath: async () => { throw new Error('Open path is not implemented in mock mode') },
     },
-    keywords: { analyze: async () => ([]), },
-    clusters: { find: async () => ([]), },
+    keywords: {
+      analyze: async (_crawlId: string, gramType: string) => {
+        await delay()
+        const unigrams = [
+          { phrase: 'adventure', count: 127 }, { phrase: 'park', count: 98 }, { phrase: 'outdoor', count: 84 },
+          { phrase: 'activities', count: 76 }, { phrase: 'family', count: 65 }, { phrase: 'kids', count: 58 },
+          { phrase: 'nature', count: 52 }, { phrase: 'trails', count: 48 }, { phrase: 'zip', count: 45 },
+          { phrase: 'line', count: 43 }, { phrase: 'climbing', count: 41 }, { phrase: 'booking', count: 39 },
+          { phrase: 'prices', count: 37 }, { phrase: 'courses', count: 35 }, { phrase: 'experience', count: 33 },
+          { phrase: 'team', count: 31 }, { phrase: 'corporate', count: 28 }, { phrase: 'events', count: 26 },
+          { phrase: 'birthday', count: 24 }, { phrase: 'safety', count: 22 }, { phrase: 'terrain', count: 20 },
+          { phrase: 'ropes', count: 19 }, { phrase: 'challenge', count: 18 }, { phrase: 'forest', count: 17 },
+          { phrase: 'canopy', count: 16 }, { phrase: 'bridge', count: 15 }, { phrase: 'hiking', count: 14 },
+          { phrase: 'seasonal', count: 13 }, { phrase: 'discounts', count: 12 }, { phrase: 'reviews', count: 11 },
+        ]
+        const bigrams = [
+          { phrase: 'adventure park', count: 87 }, { phrase: 'zip line', count: 45 }, { phrase: 'outdoor activities', count: 42 },
+          { phrase: 'family friendly', count: 38 }, { phrase: 'ropes course', count: 34 }, { phrase: 'team building', count: 28 },
+          { phrase: 'corporate events', count: 26 }, { phrase: 'birthday parties', count: 24 }, { phrase: 'climbing wall', count: 22 },
+          { phrase: 'canopy tour', count: 19 }, { phrase: 'safety guidelines', count: 18 }, { phrase: 'group discounts', count: 16 },
+          { phrase: 'seasonal passes', count: 15 }, { phrase: 'trail map', count: 14 }, { phrase: 'forest adventure', count: 13 },
+        ]
+        const trigrams = [
+          { phrase: 'adventure park activities', count: 52 }, { phrase: 'outdoor adventure park', count: 41 },
+          { phrase: 'zip line experience', count: 34 }, { phrase: 'family friendly activities', count: 28 },
+          { phrase: 'ropes challenge course', count: 24 }, { phrase: 'corporate team building', count: 22 },
+          { phrase: 'kids birthday parties', count: 19 }, { phrase: 'canopy zip line', count: 17 },
+          { phrase: 'group discount prices', count: 15 }, { phrase: 'seasonal adventure packages', count: 13 },
+        ]
+        const data = gramType === 'bigrams' ? bigrams : gramType === 'trigrams' ? trigrams : unigrams
+        return { keywords: data, totalWords: 14832 }
+      },
+    },
+    clusters: {
+      find: async (_crawlId: string) => {
+        await delay()
+        return [
+          {
+            id: 1, size: 8, representativeUrl: 'https://avanterrapark.com/activities/zip-line',
+            keywords: ['zip', 'adventure', 'outdoor', 'canopy', 'thrill'],
+            members: [
+              { url: 'https://avanterrapark.com/activities/zip-line', score: 1.0 },
+              { url: 'https://avanterrapark.com/activities/canopy-tour', score: 0.89 },
+              { url: 'https://avanterrapark.com/activities/aerial-adventure', score: 0.85 },
+              { url: 'https://avanterrapark.com/activities/ropes-course', score: 0.78 },
+              { url: 'https://avanterrapark.com/activities/climbing-wall', score: 0.72 },
+              { url: 'https://avanterrapark.com/adventure-packages', score: 0.68 },
+              { url: 'https://avanterrapark.com/group-events/outdoor', score: 0.61 },
+              { url: 'https://avanterrapark.com/seasonal/summer-thrills', score: 0.55 },
+            ],
+          },
+          {
+            id: 2, size: 5, representativeUrl: 'https://avanterrapark.com/birthday-parties',
+            keywords: ['birthday', 'kids', 'party', 'family', 'celebration'],
+            members: [
+              { url: 'https://avanterrapark.com/birthday-parties', score: 1.0 },
+              { url: 'https://avanterrapark.com/kids-activities', score: 0.82 },
+              { url: 'https://avanterrapark.com/family-packages', score: 0.76 },
+              { url: 'https://avanterrapark.com/group-events/birthdays', score: 0.71 },
+              { url: 'https://avanterrapark.com/venues/party-room', score: 0.63 },
+            ],
+          },
+          {
+            id: 3, size: 4, representativeUrl: 'https://avanterrapark.com/corporate-team-building',
+            keywords: ['corporate', 'team', 'building', 'events', 'company'],
+            members: [
+              { url: 'https://avanterrapark.com/corporate-team-building', score: 1.0 },
+              { url: 'https://avanterrapark.com/group-events/corporate', score: 0.88 },
+              { url: 'https://avanterrapark.com/venues/conference-space', score: 0.74 },
+              { url: 'https://avanterrapark.com/catering/corporate-lunch', score: 0.61 },
+            ],
+          },
+        ]
+      },
+    },
     extractions: { list: async () => [], create: async () => ({}), update: async () => ({}), delete: async () => ({}) },
     schedules: { list: async () => [], create: async () => ({}), update: async () => ({}), delete: async () => ({}) },
     diff: { get: async () => null, listByProject: async () => [] },
