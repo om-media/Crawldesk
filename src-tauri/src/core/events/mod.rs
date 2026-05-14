@@ -1,4 +1,4 @@
-//! Event system for Tauri events — replaces Electron's win.webContents.send().
+//! Event system for Tauri events — progress and state updates for the frontend.
 //! Per PRD §8.8: progress events streamed to frontend without blocking crawl.
 
 use std::sync::Arc;

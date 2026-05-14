@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useProjectStore } from '../stores/project-store'
 import ErrorBanner from '../components/ErrorBanner'
-import type { IssueCategory, IssueDefinition, IssueSummary as IssueType, Severity } from '@shared/types/issue'
+import type { IssueCategory, IssueDefinition, IssueRecord, IssueSummary as IssueType, Severity } from '@shared/types/issue'
 
 
 type SeverityFilter = 'all' | Severity
@@ -20,6 +20,9 @@ export default function IssuesScreen() {
   const [affectedTotal, setAffectedTotal] = useState(0)
   const [affectedPage, setAffectedPage] = useState(0)
   const [affectedLoading, setAffectedLoading] = useState(false)
+  const [selectedIssueDetail, setSelectedIssueDetail] = useState<IssueRecord | null>(null)
+  const [detailLoading, setDetailLoading] = useState(false)
+  const [detailError, setDetailError] = useState<string | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -85,13 +88,39 @@ export default function IssuesScreen() {
       setSelectedType(null)
       setAffectedUrls([])
       setAffectedTotal(0)
+      setSelectedIssueDetail(null)
     } else {
       setSelectedType(issueType)
+      setSelectedIssueDetail(null)
       loadAffectedUrls(issueType)
     }
   }
 
   function retry() { setLoadError(null); loadIssues() }
+
+  async function openIssueDetail(issue: IssueRecord) {
+    setSelectedIssueDetail(issue)
+    setDetailLoading(true)
+    setDetailError(null)
+    try {
+      const detail = await window.crawldesk.issues.get?.(issue.id)
+      if (detail) setSelectedIssueDetail(detail)
+    } catch (e: any) {
+      setDetailError(e?.message || 'Failed to load issue details')
+    } finally {
+      setDetailLoading(false)
+    }
+  }
+
+  function parseDetails(issue: IssueRecord | null) {
+    if (!issue?.details_json) return {}
+    try {
+      const parsed = JSON.parse(issue.details_json)
+      return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {}
+    } catch {
+      return {}
+    }
+  }
 
   async function exportVisibleIssues() {
     if (!activeCrawlId) return
@@ -267,13 +296,18 @@ export default function IssuesScreen() {
                     ) : (
                       <div className="max-h-[240px] overflow-y-auto space-y-1">
                         {affectedUrls.map((u, idx) => (
-                          <div key={u.id || idx} className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-[#0f1f2a] text-xs">
+                          <button
+                            key={u.id || idx}
+                            type="button"
+                            onClick={() => openIssueDetail(u)}
+                            className="w-full flex items-center gap-2 px-2 py-1.5 rounded hover:bg-[#0f1f2a] text-xs text-left"
+                          >
                             <span className={`${u.severity === 'critical' ? 'text-red-400' : u.severity === 'warning' ? 'text-amber-400' : 'text-blue-400'} font-mono`}>
                               {u.severity?.charAt(0).toUpperCase() || '-'}
                             </span>
                             <span className="text-teal-text truncate flex-1 font-mono">{u.url}</span>
                             {u.message && <span className="text-primary-muted truncate max-w-[200px]">{u.message}</span>}
-                          </div>
+                          </button>
                         ))}
                       </div>
                     )}
@@ -288,6 +322,120 @@ export default function IssuesScreen() {
         </div>
       )}
 
+      {selectedIssueDetail && (
+        <IssueDetailDrawer
+          issue={selectedIssueDetail}
+          definition={definitions[selectedIssueDetail.issue_type]}
+          details={parseDetails(selectedIssueDetail)}
+          loading={detailLoading}
+          error={detailError}
+          onClose={() => setSelectedIssueDetail(null)}
+        />
+      )}
+
+    </div>
+  )
+}
+
+function IssueDetailDrawer({
+  issue,
+  definition,
+  details,
+  loading,
+  error,
+  onClose,
+}: {
+  issue: IssueRecord
+  definition?: IssueDefinition
+  details: Record<string, unknown>
+  loading: boolean
+  error: string | null
+  onClose: () => void
+}) {
+  const recommendation =
+    issue.recommendation ||
+    (typeof details.recommendation === 'string' ? details.recommendation : '') ||
+    definition?.recommendation ||
+    ''
+  const detailEntries = Object.entries(details).filter(([key]) => key !== 'recommendation')
+
+  return (
+    <div className="fixed inset-0 z-50">
+      <button
+        type="button"
+        aria-label="Close issue details"
+        className="absolute inset-0 bg-black/40"
+        onClick={onClose}
+      />
+      <aside className="absolute right-0 top-0 h-full w-full max-w-[460px] bg-[#0a1018] border-l border-lumen shadow-2xl flex flex-col">
+        <div className="px-5 py-4 border-b border-lumen flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <div className="text-xs text-primary-muted uppercase">{issue.category}</div>
+            <h2 className="text-lg font-semibold text-primary-text truncate">
+              {issue.label || definition?.label || issue.issue_type}
+            </h2>
+          </div>
+          <button type="button" onClick={onClose} className="btn-secondary text-sm">Close</button>
+        </div>
+
+        <div className="p-5 overflow-y-auto space-y-4">
+          {loading && <div className="text-sm text-primary-muted">Loading details...</div>}
+          {error && <ErrorBanner message={error} />}
+
+          <div>
+            <div className="text-xs text-primary-muted mb-1">URL</div>
+            <div className="text-sm text-teal-text font-mono break-all">{issue.url}</div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <div className="text-xs text-primary-muted mb-1">Severity</div>
+              <span className={`${issue.severity === 'critical' ? 'pill-error' : issue.severity === 'warning' ? 'pill-warning' : 'pill-neutral'}`}>
+                {issue.severity.toUpperCase()}
+              </span>
+            </div>
+            <div>
+              <div className="text-xs text-primary-muted mb-1">Issue type</div>
+              <div className="text-sm text-primary-text font-mono break-all">{issue.issue_type}</div>
+            </div>
+          </div>
+
+          <div>
+            <div className="text-xs text-primary-muted mb-1">Message</div>
+            <p className="text-sm text-primary-text">{issue.message}</p>
+          </div>
+
+          {(issue.explanation || definition?.explanation) && (
+            <div>
+              <div className="text-xs text-primary-muted mb-1">Explanation</div>
+              <p className="text-sm text-primary-text">{issue.explanation || definition?.explanation}</p>
+            </div>
+          )}
+
+          {recommendation && (
+            <div>
+              <div className="text-xs text-primary-muted mb-1">Recommendation</div>
+              <p className="text-sm text-primary-text">{recommendation}</p>
+            </div>
+          )}
+
+          {detailEntries.length > 0 && (
+            <div>
+              <div className="text-xs text-primary-muted mb-2">Details</div>
+              <div className="space-y-2">
+                {detailEntries.map(([key, value]) => (
+                  <div key={key} className="border border-lumen rounded p-2">
+                    <div className="text-xs text-primary-muted font-mono">{key}</div>
+                    <pre className="text-xs text-primary-text whitespace-pre-wrap break-all mt-1">
+                      {typeof value === 'string' ? value : JSON.stringify(value, null, 2)}
+                    </pre>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </aside>
     </div>
   )
 }

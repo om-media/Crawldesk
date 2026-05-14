@@ -104,6 +104,7 @@ pub fn parse_html(base_url: &str, html: &str) -> SeoData {
     let mut images_without_alt = 0i32;
     let mut images_with_alt = 0i32;
     let mut images_missing_dimensions = 0i32;
+    let mut images_missing_lazy_loading = 0i32;
 
     for el in document.select(&image_selector) {
         image_count += 1;
@@ -121,12 +122,21 @@ pub fn parse_html(base_url: &str, html: &str) -> SeoData {
         if value.attr("width").is_none() || value.attr("height").is_none() {
             images_missing_dimensions += 1;
         }
+        if image_count > 2
+            && value
+                .attr("loading")
+                .map(|loading| !loading.eq_ignore_ascii_case("lazy"))
+                .unwrap_or(true)
+        {
+            images_missing_lazy_loading += 1;
+        }
     }
 
     seo_data.image_count = image_count;
     seo_data.images_without_alt = images_without_alt;
     seo_data.images_with_alt = images_with_alt;
     seo_data.images_missing_dimensions = images_missing_dimensions;
+    seo_data.images_missing_lazy_loading = images_missing_lazy_loading;
 
     // Count scripts and CSS (not tracked as links for SEO, but for size estimation)
     let script_count = document.select(&script_selector).count() as i32;
@@ -336,6 +346,7 @@ mod tests {
         assert_eq!(seo.image_count, 3);
         assert_eq!(seo.images_missing_dimensions, 2);
         assert_eq!(seo.images_without_alt, 1);
+        assert_eq!(seo.images_missing_lazy_loading, 1);
     }
 
     #[test]

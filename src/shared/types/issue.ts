@@ -36,6 +36,9 @@ export interface IssueRecord extends IssueRecordInput {
   detected_at?: string
   details_json?: string | null
   is_fixed?: boolean
+  label?: string | null
+  explanation?: string | null
+  count?: number
 }
 
 export interface IssueSummary {

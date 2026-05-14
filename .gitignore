@@ -9,13 +9,18 @@ Thumbs.db
 # Tauri build output
 src-tauri/target/
 
-# Old Electron compiled output
-main/**/*.js
-main/**/*.js.map
-worker/**/*.js
-worker/**/*.js.map
-preload/**/*.js
-preload/**/*.js.map
+# Old Electron source (no longer maintained)
+main/
+preload/
+src/main/
+src/preload/
+src/worker/
+worker/
+shared/types/
+shared/utils/
+
+# Reference files (local only)
+references/
 
 # Agent config (local only)
 AGENTS.md
@@ -47,15 +52,3 @@ ARCHITECTURE.md
 figma-*.png
 figma-*.txt
 mockup*.png
-
-# Old Electron source dirs (now unused)
-main/crawl/
-main/db/database.js
-main/db/database.js.map
-main/export/
-main/main.js
-main/main.js.map
-main/windows.js
-main/windows.js.map
-worker/crawler-worker.js
-worker/crawler-worker.js.map

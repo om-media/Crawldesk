@@ -44,6 +44,7 @@ pub enum IssueType {
     ImagesWithoutAlt,
     ImageOversized,
     ImageMissingDimensions,
+    ImageMissingLazyLoading,
     MissingStructuredData,
     StructuredDataMissingFields,
     ProductMissingPrice,
@@ -142,6 +143,7 @@ pub const ALL_ISSUE_TYPES: &[IssueType] = &[
     IssueType::ImagesWithoutAlt,
     IssueType::ImageOversized,
     IssueType::ImageMissingDimensions,
+    IssueType::ImageMissingLazyLoading,
     IssueType::MissingStructuredData,
     IssueType::StructuredDataMissingFields,
     IssueType::ProductMissingPrice,
@@ -207,6 +209,7 @@ impl IssueType {
             IssueType::ImagesWithoutAlt => "images_without_alt",
             IssueType::ImageOversized => "image_oversized",
             IssueType::ImageMissingDimensions => "image_missing_dimensions",
+            IssueType::ImageMissingLazyLoading => "image_missing_lazy_loading",
             IssueType::MissingStructuredData => "missing_structured_data",
             IssueType::StructuredDataMissingFields => "structured_data_missing_fields",
             IssueType::ProductMissingPrice => "product_missing_price",
@@ -417,6 +420,13 @@ impl IssueType {
                 IssueCategory::Performance,
                 "An image lacks explicit dimensions.",
                 "Set width and height to reduce layout shift.",
+            ),
+            IssueType::ImageMissingLazyLoading => (
+                "Image missing lazy loading",
+                IssueSeverity::Info,
+                IssueCategory::Performance,
+                "A likely below-the-fold image is loaded eagerly.",
+                "Add loading=\"lazy\" to non-critical below-the-fold images.",
             ),
             IssueType::MissingStructuredData
             | IssueType::StructuredDataMissingFields

@@ -182,7 +182,7 @@ function normalizeProjectRecord(record: any) {
 }
 
 function setupCrawldesk() {
-  if (window.crawldesk) return // Already set (by Electron preload or previous call)
+  if (window.crawldesk) return // Already set (by Tauri preload or previous call)
   const tauri = getTauri()
   if (!tauri) {
     console.warn('[tauri-api] window.__TAURI__ not available — no backend connected')
@@ -283,6 +283,10 @@ function setupCrawldesk() {
         const items = (result[0] || []).map(normalizeIssueRecord)
         return { items, total: result[1] ?? 0 }
       },
+      get: async (issueId: string) => {
+        const result = await invoke('get_issue_details', { issueId: toId(issueId) })
+        return result ? normalizeIssueRecord(result) : null
+      },
     },
     links: {
       list: async (input: any) => {
@@ -378,7 +382,7 @@ function setupCrawldesk() {
   window.dispatchEvent(new Event(READY_EVENT))
 }
 
-// Try immediately (works when Electron preload already set window.crawldesk
+// Try immediately (works when Tauri preload already set window.crawldesk
 // or when Tauri has already injected window.__TAURI__)
 setupCrawldesk()
 

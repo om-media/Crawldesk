@@ -113,6 +113,8 @@ pub struct SeoData {
     pub images_with_alt: i32,
     #[serde(default)]
     pub images_missing_dimensions: i32,
+    #[serde(default)]
+    pub images_missing_lazy_loading: i32,
     pub total_image_size_kb: f64,
     pub social_meta_open_graph: Option<String>, // JSON object
     pub social_meta_twitter_card: Option<String>,

@@ -33,31 +33,31 @@ pub fn run_post_crawl_analysis(
     for (url, seo) in seo_data_map {
         let fetch = fetch_results.get(url);
 
-        // Canonical Detector — ported from canonical-detector.ts
+        // Canonical Detector
         detect_canonical_issues(url, seo, &mut issues);
 
-        // Content Detector — ported from content-detector.ts
+        // Content Detector
         detect_content_issues(url, seo, &mut issues);
 
-        // Hreflang Detector — ported from hreflang-detector.ts
+        // Hreflang Detector
         detect_hreflang_issues(url, seo, &mut issues);
 
         // AMP Detector — validates AMP page signals and amphtml references.
         detect_amp_issues(url, seo, &mut issues);
 
-        // Image Detector — ported from image-detector.ts
+        // Image Detector
         detect_image_issues(url, seo, &mut issues);
 
-        // Security Detector — ported from security-detector.ts
+        // Security Detector
         detect_security_issues(url, seo, fetch, &mut issues);
 
-        // Social Detector — ported from social-detector.ts
+        // Social Detector
         detect_social_issues(url, seo, &mut issues);
 
-        // Structured Data Detector — ported from structured-data-detector.ts
+        // Structured Data Detector
         detect_structured_data_issues(url, seo, &mut issues);
 
-        // JS Rendering Detector — ported from js-rendering-detector.ts
+        // JS Rendering Detector
         detect_js_rendering_issues(url, seo, fetch, &mut issues);
     }
 
@@ -85,7 +85,7 @@ pub fn run_post_crawl_analysis_basic(
 }
 
 // ─────────────────────────────────────────────────────────────────
-// Canonical Detector — ported from canonical-detector.ts
+// Canonical Detector
 // ─────────────────────────────────────────────────────────────────
 
 /// Detects canonical-related issues: missing tag, external domain,
@@ -163,7 +163,7 @@ fn detect_canonical_issues(url: &str, seo: &SeoData, issues: &mut Vec<SeoIssue>)
 }
 
 // ─────────────────────────────────────────────────────────────────
-// Content Detector — ported from content-detector.ts
+// Content Detector
 // ─────────────────────────────────────────────────────────────────
 
 /// Detects title, meta description, heading hierarchy, and noindex issues.
@@ -367,7 +367,7 @@ fn detect_non_sequential_headings(url: &str, seo: &SeoData, issues: &mut Vec<Seo
 }
 
 // ─────────────────────────────────────────────────────────────────
-// Hreflang Detector — ported from hreflang-detector.ts
+// Hreflang Detector
 // ─────────────────────────────────────────────────────────────────
 
 /// Detects duplicate language codes and invalid hreflang codes.
@@ -543,7 +543,7 @@ fn find_seo_by_url<'a>(
 }
 
 // ─────────────────────────────────────────────────────────────────
-// Image Detector — ported from image-detector.ts
+// Image Detector
 // ─────────────────────────────────────────────────────────────────
 
 /// Detects image accessibility issues: missing alt attribute,
@@ -581,6 +581,23 @@ fn detect_image_issues(url: &str, seo: &SeoData, issues: &mut Vec<SeoIssue>) {
         ));
     }
 
+    if seo.images_missing_lazy_loading > 0 {
+        issues.push(issue_with(
+            IssueType::ImageMissingLazyLoading,
+            IssueSeverity::Info,
+            IssueCategory::Performance,
+            format!(
+                "{} likely below-the-fold image(s) are missing loading=\"lazy\".",
+                seo.images_missing_lazy_loading
+            ),
+            serde_json::json!({
+                "url": url,
+                "count": seo.images_missing_lazy_loading,
+                "recommendation": "Add loading=\"lazy\" to non-critical images that appear after the primary above-the-fold content."
+            }),
+        ));
+    }
+
     if seo.total_image_size_kb > 1024.0 {
         issues.push(issue_with(
             IssueType::ImageOversized,
@@ -600,7 +617,7 @@ fn detect_image_issues(url: &str, seo: &SeoData, issues: &mut Vec<SeoIssue>) {
 }
 
 // ─────────────────────────────────────────────────────────────────
-// JS Rendering Detector — ported from js-rendering-detector.ts
+// JS Rendering Detector
 // ─────────────────────────────────────────────────────────────────
 
 /// Detects JS rendering discrepancies: title differs, noindex injected,
@@ -631,7 +648,7 @@ fn detect_js_rendering_issues(
 }
 
 // ─────────────────────────────────────────────────────────────────
-// Security Detector — ported from security-detector.ts
+// Security Detector
 // ─────────────────────────────────────────────────────────────────
 
 /// Detects security header issues: missing X-Content-Type-Options,
@@ -782,7 +799,7 @@ fn html_contains_mixed_content(html: &str) -> bool {
 }
 
 // ─────────────────────────────────────────────────────────────────
-// Social Detector — ported from social-detector.ts
+// Social Detector
 // ─────────────────────────────────────────────────────────────────
 
 /// Detects missing/incomplete Open Graph and Twitter Card meta tags.
@@ -871,7 +888,7 @@ fn detect_social_issues(url: &str, seo: &SeoData, issues: &mut Vec<SeoIssue>) {
 }
 
 // ─────────────────────────────────────────────────────────────────
-// Structured Data Detector — ported from structured-data-detector.ts
+// Structured Data Detector
 // ─────────────────────────────────────────────────────────────────
 
 /// Required fields by schema type for rich results eligibility.
@@ -976,7 +993,7 @@ fn detect_structured_data_issues(url: &str, seo: &SeoData, issues: &mut Vec<SeoI
 }
 
 // ─────────────────────────────────────────────────────────────────
-// Link Graph Detector — ported from link-graph-detector.ts
+// Link Graph Detector
 // ─────────────────────────────────────────────────────────────────
 
 /// Data needed for link-graph detection. Constructed from DB queries
@@ -1057,7 +1074,7 @@ pub fn detect_link_graph_issues(data: &LinkGraphData) -> Vec<SeoIssue> {
 }
 
 // ─────────────────────────────────────────────────────────────────
-// Pagination Detector — ported from pagination-detector.ts
+// Pagination Detector
 // ─────────────────────────────────────────────────────────────────
 
 /// Data needed for pagination detection. Constructed from DB queries.
@@ -1135,7 +1152,7 @@ pub fn detect_pagination_issues(data: &PaginationData) -> Vec<SeoIssue> {
 }
 
 // ─────────────────────────────────────────────────────────────────
-// Sitemap Comparison Detector — ported from sitemap-comparison-detector.ts
+// Sitemap Comparison Detector
 // ─────────────────────────────────────────────────────────────────
 
 /// Data needed for sitemap comparison detection. Constructed from DB queries.
@@ -1403,6 +1420,7 @@ mod tests {
             images_without_alt: 0,
             images_with_alt: 3,
             images_missing_dimensions: 0,
+            images_missing_lazy_loading: 0,
             total_image_size_kb: 150.0,
             social_meta_open_graph: serde_json::Value::Null,
             social_meta_twitter_card: serde_json::Value::Null,
@@ -1589,6 +1607,19 @@ mod tests {
             .iter()
             .any(|i| i.issue_type == "image_missing_dimensions"));
         assert!(issues.iter().any(|i| i.issue_type == "image_oversized"));
+    }
+
+    #[test]
+    fn test_image_issues_missing_lazy_loading() {
+        let mut seo = make_seo_data();
+        seo.images_missing_lazy_loading = 3;
+        let mut issues = Vec::new();
+
+        detect_image_issues("https://example.com", &seo, &mut issues);
+
+        assert!(issues
+            .iter()
+            .any(|i| i.issue_type == "image_missing_lazy_loading"));
     }
 
     #[test]

@@ -23,12 +23,12 @@ tauri-plugin-clipboard-manager = "2"
 tokio = { version = "1", features = ["full"] }
 async-trait = "0.1"
 
-# HTTP client (replaces Node.js http/https + cheerio)
+# HTTP client
 reqwest = { version = "0.12", features = ["json", "gzip", "brotli", "deflate", "cookies"] }
 scraper = "0.22"
 url = "2.5"
 
-# HTML parsing (streaming for large pages)
+# HTML parsing
 lol_html = "1.2"
 
 # JSON-LD / structured data
@@ -47,8 +47,7 @@ time = { version = "0.3", features = ["serde"] }
 trust-dns-resolver = "0.23"
 ipnet = "2.9"
 
-# Robots.txt (custom implementation in core/crawler/robots.rs)
-# robots-rs crate removed — custom parser is sufficient
+# Robots.txt parser
 
 # Sitemap XML parsing
 xml = "0.8"

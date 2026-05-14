@@ -1,1 +1,0 @@
-{"version":3,"file":"crawl.js","sourceRoot":"","sources":["../../src/shared/types/crawl.ts"],"names":[],"mappings":";;;AAsDa,QAAA,sBAAsB,GAAoE;IACrG,OAAO,EAAE,KAAK;IACd,QAAQ,EAAE,EAAE;IACZ,WAAW,EAAE,CAAC;IACd,gBAAgB,EAAE,KAAK;IACvB,gBAAgB,EAAE,IAAI;IACtB,eAAe,EAAE,KAAK;IACtB,kBAAkB,EAAE,IAAI;IACxB,kBAAkB,EAAE,KAAK;IACzB,SAAS,EAAE,6CAA6C;CAChD,CAAA"}

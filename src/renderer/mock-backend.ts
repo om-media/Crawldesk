@@ -323,6 +323,37 @@ export function setupMockCrawldesk() {
         }
         return { items: urls, total: urls.length }
       },
+      get: async (issueId: string) => {
+        await delay()
+        const detail = MOCK_ISSUES.find(issue => issue.id === issueId) || {
+          id: issueId,
+          issueType: 'example_issue',
+          severity: 'warning',
+          category: 'content',
+          urlId: 99,
+          url: '/example',
+          message: 'Issue detected',
+          detailsJson: JSON.stringify({ recommendation: 'Review this issue in the page source.' }),
+          detectedAt: '2025-05-13T08:20:00Z',
+          isFixed: false,
+        }
+        const normalizedDetail = detail as any
+        return {
+          id: String(normalizedDetail.id),
+          issue_type: normalizedDetail.issueType ?? normalizedDetail.issue_type,
+          severity: normalizedDetail.severity,
+          category: normalizedDetail.category,
+          url_id: normalizedDetail.urlId ?? 99,
+          url: normalizedDetail.url,
+          message: normalizedDetail.message,
+          details_json: normalizedDetail.detailsJson ?? JSON.stringify({ recommendation: normalizedDetail.recommendation }),
+          detected_at: normalizedDetail.detectedAt ?? '2025-05-13T08:20:00Z',
+          is_fixed: normalizedDetail.isFixed ?? false,
+          label: normalizedDetail.label ?? null,
+          explanation: normalizedDetail.explanation ?? null,
+          recommendation: normalizedDetail.recommendation ?? null,
+        }
+      },
     },
     links: {
       list: async (input: any) => {
