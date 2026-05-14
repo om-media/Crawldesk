@@ -2,7 +2,7 @@
   "name": "crawldesk",
   "version": "0.1.0",
   "private": true,
-  "description": "Local-first desktop SEO crawler (Tauri + Rust backend)",
+  "description": "Local-first desktop SEO crawler with enterprise-grade analysis",
   "scripts": {
     "build:renderer": "vite build",
     "build:tauri": "cd src-tauri && cargo build --release",
