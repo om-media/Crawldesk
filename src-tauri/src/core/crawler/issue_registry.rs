@@ -33,6 +33,7 @@ pub enum IssueType {
     DuplicateTitle,
     DuplicateMetaDescription,
     DuplicateContent,
+    KeywordCannibalization,
     RedirectChain,
     CanonicalCluster,
     HreflangDuplicateLang,
@@ -132,6 +133,7 @@ pub const ALL_ISSUE_TYPES: &[IssueType] = &[
     IssueType::DuplicateTitle,
     IssueType::DuplicateMetaDescription,
     IssueType::DuplicateContent,
+    IssueType::KeywordCannibalization,
     IssueType::RedirectChain,
     IssueType::CanonicalCluster,
     IssueType::HreflangDuplicateLang,
@@ -198,6 +200,7 @@ impl IssueType {
             IssueType::DuplicateTitle => "duplicate_title",
             IssueType::DuplicateMetaDescription => "duplicate_meta_description",
             IssueType::DuplicateContent => "duplicate_content",
+            IssueType::KeywordCannibalization => "keyword_cannibalization",
             IssueType::RedirectChain => "redirect_chain",
             IssueType::CanonicalCluster => "canonical_cluster",
             IssueType::HreflangDuplicateLang => "hreflang_duplicate_lang",
@@ -375,6 +378,13 @@ impl IssueType {
                 "Multiple pages appear to have the same content.",
                 "Canonicalize, consolidate, or differentiate duplicate pages.",
             ),
+            IssueType::KeywordCannibalization => (
+                "Keyword cannibalization",
+                IssueSeverity::Warning,
+                IssueCategory::Content,
+                "Multiple indexable pages appear to target the same primary keyword.",
+                "Differentiate page intent, consolidate overlapping content, or adjust internal linking and canonical signals.",
+            ),
             IssueType::RedirectChain => (
                 "Redirect chain",
                 IssueSeverity::Warning,
@@ -546,7 +556,12 @@ impl IssueType {
     }
 }
 
-pub fn issue(url: impl Into<String>, issue_type: IssueType, message: impl Into<String>, details: Value) -> SeoIssue {
+pub fn issue(
+    url: impl Into<String>,
+    issue_type: IssueType,
+    message: impl Into<String>,
+    details: Value,
+) -> SeoIssue {
     let definition = issue_type.definition();
     SeoIssue {
         url: url.into(),

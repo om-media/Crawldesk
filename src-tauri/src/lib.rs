@@ -1,5 +1,5 @@
 mod commands;
-mod core;
+pub mod core;
 
 use core::events::CrawlManager;
 use tauri::Manager;

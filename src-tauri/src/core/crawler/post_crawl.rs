@@ -6,6 +6,7 @@ use super::issue_registry::{issue_with, IssueType};
 use super::models::{FetchResult, IssueCategory, IssueSeverity, SeoData, SeoIssue};
 use super::normalizer::are_same_url;
 use crate::core::storage::models::UrlRecord;
+use std::cmp::Ordering;
 use std::collections::HashMap;
 use tracing::info;
 use url::Url;
@@ -64,6 +65,7 @@ pub fn run_post_crawl_analysis(
     detect_duplicate_titles(seo_data_map, &mut issues);
     detect_duplicate_meta_descriptions(seo_data_map, &mut issues);
     detect_content_duplicates(seo_data_map, &mut issues);
+    detect_keyword_cannibalization(seo_data_map, &mut issues);
     detect_canonical_clusters(seo_data_map, &mut issues);
     detect_redirect_chains(seo_data_map, &mut issues);
     detect_amp_cross_page_issues(seo_data_map, &mut issues);
@@ -1470,6 +1472,68 @@ fn detect_content_duplicates(seo_data_map: &HashMap<String, SeoData>, issues: &m
     }
 }
 
+/// Detect pages that appear to target the same primary keyword.
+fn detect_keyword_cannibalization(
+    seo_data_map: &HashMap<String, SeoData>,
+    issues: &mut Vec<SeoIssue>,
+) {
+    let mut keyword_map: HashMap<String, Vec<String>> = HashMap::new();
+
+    for (url, seo) in seo_data_map {
+        if seo.noindex {
+            continue;
+        }
+        if let Some(keyword) = primary_keyword_from_density(&seo.keyword_density) {
+            keyword_map.entry(keyword).or_default().push(url.clone());
+        }
+    }
+
+    for (keyword, mut urls) in keyword_map {
+        if urls.len() < 2 {
+            continue;
+        }
+
+        urls.sort();
+        let count = urls.len();
+        issues.push(issue_with(
+            urls[0].clone(),
+            IssueType::KeywordCannibalization,
+            IssueSeverity::Warning,
+            IssueCategory::Content,
+            format!(
+                "{} indexable pages appear to target \"{}\".",
+                count,
+                keyword
+            ),
+            serde_json::json!({
+                "keyword": keyword,
+                "urls": urls,
+                "count": count,
+                "recommendation": "Differentiate page intent, consolidate overlapping pages, or strengthen canonical and internal linking signals."
+            }),
+        ));
+    }
+}
+
+fn primary_keyword_from_density(keyword_density: &serde_json::Value) -> Option<String> {
+    keyword_density
+        .as_object()?
+        .iter()
+        .filter_map(|(keyword, score)| {
+            let keyword = keyword.trim().to_lowercase();
+            if keyword.len() < 3 {
+                return None;
+            }
+            let score = score.as_f64()?;
+            if score <= 0.0 {
+                return None;
+            }
+            Some((keyword, score))
+        })
+        .max_by(|(_, left), (_, right)| left.partial_cmp(right).unwrap_or(Ordering::Equal))
+        .map(|(keyword, _)| keyword)
+}
+
 /// Detect redirect chains.
 fn detect_redirect_chains(seo_data_map: &HashMap<String, SeoData>, issues: &mut Vec<SeoIssue>) {
     for (url, seo) in seo_data_map {
@@ -2053,6 +2117,48 @@ mod tests {
         let mut issues2 = Vec::new();
         detect_content_duplicates(&map, &mut issues2);
         assert!(issues2.iter().any(|i| i.issue_type == "duplicate_content"));
+    }
+
+    #[test]
+    fn test_keyword_cannibalization_detects_shared_primary_keyword() {
+        let mut map: HashMap<String, SeoData> = HashMap::new();
+        let mut seo1 = make_seo_data();
+        seo1.keyword_density = serde_json::json!({
+            "red shoes": 0.12,
+            "sale": 0.03
+        });
+        let mut seo2 = make_seo_data();
+        seo2.keyword_density = serde_json::json!({
+            "red shoes": 0.10,
+            "running": 0.04
+        });
+        let mut seo3 = make_seo_data();
+        seo3.keyword_density = serde_json::json!({
+            "blue shoes": 0.11
+        });
+
+        map.insert("https://example.com/red-shoes".to_string(), seo1);
+        map.insert("https://example.com/red-running-shoes".to_string(), seo2);
+        map.insert("https://example.com/blue-shoes".to_string(), seo3);
+
+        let mut issues = Vec::new();
+        detect_keyword_cannibalization(&map, &mut issues);
+
+        let issue = issues
+            .iter()
+            .find(|issue| issue.issue_type == "keyword_cannibalization")
+            .expect("keyword cannibalization issue");
+        assert_eq!(
+            issue
+                .details
+                .get("keyword")
+                .and_then(|value| value.as_str()),
+            Some("red shoes")
+        );
+        assert_eq!(
+            issue.details.get("count").and_then(|value| value.as_i64()),
+            Some(2)
+        );
     }
 
     #[test]

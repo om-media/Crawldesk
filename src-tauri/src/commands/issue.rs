@@ -142,24 +142,22 @@ pub(crate) fn run_post_crawl_for_connection(
         }
 
         for (url, url_issues) in &issues_by_url {
-            if let Some((url_id, url_str)) = url_lookup
-                .get(url)
-                .or_else(|| {
-                    url_lookup
-                        .iter()
-                        .find(|(record_url, _)| are_same_url(record_url, url))
-                        .map(|(_, value)| value)
-                })
-            {
-                let tuples: Vec<(String, &'static str, &'static str, String, Option<String>)> = url_issues
+            if let Some((url_id, url_str)) = url_lookup.get(url).or_else(|| {
+                url_lookup
                     .iter()
-                    .map(|i| {
-                        let sev = match i.severity {
-                            crate::core::crawler::models::IssueSeverity::Critical => "critical",
-                            crate::core::crawler::models::IssueSeverity::Warning => "warning",
-                            crate::core::crawler::models::IssueSeverity::Info => "info",
-                        };
-                        let cat = match i.category {
+                    .find(|(record_url, _)| are_same_url(record_url, url))
+                    .map(|(_, value)| value)
+            }) {
+                let tuples: Vec<(String, &'static str, &'static str, String, Option<String>)> =
+                    url_issues
+                        .iter()
+                        .map(|i| {
+                            let sev = match i.severity {
+                                crate::core::crawler::models::IssueSeverity::Critical => "critical",
+                                crate::core::crawler::models::IssueSeverity::Warning => "warning",
+                                crate::core::crawler::models::IssueSeverity::Info => "info",
+                            };
+                            let cat = match i.category {
                             crate::core::crawler::models::IssueCategory::Content => "content",
                             crate::core::crawler::models::IssueCategory::Structure => "structure",
                             crate::core::crawler::models::IssueCategory::Technical => "technical",
@@ -182,16 +180,10 @@ pub(crate) fn run_post_crawl_for_connection(
                             crate::core::crawler::models::IssueCategory::Rendering => "rendering",
                             crate::core::crawler::models::IssueCategory::Sitemap => "sitemap",
                         };
-                        let details = serde_json::to_string(&i.details).ok();
-                        (
-                            i.issue_type.clone(),
-                            sev,
-                            cat,
-                            i.message.clone(),
-                            details,
-                        )
-                    })
-                    .collect();
+                            let details = serde_json::to_string(&i.details).ok();
+                            (i.issue_type.clone(), sev, cat, i.message.clone(), details)
+                        })
+                        .collect();
                 let tuple_refs: Vec<(&str, &str, &str, &str, Option<&str>)> = tuples
                     .iter()
                     .map(|(issue_type, severity, category, message, details)| {

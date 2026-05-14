@@ -3,7 +3,7 @@
 use super::models::{ExtractedLink, HreflangLink, LinkType, SeoData};
 use super::normalizer::{are_same_url, extract_hostname, resolve_url};
 use crate::core::crawler::sitemap;
-use scraper::{Html, Selector};
+use scraper::{ElementRef, Html, Selector};
 use sha2::{Digest, Sha256};
 use tracing::debug;
 
@@ -211,6 +211,46 @@ pub fn parse_html(base_url: &str, html: &str) -> SeoData {
         }
     }
 
+    // Extract simple schema.org Microdata into the same validation pipeline.
+    let microdata_item_selector = Selector::parse("[itemscope][itemtype]").unwrap();
+    let microdata_prop_selector = Selector::parse("[itemprop]").unwrap();
+    for item in document.select(&microdata_item_selector) {
+        let Some(itemtype) = item.value().attr("itemtype") else {
+            continue;
+        };
+        let Some(schema_type) = schema_type_from_itemtype(itemtype) else {
+            continue;
+        };
+
+        let mut block = serde_json::Map::new();
+        block.insert(
+            "@type".to_string(),
+            serde_json::Value::String(schema_type.to_string()),
+        );
+        block.insert(
+            "_source".to_string(),
+            serde_json::Value::String("microdata".to_string()),
+        );
+
+        for prop in item.select(&microdata_prop_selector) {
+            let Some(name) = prop.value().attr("itemprop") else {
+                continue;
+            };
+            let name = name.trim();
+            if name.is_empty() || block.contains_key(name) {
+                continue;
+            }
+            if let Some(value) = microdata_property_value(&prop) {
+                block.insert(name.to_string(), serde_json::Value::String(value));
+            }
+        }
+
+        seo_data
+            .structured_data_json
+            .push(serde_json::Value::Object(block));
+        seo_data.has_schema_org = true;
+    }
+
     // Extract hreflang links
     for el in document.select(&Selector::parse("link[rel~='alternate'][hreflang]").unwrap()) {
         if let Some(hreflang) = el.value().attr("hreflang") {
@@ -272,6 +312,37 @@ pub fn parse_html(base_url: &str, html: &str) -> SeoData {
     );
 
     seo_data
+}
+
+fn schema_type_from_itemtype(itemtype: &str) -> Option<&str> {
+    itemtype
+        .split_whitespace()
+        .find(|value| value.contains("schema.org/"))
+        .and_then(|value| value.trim_end_matches('/').rsplit('/').next())
+        .filter(|schema_type| !schema_type.is_empty())
+}
+
+fn microdata_property_value(element: &ElementRef<'_>) -> Option<String> {
+    let value = element
+        .value()
+        .attr("content")
+        .or_else(|| element.value().attr("href"))
+        .or_else(|| element.value().attr("src"))
+        .or_else(|| element.value().attr("datetime"))
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_string)
+        .or_else(|| {
+            let text = element.text().collect::<String>();
+            let trimmed = text.trim();
+            if trimmed.is_empty() {
+                None
+            } else {
+                Some(trimmed.to_string())
+            }
+        });
+
+    value
 }
 
 /// Extract crawlable HTML links from <a href> tags.
@@ -412,5 +483,47 @@ mod tests {
         assert_eq!(seo.hreflang_links[0].href, "https://example.com/de/page");
         assert_eq!(seo.hreflang_links[1].hreflang, "x-default");
         assert_eq!(seo.hreflang_links[1].href, "https://example.com/");
+    }
+
+    #[test]
+    fn parse_html_extracts_schema_org_microdata() {
+        let seo = parse_html(
+            "https://example.com/product",
+            r#"
+            <html>
+              <body>
+                <div itemscope itemtype="https://schema.org/Product">
+                  <h1 itemprop="name">Trail Shoe</h1>
+                  <meta itemprop="description" content="Lightweight trail running shoe">
+                  <link itemprop="image" href="/shoe.jpg">
+                </div>
+              </body>
+            </html>
+            "#,
+        );
+
+        assert!(seo.has_schema_org);
+        let microdata = seo
+            .structured_data_json
+            .iter()
+            .find(|block| {
+                block.get("_source").and_then(|value| value.as_str()) == Some("microdata")
+            })
+            .expect("microdata block");
+
+        assert_eq!(
+            microdata.get("@type").and_then(|value| value.as_str()),
+            Some("Product")
+        );
+        assert_eq!(
+            microdata.get("name").and_then(|value| value.as_str()),
+            Some("Trail Shoe")
+        );
+        assert_eq!(
+            microdata
+                .get("description")
+                .and_then(|value| value.as_str()),
+            Some("Lightweight trail running shoe")
+        );
     }
 }

@@ -1471,10 +1471,7 @@ pub fn query_urls_by_crawl(
 
 /// Fetch all URL records for a crawl (no pagination) — used for post-crawl analysis.
 /// Returns SEO data and fetch results deserialized from their JSON columns.
-pub fn get_all_url_records_for_crawl(
-    conn: &Connection,
-    crawl_id: i64,
-) -> Result<Vec<UrlRecord>> {
+pub fn get_all_url_records_for_crawl(conn: &Connection, crawl_id: i64) -> Result<Vec<UrlRecord>> {
     let mut stmt = conn.prepare(
         "SELECT id, url, project_id, crawl_id, fetch_result_json, seo_data_json, indexability, depth, discovered_at, fetched_at, last_crawled_at,
                 normalized_url, final_url, status_code, content_type, title, title_length,

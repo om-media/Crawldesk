@@ -9,6 +9,12 @@
 //! - Text search on dedicated columns
 
 use rusqlite::Connection;
+use std::collections::HashMap;
+
+use crawldesk_lib::core::crawler::models::{FetchResult, IssueCategory, IssueSeverity, SeoIssue};
+use crawldesk_lib::core::crawler::parser::parse_html;
+use crawldesk_lib::core::crawler::post_crawl::run_post_crawl_analysis;
+use crawldesk_lib::core::storage::queries;
 
 /// Create an in-memory database with the full production schema matching db.rs.
 /// Uses raw SQL since integration tests are a separate crate and cannot access
@@ -114,6 +120,70 @@ fn setup_db() -> Connection {
     conn
 }
 
+fn severity_str(severity: &IssueSeverity) -> &'static str {
+    match severity {
+        IssueSeverity::Critical => "critical",
+        IssueSeverity::Warning => "warning",
+        IssueSeverity::Info => "info",
+    }
+}
+
+fn category_str(category: &IssueCategory) -> &'static str {
+    match category {
+        IssueCategory::Content => "content",
+        IssueCategory::Structure => "structure",
+        IssueCategory::Links => "links",
+        IssueCategory::Performance => "performance",
+        IssueCategory::Security => "security",
+        IssueCategory::Social => "social",
+        IssueCategory::Technical => "technical",
+        IssueCategory::Internationalization => "internationalization",
+        IssueCategory::Canonical => "canonical",
+        IssueCategory::Hreflang => "hreflang",
+        IssueCategory::Image => "image",
+        IssueCategory::StructuredData => "structured_data",
+        IssueCategory::Amp => "amp",
+        IssueCategory::Rendering => "rendering",
+        IssueCategory::Sitemap => "sitemap",
+    }
+}
+
+fn fetch_result(url: &str, status_code: i32, html: &str) -> FetchResult {
+    FetchResult {
+        status_code,
+        final_url: url.to_string(),
+        requested_url: url.to_string(),
+        headers: HashMap::new(),
+        content_type: Some("text/html".to_string()),
+        content_length: Some(html.len()),
+        response_time_ms: 25.0,
+        is_redirect: false,
+        redirect_count: 0,
+        was_js_rendered: false,
+        html_content: Some(html.to_string()),
+        error_message: None,
+    }
+}
+
+fn insert_detected_issues(conn: &mut Connection, issues: &[SeoIssue]) {
+    for issue in issues {
+        let url_id: i64 = conn
+            .query_row("SELECT id FROM urls WHERE url = ?1", [&issue.url], |row| {
+                row.get(0)
+            })
+            .unwrap();
+        let details = serde_json::to_string(&issue.details).unwrap();
+        let tuple = [(
+            issue.issue_type.as_str(),
+            severity_str(&issue.severity),
+            category_str(&issue.category),
+            issue.message.as_str(),
+            Some(details.as_str()),
+        )];
+        queries::insert_issues_for_url(conn, url_id, &issue.url, &tuple).unwrap();
+    }
+}
+
 #[test]
 fn test_status_code_filtering() {
     let conn = setup_db();
@@ -169,6 +239,86 @@ fn test_status_code_filtering() {
         .query_row("SELECT COUNT(*) FROM urls", [], |row| row.get(0))
         .unwrap();
     assert_eq!(count_all, 6, "Should have all 6 URLs");
+}
+
+#[test]
+fn test_fixture_crawl_to_db_issue_query() {
+    let mut conn = setup_db();
+    let now = chrono::Utc::now().to_rfc3339();
+
+    conn.execute(
+        "INSERT INTO projects (name, root_url) VALUES ('Issues', 'https://i.test')",
+        [],
+    )
+    .unwrap();
+    conn.execute(
+        "INSERT INTO crawls (project_id, status) VALUES (1, 'completed')",
+        [],
+    )
+    .unwrap();
+
+    let en_url = "https://i.test/en/";
+    let de_url = "https://i.test/de/";
+    let en_html = r#"
+        <html>
+          <head><link rel="alternate" hreflang="de" href="/de/"></head>
+          <body><h1>English</h1></body>
+        </html>
+    "#;
+    let de_html = r#"
+        <html>
+          <body><h1>Deutsch</h1></body>
+        </html>
+    "#;
+
+    for (url, html) in [(en_url, en_html), (de_url, de_html)] {
+        conn.execute(
+            "INSERT INTO urls (url, project_id, crawl_id, status_code, indexability, depth,
+                 fetch_result_json, seo_data_json, discovered_at, fetched_at, last_crawled_at)
+             VALUES (?1, 1, 1, 200, 'indexable', 0, '{}', ?2, ?3, ?3, ?3)",
+            rusqlite::params![
+                url,
+                serde_json::to_string(&parse_html(url, html)).unwrap(),
+                now
+            ],
+        )
+        .unwrap();
+    }
+
+    let seo_data_map = HashMap::from([
+        (en_url.to_string(), parse_html(en_url, en_html)),
+        (de_url.to_string(), parse_html(de_url, de_html)),
+    ]);
+    let fetch_results = HashMap::from([
+        (en_url.to_string(), fetch_result(en_url, 200, en_html)),
+        (de_url.to_string(), fetch_result(de_url, 200, de_html)),
+    ]);
+
+    let detected = run_post_crawl_analysis(&[], &seo_data_map, &fetch_results);
+    let expected: Vec<SeoIssue> = detected
+        .into_iter()
+        .filter(|issue| issue.issue_type == "hreflang_missing_reciprocal")
+        .collect();
+    assert_eq!(expected.len(), 1);
+
+    insert_detected_issues(&mut conn, &expected);
+
+    let (records, total) = queries::query_issues_by_crawl(
+        &conn,
+        Some(1),
+        0,
+        20,
+        Some("hreflang_missing_reciprocal"),
+        Some("warning"),
+        Some("internationalization"),
+        Some("reciprocal"),
+    )
+    .unwrap();
+
+    assert_eq!(total, 1);
+    assert_eq!(records.len(), 1);
+    assert_eq!(records[0].issue_type, "hreflang_missing_reciprocal");
+    assert_eq!(records[0].url, en_url);
 }
 
 #[test]

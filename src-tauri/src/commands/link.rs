@@ -1,8 +1,8 @@
 //! Link commands — query and summarize internal/external links.
 
+use crate::core::events::CrawlManager;
 use crate::core::storage::db;
 use crate::core::storage::queries::{self, LinkRecord};
-use crate::core::events::CrawlManager;
 use tauri::State;
 use tracing::info;
 
