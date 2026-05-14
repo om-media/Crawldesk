@@ -119,6 +119,10 @@ pub struct SeoData {
     pub structured_data_json: Option<String>, // JSON-LD blocks
     pub has_schema_org: bool,
     pub hreflang_alternates: Option<String>, // JSON array
+    #[serde(default)]
+    pub amp_html_url: Option<String>,
+    #[serde(default)]
+    pub is_amp: bool,
     pub self_referencing_canonical: bool,
     pub redirect_chain: Option<String>, // JSON array of URLs
     pub final_url: Option<String>,

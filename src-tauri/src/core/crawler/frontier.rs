@@ -1,8 +1,8 @@
 //! URL frontier — SQLite-backed FIFO queue with deduplication per PRD §8.4.
 
-use std::collections::{HashMap, HashSet, VecDeque};
 use crate::core::crawler::models::FrontierEntry;
-use crate::core::crawler::normalizer::{normalize_url, are_same_url};
+use crate::core::crawler::normalizer::{are_same_url, normalize_url};
+use std::collections::{HashMap, HashSet, VecDeque};
 use tracing::{debug, trace};
 
 /// URL frontier for managing the crawl queue.
@@ -50,7 +50,11 @@ impl UrlFrontier {
 
         // Check total URL limit
         if self.visited.len() + self.queue.len() >= self.max_urls {
-            debug!("Frontier full ({}/{} URLs)", self.visited.len() + self.queue.len(), self.max_urls);
+            debug!(
+                "Frontier full ({}/{} URLs)",
+                self.visited.len() + self.queue.len(),
+                self.max_urls
+            );
             return false;
         }
 
@@ -104,7 +108,8 @@ impl UrlFrontier {
 
     /// Get remaining capacity.
     pub fn remaining_capacity(&self) -> usize {
-        self.max_urls.saturating_sub(self.visited.len() + self.queue.len())
+        self.max_urls
+            .saturating_sub(self.visited.len() + self.queue.len())
     }
 
     /// Add multiple URLs at once (for sitemap discovery).

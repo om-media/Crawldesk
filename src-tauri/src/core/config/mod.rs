@@ -27,7 +27,8 @@ impl Default for AppConfig {
                 .unwrap_or_else(|| PathBuf::from(".")),
             db_filename: "crawldesk.sqlite".to_string(),
             max_concurrent_crawls: 3,
-            default_user_agent: "CrawlDesk SEO Crawler (https://github.com/om-media/Crawldesk)".to_string(),
+            default_user_agent: "CrawlDesk SEO Crawler (https://github.com/om-media/Crawldesk)"
+                .to_string(),
             default_concurrency: 5,
             default_delay_ms: 500,
             default_max_urls: 1000,

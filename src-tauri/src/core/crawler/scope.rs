@@ -19,7 +19,7 @@ impl ScopeService {
     pub fn new(root_url: &str) -> Self {
         let parsed = Url::parse(root_url).expect("Invalid root URL");
         let hostname = parsed.host_str().unwrap_or("").to_lowercase();
-        
+
         Self {
             root_hostname: hostname.clone(),
             root_scheme: parsed.scheme().to_string(),
@@ -71,13 +71,24 @@ impl ScopeService {
         let hostname = parsed.host_str().unwrap_or("").to_lowercase();
 
         // Check blocked hostnames first
-        if self.blocked_hostnames.iter().any(|b| hostname == *b || hostname.ends_with(&format!(".{}", b))) {
+        if self
+            .blocked_hostnames
+            .iter()
+            .any(|b| hostname == *b || hostname.ends_with(&format!(".{}", b)))
+        {
             debug!("Blocked hostname: {}", url);
             return false;
         }
 
-        if !self.allowed_hostnames.iter().any(|a| hostname == *a || hostname.ends_with(&format!(".{}", a))) {
-            debug!("Hostname not in allowed list: {} (allowed: {:?})", hostname, self.allowed_hostnames);
+        if !self
+            .allowed_hostnames
+            .iter()
+            .any(|a| hostname == *a || hostname.ends_with(&format!(".{}", a)))
+        {
+            debug!(
+                "Hostname not in allowed list: {} (allowed: {:?})",
+                hostname, self.allowed_hostnames
+            );
             return false;
         }
 
@@ -91,8 +102,19 @@ impl ScopeService {
         }
 
         // Check exclude patterns (if any match, URL is out of scope)
-        let full_path = format!("{}{}", parsed.path(), parsed.query().map(|q| format!("?{}", q)).unwrap_or_default());
-        if self.exclude_patterns.iter().any(|re| re.is_match(&full_path)) {
+        let full_path = format!(
+            "{}{}",
+            parsed.path(),
+            parsed
+                .query()
+                .map(|q| format!("?{}", q))
+                .unwrap_or_default()
+        );
+        if self
+            .exclude_patterns
+            .iter()
+            .any(|re| re.is_match(&full_path))
+        {
             debug!("URL matches exclude pattern: {}", url);
             return false;
         }

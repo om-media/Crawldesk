@@ -1,6 +1,6 @@
 //! URL normalization per PRD §8.7.
 
-use url::{Url, form_urlencoded};
+use url::{form_urlencoded, Url};
 
 /// Normalize a URL per PRD §8.7:
 /// - Lowercase scheme/host
@@ -9,18 +9,18 @@ use url::{Url, form_urlencoded};
 /// - Punycode support
 pub fn normalize_url(url: &str) -> Option<String> {
     let parsed = Url::parse(url).ok()?;
-    
+
     // Normalize: lowercase scheme/host, remove fragment
     let mut url = parsed.clone();
     url.set_scheme(&parsed.scheme().to_lowercase()).ok()?;
     if let Some(host) = parsed.host_str() {
         url.set_host(Some(&host.to_lowercase())).ok()?;
     }
-    
+
     // Path normalization
     let path = normalize_path(parsed.path());
     url.set_path(&path);
-    
+
     // Query normalization (sort parameters)
     if let Some(query) = parsed.query() {
         let mut params: Vec<_> = form_urlencoded::parse(query.as_bytes()).collect();
@@ -30,27 +30,27 @@ pub fn normalize_url(url: &str) -> Option<String> {
             .finish();
         url.set_query(Some(&sorted_query));
     }
-    
+
     // Remove fragment per PRD §8.7
     url.set_fragment(None);
-    
+
     Some(url.to_string())
 }
 
 /// Normalize path: collapse double slashes, remove trailing slash (except root).
 fn normalize_path(path: &str) -> String {
     let mut path = path.to_string();
-    
+
     // Collapse multiple slashes
     while path.contains("//") {
         path = path.replace("//", "/");
     }
-    
+
     // Remove trailing slash (except for root "/")
     if path != "/" && path.ends_with('/') {
         path.pop();
     }
-    
+
     path
 }
 
@@ -62,7 +62,7 @@ pub fn is_relative_url(url: &str) -> bool {
 /// Resolve a relative URL against a base URL.
 pub fn resolve_url(base: &str, relative: &str) -> Option<String> {
     let base_url = Url::parse(base).ok()?;
-    
+
     let resolved = if is_relative_url(relative) {
         // Remove leading ./ or ../
         let clean = relative.trim_start_matches("./").trim_start_matches("../");
@@ -74,13 +74,15 @@ pub fn resolve_url(base: &str, relative: &str) -> Option<String> {
     } else {
         Url::parse(relative).ok()?
     };
-    
+
     Some(resolved.to_string())
 }
 
 /// Extract hostname from a URL.
 pub fn extract_hostname(url: &str) -> Option<String> {
-    Url::parse(url).ok().and_then(|u| u.host_str().map(|h| h.to_lowercase()))
+    Url::parse(url)
+        .ok()
+        .and_then(|u| u.host_str().map(|h| h.to_lowercase()))
 }
 
 /// Check if two URLs resolve to the same canonical form.
@@ -132,12 +134,21 @@ mod tests {
 
     #[test]
     fn test_extract_hostname() {
-        assert_eq!(extract_hostname("https://Example.COM/path"), Some("example.com".to_string()));
+        assert_eq!(
+            extract_hostname("https://Example.COM/path"),
+            Some("example.com".to_string())
+        );
     }
 
     #[test]
     fn test_are_same_url() {
-        assert!(are_same_url("https://example.com/page", "https://example.com/page"));
-        assert!(!are_same_url("https://example.com/a", "https://example.com/b"));
+        assert!(are_same_url(
+            "https://example.com/page",
+            "https://example.com/page"
+        ));
+        assert!(!are_same_url(
+            "https://example.com/a",
+            "https://example.com/b"
+        ));
     }
 }

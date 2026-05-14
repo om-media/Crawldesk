@@ -1,10 +1,11 @@
-//! HTTP fetcher per PRD §8.5 — replaces Node.js http/https modules + cheerio.
+//! HTTP fetcher per PRD §8.5.
 
+use super::normalizer::resolve_url;
+use crate::core::crawler::models::FetchResult;
 use reqwest::Client;
+use std::collections::HashMap;
 use std::time::Duration;
 use tracing::{debug, warn};
-use crate::core::crawler::models::FetchResult;
-use super::normalizer::resolve_url;
 
 /// Configuration for the HTTP fetcher.
 #[derive(Debug, Clone)]
@@ -58,24 +59,27 @@ impl Fetcher {
     /// Fetch a URL and return the result.
     pub async fn fetch(&self, url: &str) -> FetchResult {
         let start = std::time::Instant::now();
-        
+
         debug!("Fetching {}", url);
-        
+
         match self.fetch_with_redirects(url, 0).await {
             Ok(mut result) => {
                 let elapsed = start.elapsed().as_secs_f64() * 1000.0;
                 result.response_time_ms = elapsed;
-                
+
                 // Check size limit
                 if let Some(html) = &result.html_content {
                     let size_kb = html.len() as f64 / 1024.0;
                     if size_kb > self.config.max_response_size_kb as f64 {
-                        warn!("Response too large: {:.1} KB > {} KB limit for {}", 
-                              size_kb, self.config.max_response_size_kb, url);
+                        warn!(
+                            "Response too large: {:.1} KB > {} KB limit for {}",
+                            size_kb, self.config.max_response_size_kb, url
+                        );
                         return FetchResult {
                             status_code: 414,
                             final_url: result.final_url.clone(),
                             requested_url: url.to_string(),
+                            headers: result.headers.clone(),
                             content_type: result.content_type.clone(),
                             content_length: Some(html.len()),
                             response_time_ms: elapsed,
@@ -90,7 +94,7 @@ impl Fetcher {
                         };
                     }
                 }
-                
+
                 result
             }
             Err(e) => {
@@ -100,6 +104,7 @@ impl Fetcher {
                     status_code: 0,
                     final_url: url.to_string(),
                     requested_url: url.to_string(),
+                    headers: HashMap::new(),
                     content_type: None,
                     content_length: None,
                     response_time_ms: elapsed,
@@ -114,35 +119,55 @@ impl Fetcher {
     }
 
     /// Fetch with manual redirect following.
-    async fn fetch_with_redirects(&self, url: &str, depth: usize) -> Result<FetchResult, anyhow::Error> {
+    async fn fetch_with_redirects(
+        &self,
+        url: &str,
+        depth: usize,
+    ) -> Result<FetchResult, anyhow::Error> {
         if depth > self.config.max_redirects {
-            return Err(anyhow::anyhow!("Max redirects exceeded ({})", self.config.max_redirects));
+            return Err(anyhow::anyhow!(
+                "Max redirects exceeded ({})",
+                self.config.max_redirects
+            ));
         }
 
         let response = self.client.get(url).send().await?;
         let status = response.status();
-        
+
         // Handle redirect
         if status.is_redirection() && self.config.follow_redirects {
-            let location = response.headers().get("Location")
+            let location = response
+                .headers()
+                .get("Location")
                 .and_then(|h| h.to_str().ok())
                 .ok_or_else(|| anyhow::anyhow!("Redirect without Location header"))?;
-            
+
             let final_url = resolve_url(url, location)
                 .ok_or_else(|| anyhow::anyhow!("Failed to resolve redirect URL: {}", location))?;
-            
+
             debug!("Redirect {} -> {} (depth {})", url, final_url, depth + 1);
-            
+
             return Box::pin(self.fetch_with_redirects(&final_url, depth + 1)).await;
         }
 
-        let content_type = response.headers().get("Content-Type")
+        let content_type = response
+            .headers()
+            .get("Content-Type")
             .and_then(|h| h.to_str().ok())
             .map(String::from);
-        
-        let content_length = response.content_length();
+        let headers: HashMap<String, String> = response
+            .headers()
+            .iter()
+            .filter_map(|(name, value)| {
+                value
+                    .to_str()
+                    .ok()
+                    .map(|value| (name.as_str().to_ascii_lowercase(), value.to_string()))
+            })
+            .collect();
+
         let body_bytes = response.bytes().await?;
-        
+
         // Try to decode as UTF-8 text
         let html_content = String::from_utf8(body_bytes.to_vec()).ok();
 
@@ -150,6 +175,7 @@ impl Fetcher {
             status_code: status.as_u16() as i32,
             final_url: url.to_string(),
             requested_url: url.to_string(),
+            headers,
             content_type,
             content_length: Some(body_bytes.len()),
             response_time_ms: 0.0, // Will be set by caller
@@ -163,7 +189,7 @@ impl Fetcher {
 
     /// Check if a content type is crawlable (HTML).
     pub fn is_crawlable_content_type(content_type: &str) -> bool {
-        content_type.contains("text/html") 
+        content_type.contains("text/html")
             || content_type.contains("application/xhtml")
             || content_type.contains("text/xml")
     }

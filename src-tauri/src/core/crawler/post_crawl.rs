@@ -5,6 +5,7 @@
 
 use super::issue_registry::{issue_with, IssueType};
 use super::models::{FetchResult, IssueCategory, IssueSeverity, SeoData, SeoIssue};
+use super::normalizer::are_same_url;
 use crate::core::storage::models::UrlRecord;
 use std::collections::HashMap;
 use tracing::info;
@@ -41,6 +42,9 @@ pub fn run_post_crawl_analysis(
         // Hreflang Detector — ported from hreflang-detector.ts
         detect_hreflang_issues(url, seo, &mut issues);
 
+        // AMP Detector — validates AMP page signals and amphtml references.
+        detect_amp_issues(url, seo, &mut issues);
+
         // Image Detector — ported from image-detector.ts
         detect_image_issues(url, seo, &mut issues);
 
@@ -63,6 +67,7 @@ pub fn run_post_crawl_analysis(
     detect_content_duplicates(seo_data_map, &mut issues);
     detect_canonical_clusters(seo_data_map, &mut issues);
     detect_redirect_chains(seo_data_map, &mut issues);
+    detect_amp_cross_page_issues(seo_data_map, &mut issues);
 
     info!("Post-crawl analysis: {} issues found", issues.len());
 
@@ -424,6 +429,117 @@ fn detect_hreflang_issues(url: &str, seo: &SeoData, issues: &mut Vec<SeoIssue>) 
             ));
         }
     }
+}
+
+// ─────────────────────────────────────────────────────────────────
+// AMP Detector
+// ─────────────────────────────────────────────────────────────────
+
+fn detect_amp_issues(url: &str, seo: &SeoData, issues: &mut Vec<SeoIssue>) {
+    if seo.is_amp
+        && seo
+            .canonical_url
+            .as_deref()
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .is_none()
+    {
+        issues.push(issue_with(
+            IssueType::AmpMissingCanonical,
+            IssueSeverity::Warning,
+            IssueCategory::Technical,
+            "AMP page is missing a canonical URL.",
+            serde_json::json!({
+                "url": url,
+                "recommendation": "Add a canonical link from the AMP page to the equivalent canonical page."
+            }),
+        ));
+    }
+
+    if let Some(amp_url) = seo.amp_html_url.as_deref() {
+        let parsed = Url::parse(amp_url);
+        let invalid_scheme = parsed
+            .as_ref()
+            .map(|url| url.scheme() != "http" && url.scheme() != "https")
+            .unwrap_or(true);
+
+        if invalid_scheme || are_same_url(url, amp_url) {
+            issues.push(issue_with(
+                IssueType::AmpInvalidTarget,
+                IssueSeverity::Warning,
+                IssueCategory::Technical,
+                "AMP HTML link points to an invalid target.",
+                serde_json::json!({
+                    "url": url,
+                    "amp_url": amp_url,
+                    "recommendation": "Point rel=\"amphtml\" to a crawlable HTTP(S) AMP URL that is distinct from the canonical page."
+                }),
+            ));
+        }
+    }
+}
+
+fn detect_amp_cross_page_issues(
+    seo_data_map: &HashMap<String, SeoData>,
+    issues: &mut Vec<SeoIssue>,
+) {
+    for (canonical_url, seo) in seo_data_map {
+        let Some(amp_url) = seo.amp_html_url.as_deref() else {
+            continue;
+        };
+
+        if are_same_url(canonical_url, amp_url) {
+            continue;
+        }
+
+        let Some((resolved_amp_url, amp_seo)) = find_seo_by_url(seo_data_map, amp_url) else {
+            continue;
+        };
+
+        if !amp_seo.is_amp {
+            issues.push(issue_with(
+                IssueType::AmpInvalidTarget,
+                IssueSeverity::Warning,
+                IssueCategory::Technical,
+                "AMP HTML link points to a page that is not marked as AMP.",
+                serde_json::json!({
+                    "url": canonical_url,
+                    "amp_url": resolved_amp_url,
+                    "recommendation": "Ensure the rel=\"amphtml\" target is a valid AMP document with an <html amp> attribute."
+                }),
+            ));
+            continue;
+        }
+
+        let Some(amp_canonical) = amp_seo.canonical_url.as_deref() else {
+            continue;
+        };
+
+        if !are_same_url(amp_canonical, canonical_url) {
+            issues.push(issue_with(
+                IssueType::AmpCanonicalMismatch,
+                IssueSeverity::Warning,
+                IssueCategory::Technical,
+                "AMP page canonical does not point back to the canonical page that references it.",
+                serde_json::json!({
+                    "url": canonical_url,
+                    "amp_url": resolved_amp_url,
+                    "amp_canonical_url": amp_canonical,
+                    "recommendation": "Set the AMP page canonical URL to the non-AMP canonical page that links to it."
+                }),
+            ));
+        }
+    }
+}
+
+fn find_seo_by_url<'a>(
+    seo_data_map: &'a HashMap<String, SeoData>,
+    target_url: &str,
+) -> Option<(&'a str, &'a SeoData)> {
+    seo_data_map
+        .iter()
+        .find(|(url, _seo)| are_same_url(url, target_url))
+        .map(|(url, seo)| (url.as_str(), seo))
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -1396,6 +1512,55 @@ mod tests {
         assert!(issues
             .iter()
             .any(|i| i.issue_type == "hreflang_duplicate_lang"));
+    }
+
+    #[test]
+    fn test_amp_issues_missing_canonical_and_invalid_target() {
+        let mut seo = make_seo_data();
+        seo.is_amp = true;
+        seo.amp_html_url = Some("https://example.com/amp".to_string());
+        let mut issues = Vec::new();
+
+        detect_amp_issues("https://example.com/amp", &seo, &mut issues);
+
+        assert!(issues
+            .iter()
+            .any(|i| i.issue_type == "amp_missing_canonical"));
+        assert!(issues.iter().any(|i| i.issue_type == "amp_invalid_target"));
+    }
+
+    #[test]
+    fn test_amp_cross_page_detects_non_amp_target() {
+        let mut canonical = make_seo_data();
+        canonical.amp_html_url = Some("https://example.com/page.amp.html".to_string());
+        let amp_target = make_seo_data();
+        let mut map = HashMap::new();
+        map.insert("https://example.com/page".to_string(), canonical);
+        map.insert("https://example.com/page.amp.html".to_string(), amp_target);
+        let mut issues = Vec::new();
+
+        detect_amp_cross_page_issues(&map, &mut issues);
+
+        assert!(issues.iter().any(|i| i.issue_type == "amp_invalid_target"));
+    }
+
+    #[test]
+    fn test_amp_cross_page_detects_canonical_mismatch() {
+        let mut canonical = make_seo_data();
+        canonical.amp_html_url = Some("https://example.com/page.amp.html".to_string());
+        let mut amp_target = make_seo_data();
+        amp_target.is_amp = true;
+        amp_target.canonical_url = Some("https://example.com/other".to_string());
+        let mut map = HashMap::new();
+        map.insert("https://example.com/page".to_string(), canonical);
+        map.insert("https://example.com/page.amp.html".to_string(), amp_target);
+        let mut issues = Vec::new();
+
+        detect_amp_cross_page_issues(&map, &mut issues);
+
+        assert!(issues
+            .iter()
+            .any(|i| i.issue_type == "amp_canonical_mismatch"));
     }
 
     #[test]

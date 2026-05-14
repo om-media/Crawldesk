@@ -51,6 +51,7 @@ pub enum IssueType {
     BreadcrumbInvalid,
     AmpMissingCanonical,
     AmpInvalidTarget,
+    AmpCanonicalMismatch,
     MissingSecurityHeader,
     MissingHsts,
     MissingCsp,
@@ -148,6 +149,7 @@ pub const ALL_ISSUE_TYPES: &[IssueType] = &[
     IssueType::BreadcrumbInvalid,
     IssueType::AmpMissingCanonical,
     IssueType::AmpInvalidTarget,
+    IssueType::AmpCanonicalMismatch,
     IssueType::MissingSecurityHeader,
     IssueType::MissingHsts,
     IssueType::MissingCsp,
@@ -212,6 +214,7 @@ impl IssueType {
             IssueType::BreadcrumbInvalid => "breadcrumb_invalid",
             IssueType::AmpMissingCanonical => "amp_missing_canonical",
             IssueType::AmpInvalidTarget => "amp_invalid_target",
+            IssueType::AmpCanonicalMismatch => "amp_canonical_mismatch",
             IssueType::MissingSecurityHeader => "missing_security_header",
             IssueType::MissingHsts => "missing_hsts",
             IssueType::MissingCsp => "missing_csp",
@@ -426,7 +429,9 @@ impl IssueType {
                 "Structured data is missing or incomplete.",
                 "Add required fields for the schema type.",
             ),
-            IssueType::AmpMissingCanonical | IssueType::AmpInvalidTarget => (
+            IssueType::AmpMissingCanonical
+            | IssueType::AmpInvalidTarget
+            | IssueType::AmpCanonicalMismatch => (
                 "AMP issue",
                 IssueSeverity::Warning,
                 IssueCategory::Technical,

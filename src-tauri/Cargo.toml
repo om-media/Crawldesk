@@ -77,6 +77,9 @@ futures = "0.3"
 # Rate limiting (reserved for future use)
 # governor = "0.7"
 
+# CSV export
+csv = "1"
+
 # Error handling (using thiserror where needed)
 anyhow = "1"
 # thiserror = "2"

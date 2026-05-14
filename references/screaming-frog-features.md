@@ -1,349 +1,519 @@
-# Screaming Frog SEO Spider - Complete Feature Analysis
+# Screaming Frog SEO Spider — Complete Feature Breakdown
 
-**Version:** 23.3 (Feb 2026) | **License:** £199/year (~$259)
-**Free tier:** 500 URLs max
+> **Source of truth for CrawlDesk feature planning.** Last updated: 2026-05-14.
+> Based on official docs, version history (v10–v23), blog posts, and tutorials.
+
+---
 
 ## 1. CRAWLING ENGINE
-- Spider Mode: Standard recursive crawl from a start URL
-- List Mode: Crawl URLs from a list (CSV, sitemap XML, etc.)
-- SERP Mode: Crawl Google search results pages
-- Compare Mode: Compare two crawls against each other
-- API Mode: Crawl via API integration
-- JavaScript Rendering: Headless Chromium rendering for JS-heavy sites
-- HTTP/2 support in JS rendering mode
-- Proxy support with authentication
-- Custom user-agent strings
-- Cookie storage and session handling
-- Basic & Digest authentication
-- Web form authentication with profiles
-- Crawl all subdomains option
-- CDN URL handling
-- Robots.txt respect (or ignore + report)
-- HSTS policy following
-- Redirect following (configurable max hops)
-- Canonical following
-- Pagination (rel=next/prev) following
-- Fragment identifier crawling
-- iframe crawling
-- AMP page crawling
-- Meta refresh redirect detection
-- PDF crawling with link extraction
-- Response timeout configuration
-- 5XX retry configuration
-- Memory allocation settings
-- Storage mode (file-based vs in-memory)
-- Crawl retention (auto-delete old crawls)
-- Scheduled crawls with email notifications
 
-## 2. DATA EXTRACTION - ALL COLUMNS PER URL
-Address, Content Type, Status Code, Status Text, Indexability,
-Indexability Status, Title (1 & 2), Title Length, Title Pixel Width,
-Meta Description (1 & 2), Meta Description Length, Meta Description
-Pixel Width, Meta Keywords (1 & 2), Meta Keywords Length, H1 (1-4),
-H1 Length, H2 (1-4), H2 Length, Canonical (HTML + Rendered + HTTP),
-Canonical Occurrences, Meta Robots, X-Robots-Tag, hreflang (HTML +
-HTTP + Sitemap), rel=next/prev (HTML + HTTP), Language, Word Count,
-Text Ratio, JS Word Count %, Word Count Change (JS delta), HTML Size,
-Total Page Size, Transferred Size, Total Requests, Crawl Depth,
-Folder Depth, Length, Domain, Path, Response Times, Last-Modified,
-HTTP Version, Crawled As (desktop/mobile), Hash (MD5 duplicate check)
+### Core Crawling
+- **Spider mode** — crawl a website from a seed URL, following links recursively
+- **List mode** — paste/CSV-import URLs to audit without crawling
+- **API mode** (v10+) — headless automation via REST API, no UI needed
+- **CLI mode** — command-line interface for scripting and CI/CD pipelines
+- **Scheduled crawls** — set recurring crawl schedules automatically
+- **Crawl retention** (v23) — auto-delete old crawls to manage disk space
+- **Multiple sitemaps** support — ingest multiple sitemap.xml files
+- **Custom JavaScript** — inject custom JS functions during crawl; integrate with ChatGPT/LLM APIs for dynamic data extraction
+- **Database storage mode** (v12+) — save all data to SQLite on disk instead of RAM, enabling crawls beyond memory limits (200k+ URLs)
 
-## 3. LINKS ANALYSIS
-Internal Inlinks (total + unique), Internal Outlinks (total + unique),
-External Outlinks (total + unique), Unique External Outlinks,
-Unique JS Inlinks/Outlinks (rendered-only links), Link Origin
-(HTML/Rendered/Both/Dynamically Loaded), Link Path (XPath),
-DoFollow/NoFollow count, NoFollow types (nofollow/UGC/sponsored),
-Target attributes (_blank, _self, etc.), Path Type (absolute/protocol-
-relative/root-relative/path-relative), Inlinks to Root Domain,
-Inlinks to Subdomain, Outlinks to Root Domain, Outlinks to Subdomain,
-Linked Root Domains, Total Equity-Passing Links, External Equity-
-Passing Links, Site Wide vs Not Site Wide links, Link Score (0-100)
-
-## 4. IMAGES ANALYSIS
-Image Count, Image Size, Content Type, Real Dimensions (WxH),
-Display Dimensions (WxH via JS render), Alt Text, Decorative image
-detection, Empty alt detection, img srcset extraction, Total Image
-Size per page
-
-## 5. CSS/JS/RESOURCE ANALYSIS
-CSS Count, CSS Size, JavaScript Count, JavaScript Size, JavaScript
-Execution Time, Media Count, Media Size, Font Count, Third Party
-Count, Third Party Size, Other Count, Other Size, Duplicated
-JavaScript detection, Total Requests per page
-
-## 6. SEO ISSUES DETECTED (per category)
-Page Titles: Missing, Duplicate, Too Long, Too Short, Truncated,
-  Multiple titles, JS-modified titles
-Meta Descriptions: Missing, Duplicate, Too Long, Too Short, Multiple,
-  Outside head element, JS-modified
-H1 Tags: Missing, Multiple, Duplicate, Empty, JS-modified
-H2 Tags: Missing, Multiple, Duplicate
-Canonicals: Missing, Multiple, Self-referencing, JS-modified,
-  HTTP canonical vs HTML canonical mismatch
-Meta Robots: noindex, nofollow, nosnippet, etc. detection
-X-Robots-Tag: HTTP header directives
-hreflang: Missing, Mismatched, Circular, Self-referencing
-AMP: Valid/Invalid/Valid with Warnings verdict
-Pagination: rel=next/prev missing or incorrect
-Redirects: Broken redirects, Redirect chains, Redirect loops,
-  Redirect types (HTTP/HSTS/JS/Meta Refresh)
-Response Codes: 4xx errors, 5xx errors, 3xx redirects, 200 OK
-Indexability: Non-indexable URLs with reasons
-Duplicate Content: Exact duplicates (MD5 hash), Near duplicates
-  (configurable similarity threshold, default 90%)
-Thin Content: Low word count pages
-Content: Missing titles/descriptions, keyword cannibalization
-
-## 7. STRUCTURED DATA / SCHEMA
-Structured Data detection (JSON-LD, Microdata, RDFa)
-Schema.org validation with error/warning counts
-Google Rich Results validation (valid/invalid/warnings)
-Rich Results Types detected per page
-Rich Results Types Errors list
-Rich Results Warnings list
-Unique Structured Data Types count
-Validation errors by field type
-
-## 8. PERFORMANCE / PAGE SPEED
-Lighthouse Integration:
-  - Performance Score (0-100)
-  - First Contentful Paint (time + score)
-  - Largest Contentful Paint (time + score)
-  - Cumulative Layout Shift (score)
-  - Speed Index (time + score)
-  - Time to Interactive (time + score)
-  - Total Blocking Time (ms + score)
-  - Max Potential First Input Delay (ms + score)
-  - Render Blocking Requests Savings
-  - Reduce Unused CSS/JS Savings
-  - Minify CSS/JS Savings
-  - Font Display Savings
-  - Preconnect Candidates Savings
-  - Efficient Cache Policy Savings
-  - Improve Image Delivery Savings
-  - Legacy JavaScript Savings
-  - Minimize Main-Thread Work
-  - Layout Shift Culprits
-  - LCP Breakdown
-  - LCP Request Discovery
-  - Tap Targets score
-  - Viewport score
-  - Plugins score
-  - Font Display score
-  - Content Width score
-CrUX (Chrome User Experience Report) Field Data:
-  - TTFB (time + category)
-  - FCP (time + category)
-  - LCP (time + category)
-  - INP (time + category)
-  - CLS (score + category)
-  - Origin-level CWV assessment
-
-## 9. SEARCH CONSOLE INTEGRATION
-Google Search Analytics data:
-  - Impressions, Clicks, CTR, Average Position
-  - Top 10/Top 3/Top 100 queries
-  - Top 10/Top 3/Top 100 pages by traffic
-  - Top 10/Top 3/Top 100 pages by value
-  - Indexed URLs count
-  - Coverage data (valid/valid with warnings/error/excluded)
-  - Last Crawled timestamp
-  - Page Fetch status
-  - Indexing Allowed status
-  - Google-Selected Canonical
-
-## 10. ANALYTICS INTEGRATION
-Google Analytics integration:
-  - Sessions, New Users, Bounce Rate, Avg Session Duration
-  - Page Views Per Session
-  - Goal Completions, Goal Conversion Rate, Goal Value
-  - Traffic Top 10/Top 3 pages
-  - Social: Facebook Shares/Likes/Comments, Twitter, Pinterest, GPlus
-
-## 11. BACKLINK / LINK METRICS INTEGRATION
-Ahrefs API (v3):
-  - URL Rating, Domain Rating
-  - Backlinks count, Referring Domains
-  - External Backlinks EDU/GOV
-  - Citation Flow, Trust Flow
-  - Trust Flow Topics
-  - Top 10 linking pages by value
-Majestic API:
-  - Citation Flow, Trust Flow
-  - RefDomains, RefPages, RefClass C
-  - Referring IPs, Referring Subnets
-  - Root Domains Linking
-  - Subdomains Linking
-Moz API:
-  - Page Authority, Domain Authority
-  - MozRank (Combined + External Equity)
-  - MozTrust
-  - Spam Score
-
-## 12. AI / SEMANTIC FEATURES
-Custom AI Prompts:
-  - OpenAI, Gemini, Ollama, Anthropic integration
-  - Custom prompt templates per crawl
-  - Dynamic columns from prompt results
-Embeddings:
-  - Vector embeddings of page content
-  - Semantic similarity search across crawled URLs
-  - Near duplicate detection via semantic similarity (not just hash)
-  - Content clustering by topic similarity
-  - Visualizations of semantically related pages
-  - Embedding Rules for filtering which pages to embed
-
-## 13. CONTENT ANALYSIS
-Flesch Reading Ease Score (0-100 readability)
-Average Words Per Sentence
-Spelling & Grammar Check (configurable language)
-Spelling Errors count, Grammar Errors count
-N-grams extraction
-Custom Search: Find URLs containing/NOT containing specific strings
-Custom Extraction: Regex-based data extraction with named columns
-Content area definition (configurable selectors)
-
-## 14. ACCESSIBILITY
-WCAG 2.0 A Violations count
-WCAG 2.0 AA Violations count
-WCAG 2.1 AA Violations count
-WCAG 2.2 AA Violations count
-Best Practice Violations count
-All Violations total
-Location on Page for each issue
-Show Issue in Browser / Show Issue in Rendered HTML
-
-## 15. SECURITY
-Cookie analysis: Name, Value, Domain, Type (HTTP/On-Page),
-  Expiration Time, HttpOnly, Secure attributes
-Mixed content detection
-Security header analysis
-
-## 16. EXPORT & OUTPUT
-CSV export (full crawl data)
-Bulk Export options:
-  - All URLs, All Inlinks, All Outlinks
-  - Broken Links (all 4xx/5xx)
-  - Redirect Chains
-  - Duplicate Content
-  - Missing Titles/Descriptions/H1s
-  - Non-Indexable URLs
-  - Response Code categories
-  - Structured Data errors
-  - Image Alt Text issues
-  - Canonical issues
-  - hreflang issues
-XML Sitemap generation (HTML pages, PDFs, Images)
-HTML Sitemap generation
-JSON export
-Google Sheets integration (direct push)
-
-## 17. URL MANAGEMENT
-URL Rewriting rules
-Remove Parameters (query string stripping)
-Regex Replace for URL normalization
-CDN URL mapping
-Include/Exclude URL patterns
-Limit by URL path
-Limit crawl total (max URLs)
-Limit crawl depth (max clicks)
-Limit URLs per crawl depth
-Limit max folder depth
-Limit number of query strings
-Limit max URL length
-Max links per URL to crawl
-Max page size to crawl
-
-## 18. SEGMENTATION & ANALYSIS
-Custom Segments (filter + group URLs)
-Crawl Analysis (aggregate statistics)
-SEO Elements summary (counts per issue category)
-Response Time distribution
-Depth distribution
-Indexable vs Non-Indexable breakdown
-Segment-based filtering and comparison
-
-## 19. USER INTERFACE
-Tabbed interface (Internal, External, Images, CSS, JS, Links, etc.)
-Internal tab combines all data except External/hreflang/Structured Data
-Sortable/filterable columns
-Multi-select URLs for comparison
-View Source / Rendered HTML / Rendered Page screenshots
-SERP Snippet preview tool
-Configurable column display
-Language selection
-
-## 20. LOG FILE ANALYSER (SEPARATE PRODUCT)
-Server log file parsing and analysis
-Crawl vs Log comparison
-User agent breakdown
-Response code distribution from logs
-Top requested URLs from logs
-Bot vs human traffic separation
-Crawl budget analysis
+### Crawl Configuration
+- **Robots.txt** respect / ignore toggle
+- **Sitemap.xml** parsing and submission
+- **Crawl depth** limit control
+- **URL patterns** — include/exclude via regex, wildcards, path segments
+- **User-Agent** customization
+- **Request delay** and concurrency controls
+- **Authentication** — basic auth, form-based login support
+- **Proxy** support
+- **Custom headers** injection
+- **Canonicalization** — handle www/non-www, HTTP/HTTPS, trailing slashes
+- **Redirect following** — follow 3xx redirects, detect redirect chains and loops
+- **JavaScript rendering** — headless Chrome rendering for SPAs and JS-heavy sites
+- **AMP crawling** — crawl both AMP and non-AMP versions
+- **Hreflang crawling** — international hreflang annotation detection
 
 ---
 
-## CRAWLDESK CURRENT STATE vs SCREAMING FROG
+## 2. DATA COLLECTION TABS (What SF Collects Per URL)
 
-### Already implemented:
-- Basic recursive crawling
-- Project management
-- URL database (SQLite)
-- Status code tracking
-- Internal/external link detection
-- Basic SEO issues (missing titles, meta descriptions)
-- XML sitemap generation
-- CSV export
-- JavaScript rendering (via Playwright)
-- Pagination support
+SF collects data across these tabs for every crawled URL:
 
-### Missing - Priority tiers:
-
-**Phase 1 (Core SEO - next 3-6 months):**
-- Structured data / Schema validation (JSON-LD, Microdata, RDFa)
-- Near-duplicate detection (hash + semantic similarity)
-- hreflang analysis (HTML + HTTP + Sitemap)
-- Advanced URL rewriting/normalization (regex replace, parameter removal)
-- Redirect chain/loop detection
-- Canonical comparison (HTML vs HTTP vs Google-selected)
-- Bulk export by issue category
-- Thin content detection (word count thresholds)
-
-**Phase 2 (Integrations - 6-12 months):**
-- Lighthouse API integration for performance metrics
-- Google Search Console API (indexing, coverage, performance)
-- Google Analytics API (traffic, engagement metrics)
-- Custom AI prompts on crawl data (OpenAI/Gemini/Ollama)
-- Embeddings for semantic content clustering
-
-**Phase 3 (Advanced - 12+ months):**
-- Accessibility audit (WCAG 2.0/2.1/2.2 violations)
-- Log File Analyser mode
-- Crawl comparison mode
-- Segmentation system
-- Scheduled crawls with notifications
-- Backlink metrics integration (Ahrefs/Moz/Majestic APIs)
-- Carbon footprint calculation
-- Image dimension analysis (real vs display via JS render)
-- SERP snippet preview tool
+| Tab | Data Collected |
+|-----|---------------|
+| **Response Codes** | HTTP status, response time, content type, page size, last modified, cache control |
+| **Page Titles** | Title tag text, length, word count |
+| **Meta Descriptions** | Meta description text, length, word count |
+| **Headings** | H1–H6 hierarchy, heading structure, missing H1s |
+| **Images** | Src, alt text, title attribute, dimensions, file size, lazy loading |
+| **CSS** | Stylesheet URLs, render-blocking detection, inline vs external |
+| **JavaScript** | JS file URLs, inline scripts, render-blocking detection |
+| **Links (Internal)** | Internal link count, anchor text, nofollow status, link depth |
+| **Links (External)** | External link count, anchor text, nofollow status, domain distribution |
+| **Broken Links** | 4xx/5xx internal links, orphaned pages |
+| **Duplicate Content** | Exact duplicate titles, meta descriptions, page content |
+| **Canonical** | Canonical URL, self-referencing, canonical chains |
+| **Hreflang** | Hreflang annotations, missing return links, x-default |
+| **AMP** | AMP version detection, amphtml links, AMP validation |
+| **Structured Data** | Schema.org types, JSON-LD, Microdata, Rich Results validation (26+ Google features) |
+| **Security** | HTTPS status, mixed content, HSTS, security headers |
+| **Accessibility** | Missing alt text, empty links, heading order violations |
+| **Carbon Footprint** | CO2 emissions estimate per page using CO2.js |
+| **Page Speed Insights** | PSI scores (mobile/desktop) via Google API |
+| **Mobile Usability** | Lighthouse mobile audit results |
+| **Content Audit** | Word count, JS-rendered word count, JS word count %, readability metrics |
+| **N-Grams** | Bigram/trigram frequency analysis of page content |
+| **Anchor Text** | Aggregated anchor text distribution for internal/external links |
+| **Custom Extraction** | User-defined XPath/CSS/regex extractions into custom columns |
 
 ---
 
-## KEY DIFFERENTIATORS TO CONSIDER
+## 3. ISSUES DETECTION (300+ SEO Issues)
 
-Screaming Frog is a **desktop app** (Java-based). Our advantages:
-1. **Local-first + API** — they don't have a proper API or programmatic interface
-2. **SQLite database** — their data is in-memory/CSV; we persist to SQLite for queries
-3. **Web UI** — they're a desktop app; we can build a browser-based experience
-4. **Multi-project** — they handle one site per crawl; we support projects
-5. **Open source** — they charge £199/year; we can be free/open
-6. **Extensible** — skills, MCP servers, cron jobs, subagents
+SF validates against 300+ SEO issues, warnings, and opportunities across these categories:
 
-Their strengths we should match:
-- Comprehensive issue detection (they check 20+ issue types per URL)
-- Multiple data sources in one view (crawl + Search Console + Analytics + Lighthouse)
-- Bulk export workflows for SEO teams
-- JavaScript rendering for SPAs
+### Response Codes
+- 4xx errors (400, 401, 403, 404, 410, etc.)
+- 5xx errors (500, 502, 503, 504)
+- Redirect chains and loops
+- Non-200 response codes
+
+### Page Titles
+- Missing title tags
+- Duplicate title tags
+- Title too long / too short
+- Title contains stop words
+- Keyword cannibalization (multiple pages targeting same keyword)
+
+### Meta Descriptions
+- Missing meta descriptions
+- Duplicate meta descriptions
+- Description too long / too short
+
+### Headings
+- Missing H1 tags
+- Multiple H1 tags per page
+- Missing H2–H6 hierarchy
+- Empty headings
+
+### Images
+- Missing alt attributes
+- Empty alt attributes on non-decorative images
+- Large image file sizes
+- Images without dimensions
+- Lazy-loaded images not detected
+
+### CSS
+- Render-blocking CSS
+- Duplicate stylesheets
+- Orphaned CSS files
+- CSS too large
+
+### JavaScript
+- Render-blocking JavaScript
+- Duplicate JS files
+- Orphaned JS files
+- JavaScript errors in console
+- JS-rendered content vs. source content mismatch
+
+### Links (Internal)
+- Broken internal links (4xx/5xx)
+- Internal links with no response
+- Orphaned pages (no internal links pointing to them)
+- Deep pages (excessive crawl depth)
+- Internal link count outliers
+
+### Links (External)
+- Broken external links
+- Unsafe external links (HTTP instead of HTTPS)
+- External link domain distribution analysis
+
+### Duplicate Content
+- Exact duplicate page titles
+- Exact duplicate meta descriptions
+- Exact duplicate page content
+- Near-duplicate content detection
+
+### Canonical
+- Missing canonical tags
+- Self-referencing canonicals
+- Canonical chains
+- Canonicalized URLs (URLs that point to a different canonical)
+- No canonical URLs
+
+### Hreflang
+- Missing hreflang annotations
+- Incomplete hreflang groups
+- Hreflang not using canonical URLs
+- Missing return links in hreflang
+- Invalid hreflang values
+
+### AMP
+- Missing non-AMP return link
+- AMP page without canonical
+- AMP validation errors
+
+### Structured Data
+- Missing structured data
+- Invalid structured data (JSON-LD errors)
+- Missing required fields for Rich Results
+- Deprecated schema types
+- Validation against 26+ Google search features
+
+### Security
+- HTTP pages (non-HTTPS)
+- Mixed content (HTTP resources on HTTPS pages)
+- Missing HSTS header
+- Missing security headers (X-Frame-Options, CSP, etc.)
+
+### Accessibility
+- Missing alt text on images
+- Empty link text
+- Heading order violations (skipping levels)
+- Missing language attribute
+
+### Carbon Footprint
+- High CO2 emissions per page
+- Site-wide carbon footprint estimate
+- Sustainability rating (CO2.js integration)
+
+### Page Speed / Performance
+- Slow response times
+- Large page sizes
+- Unoptimized resources
+- PSI score warnings (via Google PageSpeed Insights API)
+
+### Mobile Usability
+- Viewport not set
+- Content wider than screen
+- Tap targets too close together
+- Font size too small
+- Lighthouse mobile audit failures
+
+### Content Quality
+- Thin content (low word count)
+- Missing meta descriptions on important pages
+- Title/meta mismatch
+- Keyword density analysis
+
+---
+
+## 4. VISUALISATIONS
+
+SF has **three** visualization categories in the top-level menu:
+
+### Crawl Visualisations
+Shows how SF crawled the site (shortest path to each page):
+- **Crawl Tree Graph** — hierarchical tree showing crawl paths from root
+- **Force-Directed Crawl Diagram** — interactive node-link diagram showing all URLs and their relationships, filterable by status code, link type, etc.
+
+### Directory Tree Visualisations
+Shows the URL path structure (not crawl paths):
+- **Directory Tree Graph** — hierarchical tree of URL directory structure
+- **Force-Directed Directory Diagram** — force-directed layout of directory structure
+
+### Word Clouds
+- Frequency-based word cloud from page titles, meta descriptions, headings, or content text
+
+### 3D Visualizations (v20.2)
+- **3D Force-Directed Graph** — three-dimensional interactive visualization of site architecture
+
+---
+
+## 5. REPORTS TAB
+
+The Reports tab provides pre-built analytical reports with charts and graphs:
+
+- **Overview** — high-level crawl summary with pie charts and bar graphs
+- **Crawl Analysis** — response code distribution, depth distribution, response time distribution, indexable vs non-indexable breakdown
+- **SEO Elements** — title length distribution, meta description length, heading structure, word count distribution
+- **Bulk Export** — export any report as CSV/Excel
+
+---
+
+## 6. ORGANIZATION FEATURE
+
+- **Custom Groups** — create named groups to organize URLs across any tab
+- **Filter by Group** — apply group filters to isolate specific URL sets
+- **Cross-tab Organization** — groups persist across all tabs for consistent segmentation
+- **Use Cases** — compare pre/post migration, separate by subdomain, group by campaign, segment by content type
+
+---
+
+## 7. SEGMENTS (v20.2)
+
+- Define URL patterns to create dynamic segments
+- Automatically categorize URLs into segments based on regex/path rules
+- Analyze segments independently (e.g., all blog posts, all product pages, all category pages)
+- Compare metrics across segments
+
+---
+
+## 8. CUSTOM EXTRACTION
+
+### Custom Search
+- Find URLs matching custom patterns using regex, XPath, or CSS selectors
+- Search within page content, titles, meta tags, headings, links, etc.
+
+### Custom Extraction
+- Define custom columns to extract data from any part of the HTML
+- Support for **XPath**, **CSS selectors**, and **regex** patterns
+- Extract arbitrary data: prices, dates, author names, schema values, etc.
+- Results appear as new columns in the main table
+- **Visual Custom Extraction** — point-and-click interface for building extractions without writing code
+
+---
+
+## 9. INTEGRATIONS
+
+### Google PageSpeed Insights (PSI) API
+- Fetch Core Web Vitals scores (LCP, FID, CLS) for every crawled URL
+- Mobile and desktop PSI scores
+- Performance, accessibility, best practices, SEO scores
+- Field data vs. lab data comparison
+
+### Lighthouse Mobile Usability Audit
+- Full Lighthouse audit results integrated into crawl data
+- Mobile-specific issues: viewport, tap targets, font size, content width
+- Performance metrics from Lighthouse
+
+### Bing Webmaster Tools API
+- Connect Bing Webmaster Tools account
+- Import Bing index status and crawl data
+- Compare SF crawl data with Bing's index
+
+### Google Sheets Integration
+- Direct API connection to export crawl data to Google Sheets
+- Real-time sync of crawl results
+- Automated reporting pipelines
+
+### Ahrefs API (v23)
+- Import Ahrefs backlink data into crawl results
+- Enrich URLs with Ahrefs metrics (DR, UR, backlink count, referring domains)
+- Combined analysis of technical SEO + backlink profile
+
+---
+
+## 10. AI / SEMANTIC FEATURES (v22–v23)
+
+### Semantic Similarity / Embeddings (v22)
+- Generate semantic embeddings for page content
+- Find semantically similar pages across the site
+- Identify content gaps and duplication beyond exact matching
+- Cluster related pages by topic
+
+### Content Cluster Diagram (v23)
+- Visualize semantic content clusters as interactive diagrams
+- See how pages group by topic similarity
+- Identify orphaned content and content silos
+- Inlinks/outlinks visualization within clusters
+
+### Semantic Embedding Rules (v23)
+- Create filter rules based on semantic similarity
+- Find pages similar to a seed URL using embeddings
+- Smart filtering beyond regex/path patterns
+
+### Custom JavaScript + LLM Integration
+- Run custom JavaScript during crawl
+- Call external APIs including ChatGPT, Anthropic Claude, open-source LLMs
+- Extract AI-generated insights from page content
+- Automate content analysis at scale
+
+---
+
+## 11. CONTENT ANALYSIS
+
+### Content Audit Tab
+- Word count (HTML source vs. JS-rendered)
+- JavaScript word count percentage
+- Readability scores (Flesch Reading Ease)
+- Spelling and grammar checks
+- Keyword density analysis
+
+### N-Grams Analysis
+- Bigram and trigram frequency analysis
+- Identify common phrase patterns across pages
+- Content theme detection
+- Duplicate content at phrase level
+
+### Anchor Text Analysis
+- Aggregated anchor text distribution for all internal links
+- Aggregated anchor text for external links
+- Top anchor texts per page
+- Anchor text diversity metrics
+
+---
+
+## 12. COMPARISON MODES
+
+SF supports multiple comparison modes for analyzing crawl data:
+
+- **Compare mode** — compare two crawls side-by-side (e.g., pre/post migration, before/after changes)
+- **Serp mode** — analyze SERP features and rich results presence
+- **List mode** — audit a static list of URLs without crawling
+
+---
+
+## 13. EXPORT & REPORTING
+
+### Export Formats
+- CSV (all tabs)
+- Excel / XLSX
+- PDF reports
+- JSON (API mode)
+
+### Bulk Export
+- Export any filtered view to CSV/Excel
+- Custom column selection for exports
+- Scheduled export automation
+
+### Report Generation
+- Pre-built report templates in Reports tab
+- Custom report builder with drag-and-drop metrics
+- Automated report scheduling
+
+---
+
+## 14. CONFIGURATION & SETTINGS
+
+### Unified Config (v20.2)
+- Share configuration profiles across team members
+- Export/import config files
+- Standardize crawl settings across organization
+
+### Configuration Categories
+- **General** — user agent, request delay, timeout, max pages
+- **Spider** — follow redirects, external product links, image options
+- **JavaScript** — render JS, execute custom JS, wait conditions
+- **Advanced** — headers, cookies, authentication, proxy
+- **robots.txt** — parsing rules
+- **sitemap.xml** — sitemap handling
+- **File settings** — export formats, database path
+- **Look & Feel** — UI customization
+- **Visualisations** — visualization defaults
+- **Custom** — custom extraction rules, search patterns
+- **Identity** — licensing, user info
+
+---
+
+## 15. PLATFORM & TECHNICAL
+
+- **OS Support** — Windows, macOS, Linux
+- **Memory Management** — RAM mode (fast, limited) and Database mode (disk-based, unlimited scale)
+- **Concurrency** — configurable parallel request threads
+- **Resumable crawls** — pause and resume interrupted crawls
+- **Crawl statistics** — real-time progress tracking, ETA, URLs crawled/sec
+- **Filtering & Sorting** — filter any column, sort by any metric, multi-column sorting
+- **Color coding** — visual indicators for issues (red=error, amber=warning, green=ok)
+- **Column customization** — show/hide columns, reorder, resize
+- **Bookmarking** — save filtered views as bookmarks
+
+---
+
+## 16. PRICING MODEL
+
+- **Free version** — limited to 500 URLs per crawl
+- **Licensed version** — unlimited URLs, all features unlocked
+- **Perpetual license** — one-time purchase, free updates for 1 year
+- **Subscription** — annual subscription option available
+
+---
+
+## 17. VERSION HISTORY HIGHLIGHTS
+
+| Version | Key Features Added |
+|---------|-------------------|
+| v10.0 | API mode (headless automation) |
+| v11.0 | Enhanced structured data validation (26+ Google features) |
+| v12.0 | Database storage mode (disk-based, unlimited scale) |
+| v20.0 | Mobile usability audit, n-grams, anchor text insights, PSI integration, content audit tab, spelling/grammar checks, Flesch readability |
+| v20.2 | 3D visualizations, segments, unified config |
+| v21.0 | Carbon footprint calculator, Lighthouse integration, Bing Webmaster Tools API |
+| v22.0 | Semantic similarity/embeddings, content cluster diagram, semantic embedding rules, custom JS + ChatGPT/LLM integration, multiple sitemaps |
+| v23.0 | Insight audits (heatmap), Ahrefs v3 API, crawl retention auto-delete, enhanced PSI/Lighthouse |
+
+---
+
+## 18. COMPETITIVE DIFFERENTIATORS
+
+What makes SF unique vs. other crawlers:
+1. **Desktop-first** — runs locally, no cloud dependency, full data ownership
+2. **300+ validated issues** — most comprehensive issue detection in the industry
+3. **JavaScript rendering** — headless Chrome for SPA crawling
+4. **Database mode** — crawl millions of URLs without memory limits
+5. **API + CLI** — full automation capability
+6. **Custom extraction** — XPath/CSS/regex for arbitrary data collection
+7. **Semantic embeddings** — AI-powered content clustering (v22+)
+8. **Multi-API integrations** — PSI, Lighthouse, Bing, Ahrefs, Google Sheets
+9. **Carbon footprint** — sustainability auditing built in
+10. **Free tier** — 500 URL crawl free forever
+
+---
+
+## 19. KNOWN LIMITATIONS
+
+- No real-time monitoring (batch crawls only)
+- No keyword rank tracking
+- No backlink analysis built-in (requires Ahrefs API integration)
+- No social media preview/audit
+- No content marketing analytics
+- No competitor analysis features
+- No white-label reporting (paid add-on)
+- Windows-only for some integrations (Google Sheets, Bing Webmaster Tools)
+
+---
+
+## 20. CRAWLDESK IMPLEMENTATION PRIORITY MAP
+
+### Phase 1 (Core — already planned)
+- Basic spider crawl with robots.txt/sitemap support
+- Response codes, titles, meta descriptions, headings
+- Internal/external links, broken links
+- Canonical detection, redirect chains
+- JavaScript rendering
+- CSV/Excel export
+- Database storage mode for scale
+
+### Phase 2 (Issues & Analysis)
+- Full 300+ issue detection engine
 - Structured data validation
+- Hreflang validation
+- AMP validation
+- Security header checks
+- Image analysis (alt text, size, dimensions)
+- Duplicate content detection
+- Keyword cannibalization
+
+### Phase 3 (Advanced Data Collection)
+- Custom extraction (XPath/CSS/regex)
+- N-grams analysis
+- Anchor text aggregation
+- Content audit tab with readability
+- Page Speed Insights integration
+- Mobile usability (Lighthouse)
+- Carbon footprint calculator
+
+### Phase 4 (Visualization & Organization)
+- Crawl visualizations (tree graph, force-directed)
+- Directory tree visualizations
+- Word clouds
+- Reports tab with charts
+- Organization groups
+- Segments
+
+### Phase 5 (AI & Integrations)
+- Semantic embeddings for content clustering
+- Content cluster diagram
+- LLM integration via custom JS
+- Ahrefs API integration
+- Bing Webmaster Tools API
+- Google Sheets sync
+- Scheduled crawls with retention
+
+### Phase 6 (Automation & Platform)
+- Full API mode
+- CLI mode
+- Unified config sharing
+- Bulk export automation
+- White-label reporting

@@ -76,6 +76,10 @@ pub struct SeoData {
     pub structured_data_json: Vec<serde_json::Value>,
     pub has_schema_org: bool,
     pub hreflang_alternates: Vec<String>,
+    #[serde(default)]
+    pub amp_html_url: Option<String>,
+    #[serde(default)]
+    pub is_amp: bool,
     pub self_referencing_canonical: bool,
     pub redirect_chain: Vec<String>,
     pub final_url: Option<String>,
