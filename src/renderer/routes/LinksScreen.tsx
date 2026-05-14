@@ -28,7 +28,7 @@ export default function LinksScreen() {
 
   async function loadSummary() {
     if (!activeCrawlId) return
-    try { const s = await window.crawldesk.links.summarize(activeCrawlId); console.log('[Links] summary:', s); setSummary(s) } catch (e) { console.error('[Links] Failed to load summary:', e) }
+    try { const s = await window.crawldesk.links.summarize(activeCrawlId); setSummary(s) } catch (e) { console.error('[Links] Failed to load summary:', e) }
   }
 
   async function retry() { setLoadError(null); loadLinks() }
