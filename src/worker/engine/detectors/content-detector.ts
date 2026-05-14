@@ -82,7 +82,7 @@ export function detectContentIssues(result: PageResult): IssueRecordInput[] {
   }
 
   // --- Feature 1.1: Missing H2 ---
-  const h2Count = seo.h2?.count ?? 0
+  const h2Count = seo.h2Count ?? 0
   if (h2Count === 0 && seo.wordCount > 0) {
     issues.push({
       crawlId: result.crawlId, url: result.url, urlId: result.urlId,
@@ -123,11 +123,16 @@ function detectNonSequentialHeadings(result: PageResult, issues: IssueRecordInpu
   // H1 always exists as part of SeoData
   if ((seo.h1Count ?? 0) > 0) levelsPresent.push({ level: 1, count: seo.h1Count! })
 
-  const headings = ['h2', 'h3', 'h4', 'h5', 'h6'] as const
-  for (const h of headings) {
-    const headingData = seo[h]
-    if (headingData && headingData.count > 0) {
-      levelsPresent.push({ level: parseInt(h.slice(1)), count: headingData.count })
+  const headings = [
+    { level: 2, count: seo.h2Count ?? 0 },
+    { level: 3, count: seo.h3Count ?? 0 },
+    { level: 4, count: seo.h4Count ?? 0 },
+    { level: 5, count: seo.h5Count ?? 0 },
+    { level: 6, count: seo.h6Count ?? 0 },
+  ]
+  for (const heading of headings) {
+    if (heading.count > 0) {
+      levelsPresent.push(heading)
     }
   }
 

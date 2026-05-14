@@ -1,31 +1,53 @@
 node_modules/
 dist/
-out/
 *.log
 .env
 .env.local
 .DS_Store
 Thumbs.db
 
-# Compiled output from tsc builds
-main/*.js
-main/*.js.map
+# Tauri build output
+src-tauri/target/
+
+# Old Electron compiled output
 main/**/*.js
 main/**/*.js.map
-main/**/**/*.js
-main/**/**/*.js.map
-worker/*.js
-worker/*.js.map
 worker/**/*.js
 worker/**/*.js.map
-preload/*.js
-preload/*.js.map
+preload/**/*.js
+preload/**/*.js.map
+
+# Agent config (local only)
+AGENTS.md
+docs/agents/
+
+# Hermes local config
+.hermes/
+
+# Claude local config
+.claude/
+
+# E2E test screenshots
+/tmp/crawldesk-test-*.png
+/tmp/crawldesk-*.png
+
+# IDE
+.idea/
+.vscode/
 
 # Figma assets & mockups (local only)
 figma-*.png
 figma-*.txt
 mockup*.png
 
-# Agent config (local only)
-AGENTS.md
-docs/agents/
+# Old Electron source dirs (now unused)
+main/crawl/
+main/db/database.js
+main/db/database.js.map
+main/export/
+main/main.js
+main/main.js.map
+main/windows.js
+main/windows.js.map
+worker/crawler-worker.js
+worker/crawler-worker.js.map

@@ -20,6 +20,14 @@ export function extractSeo(html: string, pageUrl: string): SeoData & { links: Ex
   const canonicalRaw = canonicalEls.first().attr('href')?.trim() || null
   const canonical = resolveRelative(canonicalRaw, pageUrl)
 
+  const paginationNext = resolveRelative($('link[rel~="next"]').first().attr('href')?.trim() || null, pageUrl)
+  const paginationPrev = resolveRelative($('link[rel~="prev"]').first().attr('href')?.trim() || null, pageUrl)
+  const pagination = {
+    isPaginated: !!(paginationNext || paginationPrev),
+    relNext: paginationNext,
+    relPrev: paginationPrev,
+  }
+
   let robotsMeta = $('meta[name="robots"]').first().attr('content')?.trim() || null
   if (!robotsMeta) {
     robotsMeta = $('meta[name="googlebot"]').first().attr('content')?.trim() || null
@@ -67,7 +75,24 @@ export function extractSeo(html: string, pageUrl: string): SeoData & { links: Ex
     if (src) links.push({ targetUrl: src, linkType: 'iframe' })
   })
 
-  return { title, titleLength, metaDescription, metaDescriptionLength, h1, h1Count, canonical, robotsMeta, xRobotsTag, wordCount, contentHash, links }
+  return {
+    title,
+    titleLength,
+    metaDescription,
+    metaDescriptionLength,
+    h1,
+    h1Count,
+    canonical,
+    robotsMeta,
+    xRobotsTag,
+    wordCount,
+    contentHash,
+    pagination,
+    paginationNext,
+    paginationPrev,
+    isPaginated: pagination.isPaginated,
+    links
+  }
 }
 
 function resolveRelative(href: string | null, base: string): string | null {

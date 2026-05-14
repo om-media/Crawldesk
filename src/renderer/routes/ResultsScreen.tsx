@@ -18,17 +18,17 @@ export default function ResultsScreen() {
   const [selectedUrl, setSelectedUrl] = useState<UrlRecord | null>(null)
 
   const loadUrls = useCallback(async () => {
-    if (!activeCrawlId) return
+    if (!activeCrawlId || !selectedProjectId) return
     setLoading(true)
     setLoadError(null)
     try {
-      const result = await window.crawldesk.urls.list({ crawlId: activeCrawlId, page, pageSize, sort: { field: sortField, direction: sortDir }, filters: Object.fromEntries(Object.entries(filters).filter(([_, v]) => v !== '')) })
-      setUrls(result.items || [])
+      const result = await window.crawldesk.urls.list({ projectId: selectedProjectId, crawlId: activeCrawlId, page, pageSize, sort: { field: sortField, direction: sortDir }, filters: Object.fromEntries(Object.entries(filters).filter(([_, v]) => v !== '')) })
+      setUrls((result.items || []).map(normalizeUrlRecord))
       setTotal(result.total || 0)
     } catch (e: any) {
       setLoadError(e?.message || 'Failed to load URLs. Check connection and retry.')
     } finally { setLoading(false) }
-  }, [activeCrawlId, page, pageSize, sortField, sortDir, filters])
+  }, [activeCrawlId, selectedProjectId, page, pageSize, sortField, sortDir, filters])
 
   useEffect(() => { loadUrls() }, [loadUrls])
 
@@ -128,4 +128,36 @@ export default function ResultsScreen() {
       )}
     </div>
   )
+}
+
+function parseJson(value: unknown) {
+  if (typeof value !== 'string') return null
+  try { return JSON.parse(value) } catch { return null }
+}
+
+function normalizeUrlRecord(record: any): UrlRecord {
+  const fetch = parseJson(record.fetchResultJson ?? record.fetch_result_json) ?? {}
+  const seo = parseJson(record.seoDataJson ?? record.seo_data_json) ?? {}
+  return {
+    ...record,
+    id: String(record.id),
+    crawl_id: String(record.crawlId ?? record.crawl_id ?? ''),
+    status_code: fetch.statusCode ?? fetch.status_code ?? null,
+    content_type: fetch.contentType ?? fetch.content_type ?? null,
+    content_length: fetch.contentLength ?? fetch.content_length ?? null,
+    response_time_ms: fetch.responseTimeMs ?? fetch.response_time_ms ?? null,
+    final_url: fetch.finalUrl ?? fetch.final_url ?? null,
+    title: seo.title ?? null,
+    meta_description: seo.metaDescription ?? seo.meta_description ?? null,
+    h1: seo.h1Text ?? seo.h1_text ?? null,
+    canonical: seo.canonicalUrl ?? seo.canonical_url ?? null,
+    robots_meta: seo.robotsMeta ?? seo.robots_meta ?? null,
+    word_count: seo.wordCount ?? seo.word_count ?? null,
+    depth: record.depth ?? 0,
+    is_internal: true,
+    is_crawlable: true,
+    normalized_url: record.url,
+    created_at: record.discoveredAt ?? record.discovered_at ?? '',
+    updated_at: record.fetchedAt ?? record.fetched_at ?? '',
+  }
 }

@@ -21,13 +21,16 @@ export default function LinksScreen() {
     setLoadError(null)
     try {
       const result = await window.crawldesk.links.list({ crawlId: activeCrawlId, page, pageSize, filters: filterInternal !== null ? { isInternal: filterInternal } : {} })
-      setLinks(result.items || [])
-    } catch (e: any) { setLoadError(e?.message || 'Failed to load links') } finally { setLoading(false) }
+      console.log('[Links] raw result:', result, 'type:', typeof result, 'isArr:', Array.isArray(result))
+      const items = result?.items ?? (Array.isArray(result) ? result[0] ?? [] : [])
+      console.log('[Links] items:', items, 'count:', items.length)
+      setLinks(Array.isArray(items) ? items : [])
+    } catch (e: any) { console.error('[Links] loadLinks error:', e); setLoadError(e?.message || 'Failed to load links') } finally { setLoading(false) }
   }
 
   async function loadSummary() {
     if (!activeCrawlId) return
-    try { const s = await window.crawldesk.links.summarize(activeCrawlId); setSummary(s) } catch (e) { console.error('[Links] Failed to load summary:', e) }
+    try { const s = await window.crawldesk.links.summarize(activeCrawlId); console.log('[Links] summary:', s); setSummary(s) } catch (e) { console.error('[Links] Failed to load summary:', e) }
   }
 
   async function retry() { setLoadError(null); loadLinks() }

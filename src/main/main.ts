@@ -1,3 +1,16 @@
+/**
+ * @DEPRECATED - Electron Main Process (Legacy)
+ * 
+ * This file is DEPRECATED and kept only for reference.
+ * The application now uses Tauri as its primary desktop framework.
+ * 
+ * Tauri implementation: src-tauri/src/lib.rs + src-tauri/src/commands/
+ * 
+ * DO NOT use this file - it's not loaded in the current build.
+ */
+
+// @ts-nocheck - This file is deprecated and not actively maintained
+
 import { app, BrowserWindow } from 'electron'
 import path from 'path'
 import { initDatabase, closeDatabase, getDbPath } from './db/database'

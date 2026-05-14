@@ -1,0 +1,37 @@
+{
+  "productName": "CrawlDesk",
+  "version": "0.1.0",
+  "identifier": "com.crawldesk.desktop",
+  "build": {
+    "frontendDist": "../dist/renderer",
+    "devUrl": "http://localhost:5173",
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build:renderer"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "title": "CrawlDesk - SEO Crawler",
+        "width": 1400,
+        "height": 900,
+        "resizable": true,
+        "fullscreen": false
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["deb", "appimage", "nsis"],
+    "icon": [
+      "icons/icon.png",
+      "icons/128x128.png",
+      "icons/32x32.png",
+      "icons/16x16.png",
+      "icons/icon.ico"
+    ]
+  }
+}

@@ -10,23 +10,41 @@ export default function ProjectsScreen({ onNavigate }: Props) {
   const [showModal, setShowModal] = useState(false)
   const [name, setName] = useState('')
   const [url, setUrl] = useState('')
+  const [urlError, setUrlError] = useState('')
   const [loading, setLoading] = useState(true)
 
   useEffect(() => { loadProjects() }, [])
 
   async function loadProjects() {
-    try { const list = await window.crawldesk.projects.list(); setProjects(list || []) } finally { setLoading(false) }
+    try {
+      if (!window.crawldesk) {
+        console.error('[ProjectsScreen] window.crawldesk is not available!')
+        setProjects([])
+        return
+      }
+      const list = await window.crawldesk.projects.list()
+      setProjects(list || [])
+    } catch (err) {
+      console.error('[ProjectsScreen] Failed to load projects:', err)
+    } finally { setLoading(false) }
   }
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault()
+    setUrlError('')
     if (!name.trim() || !url.trim()) return
     try {
-      new URL(url)
-      const project = await window.crawldesk.projects.create({ name: name.trim(), rootUrl: url.trim() })
-      if (project) { setSelectedProjectId(project.id); loadProjects(); setShowModal(false); setName(''); setUrl(''); if (onNavigate) onNavigate('overview') }
+      new URL(url.startsWith('http') ? url : `https://${url}`)
+    } catch {
+      setUrlError('Please enter a valid URL (e.g. https://example.com)')
+      return
+    }
+    try {
+      const project = await window.crawldesk.projects.create({ name: name.trim(), rootUrl: url.trim().startsWith('http') ? url.trim() : `https://${url.trim()}` })
+      if (project) { setSelectedProjectId(project.id); loadProjects(); setShowModal(false); setName(''); setUrl(''); setUrlError(''); if (onNavigate) onNavigate('overview') }
     } catch (err) {
       console.error('[Renderer] Failed to create project:', err)
+      setUrlError(err instanceof Error ? err.message : String(err))
     }
   }
 
@@ -63,8 +81,8 @@ export default function ProjectsScreen({ onNavigate }: Props) {
               </div>
               <a href={p.root_url} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="text-xs font-medium truncate block mt-1" style={{ color: '#3B82F6' }}>{p.root_url}</a>
               <div className="flex items-center gap-3 mt-4 text-xs text-primary-muted border-t border-row pt-3">
-                {p.lastCrawlUrlCount !== null && <span>{p.lastCrawlUrlCount.toLocaleString()} URLs</span>}
-                {p.lastCrawlIssueCount !== null && <span>{p.lastCrawlIssueCount} issues</span>}
+                {p.lastCrawlUrlCount != null && <span>{p.lastCrawlUrlCount.toLocaleString()} URLs</span>}
+                {p.lastCrawlIssueCount != null && <span>{p.lastCrawlIssueCount} issues</span>}
               </div>
               <div className="mt-3 flex justify-end gap-2" onClick={(e) => e.stopPropagation()}>
                 <button onClick={() => deleteProject(p.id)} className="btn-danger !py-1.5 !px-3 !text-xs rounded-lg">Delete</button>
@@ -76,20 +94,21 @@ export default function ProjectsScreen({ onNavigate }: Props) {
 
       {/* New Project Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-midnight/70 backdrop-blur-sm flex items-center justify-center z-50" onClick={() => setShowModal(false)}>
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[100]" onClick={() => { setShowModal(false); setUrlError('') }}>
           <div className="bg-panel-dark border border-lumen rounded-xl shadow-2xl w-full max-w-md p-6" onClick={e => e.stopPropagation()} style={{ borderRadius: '14px' }}>
             <h2 className="text-lg font-bold text-primary-text mb-5">New Project</h2>
             <form onSubmit={handleCreate} className="space-y-4">
               <div>
                 <label className="block text-xs text-primary-muted uppercase tracking-wider font-semibold mb-1.5">Project Name</label>
-                <input value={name} onChange={e => setName(e.target.value)} placeholder="My Website Audit" className="input-field" required />
+                <input value={name} onChange={e => setName(e.target.value)} placeholder="My Website Audit" className="input-field" required autoFocus />
               </div>
               <div>
                 <label className="block text-xs text-primary-muted uppercase tracking-wider font-semibold mb-1.5">Website URL</label>
-                <input value={url} onChange={e => setUrl(e.target.value)} placeholder="https://example.com" className="input-field" type="url" required />
+                <input value={url} onChange={e => { setUrl(e.target.value); setUrlError('') }} placeholder="https://example.com" className="input-field" required />
+                {urlError && <p className="text-xs text-red-400 mt-1">{urlError}</p>}
               </div>
               <div className="flex gap-3 justify-end mt-6">
-                <button type="button" onClick={() => setShowModal(false)} className="btn-secondary py-2 px-4 rounded-lg text-xs">Cancel</button>
+                <button type="button" onClick={() => { setShowModal(false); setUrlError('') }} className="btn-secondary py-2 px-4 rounded-lg text-xs">Cancel</button>
                 <button type="submit" className="btn-primary py-2 px-5">Create Project</button>
               </div>
             </form>

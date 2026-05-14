@@ -3,8 +3,9 @@
 <div align="center">
 
 <img src="https://img.shields.io/badge/version-0.1.0-teal" alt="version" />
-<img src="https://img.shields.io/badge/electron-33-green" alt="electron" />
+<img src="https://img.shields.io/badge/tauri-2-green" alt="tauri" />
 <img src="https://img.shields.io/badge/react-19-blue" alt="react" />
+<img src="https://img.shields.io/badge/rust-orange" alt="rust" />
 <img src="https://img.shields.io/badge/license-proprietary-red" alt="license" />
 
 <br/>
@@ -20,11 +21,11 @@ No cloud. No accounts. No data leaving your device.
 
 ## Features
 
-- **Crawl Engine** — Multi-threaded crawler with robots.txt respect, scope control, private IP guarding, and rate limiting
+- **Crawl Engine** — Multi-threaded Rust crawler with robots.txt respect, scope control, private IP guarding, and rate limiting
 - **SEO Issue Detection** — 20+ issue types: missing titles, duplicate meta descriptions, canonical problems, noindex pages, redirect chains, slow responses, and more
 - **Live Crawl Monitoring** — Real-time progress with pause/resume/stop controls
 - **URL Explorer** — Filter, sort, and paginate crawled URLs with a detail drawer for every page
-- **Link Analysis** — Internal vs. external, follow vs. nofollow, broken link detection
+- **Link Analysis** — Internal vs. external, follow vs. nofollow, broken link detection with filtering
 - **PageSpeed Insights** — Lighthouse scores and Core Web Vitals per URL (opt-in)
 - **Health Score** — Aggregated site health with circular gauge visualization
 - **CSV Export** — Export URLs, issues, and links to CSV with filter-aware exports
@@ -43,38 +44,38 @@ No cloud. No accounts. No data leaving your device.
 
 | Layer | Technology |
 |-------|------------|
-| Desktop Shell | Electron 33 |
+| Desktop Shell | Tauri 2 (WebView2 / WKWebView) |
+| Backend / Crawler | Rust (tokio, reqwest, scraper) |
 | Renderer | React 19 + Vite 6 |
 | State Management | Zustand 5 |
 | Styling | TailwindCSS 3 + custom design tokens |
-| Database | SQLite (better-sqlite3) with WAL mode |
-| HTML Parsing | Cheerio |
-| Validation | Zod |
-| Crawl Engine | Node.js Worker Threads |
-| Testing | Vitest |
-| Language | TypeScript (strict mode) |
+| Database | SQLite (via rusqlite) with WAL mode |
+| UI Components | shadcn/ui |
+| Language | TypeScript (frontend) + Rust (backend) |
 
 ## Architecture
 
 ```
 CrawlDesk
-├── src/main/          ┬─ Electron main process
-│   ├── api/          │  External API clients (PageSpeed Insights)
-│   ├── crawl/        │  CrawlJobManager (worker orchestration)
-│   ├── db/           │  SQLite schema + repositories
-│   ├── export/       │  CSV export service
-│   ├── ipc/          │  IPC handlers (projects, crawls, URLs, issues, links, PSI, keywords, sitemaps)
-│   └── scheduler/     │  Cron service for scheduled crawls
-├── src/preload/       ── Context bridge (type-safe IPC API)
-├── src/renderer/      ┬─ React UI
-│   ├── components/  │  Layout (Sidebar)
-│   ├── routes/      │  Screens (Overview, LiveCrawl, Results, Issues, Links, Exports, Settings, ...)
-│   └── stores/      │  Zustand stores (project-store, crawl-store)
-├── src/worker/       ┬─ Crawl engine (runs in Worker Thread)
-│   ├── engine/      │  Fetcher, parser, robots, sitemap, SEO extractor, issue detectors
-│   └── detectors/   │  Modular issue detectors (canonical, content, image, social, security, hreflang, structured-data)
-├── src/shared/      ── Shared TypeScript types (URL, issue, crawl, project, link, IPC)
-└── tests/           ── Vitest test suite
+├── src-tauri/                ┬─ Tauri / Rust backend
+│   ├── src/
+│   │   ├── core/
+│   │   │   ├── crawler/      │  Async crawl engine (tokio, reqwest, scraper)
+│   │   │   ├── storage/      │  SQLite schema, queries, models (rusqlite)
+│   │   │   └── seo/          │  Issue detectors, SEO analyzers
+│   │   ├── commands/         │  Tauri IPC command handlers (projects, crawls, urls, issues, links, exports)
+│   │   └── lib.rs            │  App setup, IPC registration
+│   ├── Cargo.toml
+│   └── tauri.conf.json       │  Tauri configuration
+├── src/renderer/              ┬─ React UI (Vite)
+│   ├── routes/               │  Screens (Overview, LiveCrawl, Results, Issues, Links, Exports, Settings)
+│   ├── components/           │  Layout (Sidebar), shared UI components
+│   ├── stores/               │  Zustand stores (project-store, crawl-store)
+│   ├── mock-backend.ts       │  Mock window.crawldesk for Playwright E2E testing
+│   ├── tauri-api.ts          │  Tauri IPC bridge (camelCase → snake_case normalization)
+│   └── App.tsx               │  Root layout, routing, toolbar
+├── e2e-test.js                ── Playwright E2E tests (run with ?mock=true)
+└── package.json
 ```
 
 ## Getting Started
@@ -82,7 +83,8 @@ CrawlDesk
 ### Prerequisites
 
 - Node.js >= 20
-- npm >= 10
+- Rust >= 1.77 (via rustup)
+- Platform-specific WebView2 (Windows) or WebKit (macOS/Linux)
 
 ### Install
 
@@ -94,46 +96,62 @@ npm install
 
 ### Development
 
-Run the Vite renderer and Electron main process concurrently:
+Start the Vite dev server for frontend-only development (with mock backend):
 
 ```bash
 npm run dev
 ```
 
+Open http://localhost:5173/?mock=true in your browser.
+
+For full-stack development with the Tauri window:
+
+```bash
+npm run tauri:dev
+```
+
 This starts:
 - **Vite dev server** on http://localhost:5173 (renderer with HMR)
-- **Electron main process** with hot-reload via nodemon
+- **Tauri window** with live Rust backend
 
 ### Build
+
+Frontend only (for development):
 
 ```bash
 npm run build
 ```
 
-Compiles TypeScript (main + preload + worker) and builds the Vite renderer to dist/renderer/.
-
-### Test
+Production desktop app:
 
 ```bash
-npm test           # Run once
-npm run test:watch  # Watch mode
+npm run tauri:build
 ```
 
-### Lint
+### E2E Testing
+
+Playwright-based end-to-end tests using a mock backend (no Tauri required):
 
 ```bash
-npm run lint
+# Start the dev server
+npm run dev &
+sleep 4
+
+# Run E2E tests
+node e2e-test.js
 ```
+
+The mock backend activates when `?mock=true` is in the URL or `localStorage.crawldesk-mock` is set.
 
 ## Usage
 
-1. **Create a project** - Name it and enter the root URL of the site to crawl
-2. **Configure crawl** - Set max URLs, depth, concurrency, timeout, and toggle robots.txt respect, subdomains, external links
-3. **Start crawling** - Watch live progress with real-time stats (completed, queued, failed, blocked)
-4. **Review results** - Browse URLs with filters, inspect individual pages in the detail drawer
-5. **Fix issues** - Check the Issues dashboard grouped by severity (critical, high, medium, low)
-6. **Analyze links** - View internal/external link distribution, follow/nofollow ratios, broken links
-7. **Export** - Download URLs, issues, or links as CSV files
+1. **Create a project** — Name it and enter the root URL of the site to crawl
+2. **Configure crawl** — Set max URLs, depth, concurrency, timeout, and toggle robots.txt respect, subdomains, external links
+3. **Start crawling** — Watch live progress with real-time stats (completed, queued, failed, blocked)
+4. **Review results** — Browse URLs with filters, inspect individual pages in the detail drawer
+5. **Fix issues** — Check the Issues dashboard grouped by severity (critical, high, medium, low)
+6. **Analyze links** — View internal/external link distribution, follow/nofollow ratios, broken links
+7. **Export** — Download URLs, issues, or links as CSV files
 
 ## Issue Detection
 
@@ -147,21 +165,21 @@ CrawlDesk detects 20+ SEO issue types across 4 severity levels:
 | Low | Title too long/short, meta description too long/short, slow response, multiple H1s |
 
 Specialized detectors also check:
-- **Canonical tags** - multiple canonicals, self-referencing, cross-domain
-- **Image optimization** - missing alt text, large images without dimensions
-- **Open Graph / Twitter Cards** - missing og:title, og:description, og:image, twitter:card
-- **Security headers** - missing HSTS, CSP, X-Frame-Options, X-Content-Type-Options
-- **Hreflang** - missing, invalid format, no return link, wrong language codes
-- **Structured data / JSON-LD** - syntax errors, missing required properties, invalid types
-- **JavaScript rendering** - pages that require JS for content
-- **Pagination** - rel prev/next patterns
-- **Sitemap coverage** - URLs in sitemap but not crawled, and vice versa
+- **Canonical tags** — multiple canonicals, self-referencing, cross-domain
+- **Image optimization** — missing alt text, large images without dimensions
+- **Open Graph / Twitter Cards** — missing og:title, og:description, og:image, twitter:card
+- **Security headers** — missing HSTS, CSP, X-Frame-Options, X-Content-Type-Options
+- **Hreflang** — missing, invalid format, no return link, wrong language codes
+- **Structured data / JSON-LD** — syntax errors, missing required properties, invalid types
+- **JavaScript rendering** — pages that require JS for content
+- **Pagination** — rel prev/next patterns
+- **Sitemap coverage** — URLs in sitemap but not crawled, and vice versa
 
 ## Privacy
 
 All data stays on your machine:
 
-- Crawling runs locally via Node.js worker threads
+- Crawling runs locally via Rust async runtime (tokio)
 - Results are stored in a local SQLite database (crawldesk.sqlite)
 - No accounts, logins, or cloud sync
 - No telemetry or analytics
@@ -175,8 +193,8 @@ Crawl settings are per-crawl and fully configurable:
 |---------|---------|-------------|
 | Max URLs | 10,000 | Maximum pages to crawl |
 | Max Depth | 10 | Maximum crawl depth from start URL |
-| Concurrency | 5 | Parallel requests (max 20) |
-| Request Timeout | 15s | Per-request timeout in milliseconds |
+| Concurrency | 10 | Parallel requests (max 20) |
+| Request Timeout | 30s | Per-request timeout |
 | Respect robots.txt | On | Honor robots.txt directives |
 | Crawl Subdomains | Off | Include subdomains in scope |
 | Check External Links | On | Detect external link targets |
@@ -187,22 +205,17 @@ Crawl settings are per-crawl and fully configurable:
 
 | Command | Description |
 |---------|-------------|
-| npm run dev | Start dev mode (Vite + Electron with nodemon) |
-| npm run build | Build all layers (main, preload, worker, renderer) |
-| npm run build:main | Compile main process TypeScript |
-| npm run build:preload | Compile preload script TypeScript |
-| npm run build:worker | Compile worker TypeScript |
-| npm run build:renderer | Vite production build |
-| npm run lint | ESLint on src/ and shared/ |
-| npm test | Run Vitest |
-| npm run test:watch | Vitest in watch mode |
-| npm run typecheck | TypeScript type checking (no emit) |
-| npm run electron:start | Launch Electron on built output |
+| `npm run dev` | Start Vite dev server (frontend only) |
+| `npm run tauri:dev` | Start Tauri dev mode (full stack) |
+| `npm run build` | Build frontend (Vite production) |
+| `npm run tauri:build` | Build production desktop app |
+| `npm run typecheck` | TypeScript type checking (no emit) |
+| `npm run lint` | ESLint on src/renderer/ |
 
 ## Contributing
 
 1. Fork the repository
-2. Create a feature branch (git checkout -b feat/my-feature)
+2. Create a feature branch (`git checkout -b feat/my-feature`)
 3. Commit with conventional commits
 4. Push and open a Pull Request
 

@@ -63,6 +63,130 @@ function runMigrations(db: Database.Database): void {
 
   const version = (currentVersion?.v ?? 0) + 1
 
+  // Version 2: Add all columns referenced by detectors/analyzers
+  if (version >= 2) {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS crawl_diffs (
+        id TEXT PRIMARY KEY,
+        current_crawl_id TEXT NOT NULL,
+        previous_crawl_id TEXT NOT NULL,
+        url_count_delta INTEGER NOT NULL DEFAULT 0,
+        new_urls_count INTEGER NOT NULL DEFAULT 0,
+        removed_urls_count INTEGER NOT NULL DEFAULT 0,
+        broken_links_delta INTEGER NOT NULL DEFAULT 0,
+        issues_delta INTEGER NOT NULL DEFAULT 0,
+        critical_issues_delta INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL,
+        FOREIGN KEY(current_crawl_id) REFERENCES crawls(id) ON DELETE CASCADE,
+        FOREIGN KEY(previous_crawl_id) REFERENCES crawls(id) ON DELETE CASCADE
+      );
+
+      CREATE TABLE IF NOT EXISTS psi_results (
+        id TEXT PRIMARY KEY,
+        crawl_id TEXT NOT NULL,
+        url_id TEXT,
+        url TEXT NOT NULL,
+        strategy TEXT NOT NULL DEFAULT 'mobile',
+        performance_score REAL,
+        accessibility_score REAL,
+        best_practices_score REAL,
+        seo_score REAL,
+        lcp_ms REAL,
+        fid_ms REAL,
+        cls REAL,
+        fcp_ms REAL,
+        ttfb_ms REAL,
+        speed_index REAL,
+        fetched_at TEXT NOT NULL,
+        FOREIGN KEY(crawl_id) REFERENCES crawls(id) ON DELETE CASCADE
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_psi_results_crawl_id ON psi_results(crawl_id);
+      CREATE INDEX IF NOT EXISTS idx_psi_results_url_id ON psi_results(url_id);
+
+      -- Hreflang columns
+      ALTER TABLE urls ADD COLUMN hreflangs_json TEXT NOT NULL DEFAULT '[]';
+      ALTER TABLE urls ADD COLUMN has_hreflangs INTEGER NOT NULL DEFAULT 0;
+
+      -- Heading hierarchy (h2–h6)
+      ALTER TABLE urls ADD COLUMN h2 TEXT;
+      ALTER TABLE urls ADD COLUMN h2_count INTEGER NOT NULL DEFAULT 0;
+      ALTER TABLE urls ADD COLUMN h3 TEXT;
+      ALTER TABLE urls ADD COLUMN h3_count INTEGER NOT NULL DEFAULT 0;
+      ALTER TABLE urls ADD COLUMN h4 TEXT;
+      ALTER TABLE urls ADD COLUMN h4_count INTEGER NOT NULL DEFAULT 0;
+      ALTER TABLE urls ADD COLUMN h5 TEXT;
+      ALTER TABLE urls ADD COLUMN h5_count INTEGER NOT NULL DEFAULT 0;
+      ALTER TABLE urls ADD COLUMN h6 TEXT;
+      ALTER TABLE urls ADD COLUMN h6_count INTEGER NOT NULL DEFAULT 0;
+
+      -- Image alt audit
+      ALTER TABLE urls ADD COLUMN image_count INTEGER NOT NULL DEFAULT 0;
+      ALTER TABLE urls ADD COLUMN images_missing_alt_attr INTEGER NOT NULL DEFAULT 0;
+      ALTER TABLE urls ADD COLUMN images_empty_alt INTEGER NOT NULL DEFAULT 0;
+      ALTER TABLE urls ADD COLUMN images_long_alt INTEGER NOT NULL DEFAULT 0;
+
+      -- Social media meta
+      ALTER TABLE urls ADD COLUMN social_meta_json TEXT NOT NULL DEFAULT '{}';
+      ALTER TABLE urls ADD COLUMN has_og_tags INTEGER NOT NULL DEFAULT 0;
+      ALTER TABLE urls ADD COLUMN has_twitter_card INTEGER NOT NULL DEFAULT 0;
+
+      -- Structured data flags
+      ALTER TABLE urls ADD COLUMN structured_data_json TEXT NOT NULL DEFAULT '[]';
+      ALTER TABLE urls ADD COLUMN sd_webpage INTEGER NOT NULL DEFAULT 0;
+      ALTER TABLE urls ADD COLUMN sd_article INTEGER NOT NULL DEFAULT 0;
+      ALTER TABLE urls ADD COLUMN sd_product INTEGER NOT NULL DEFAULT 0;
+      ALTER TABLE urls ADD COLUMN sd_faq_page INTEGER NOT NULL DEFAULT 0;
+      ALTER TABLE urls ADD COLUMN sd_breadcrumblist INTEGER NOT NULL DEFAULT 0;
+      ALTER TABLE urls ADD COLUMN sd_organization INTEGER NOT NULL DEFAULT 0;
+      ALTER TABLE urls ADD COLUMN sd_local_business INTEGER NOT NULL DEFAULT 0;
+      ALTER TABLE urls ADD COLUMN sd_review INTEGER NOT NULL DEFAULT 0;
+      ALTER TABLE urls ADD COLUMN sd_event INTEGER NOT NULL DEFAULT 0;
+      ALTER TABLE urls ADD COLUMN sd_has_parse_errors INTEGER NOT NULL DEFAULT 0;
+
+      -- Carbon estimation
+      ALTER TABLE urls ADD COLUMN carbon_bytes_transferred INTEGER NOT NULL DEFAULT 0;
+      ALTER TABLE urls ADD COLUMN carbon_co2_grams REAL NOT NULL DEFAULT 0;
+      ALTER TABLE urls ADD COLUMN carbon_rating TEXT NOT NULL DEFAULT '';
+
+      -- Link graph counts
+      ALTER TABLE urls ADD COLUMN inlink_count INTEGER NOT NULL DEFAULT 0;
+      ALTER TABLE urls ADD COLUMN unique_inlink_count INTEGER NOT NULL DEFAULT 0;
+      ALTER TABLE urls ADD COLUMN outlink_count INTEGER NOT NULL DEFAULT 0;
+      ALTER TABLE urls ADD COLUMN unique_outlink_count INTEGER NOT NULL DEFAULT 0;
+      ALTER TABLE urls ADD COLUMN external_outlink_count INTEGER NOT NULL DEFAULT 0;
+
+      -- Pagination
+      ALTER TABLE urls ADD COLUMN pagination_next TEXT;
+      ALTER TABLE urls ADD COLUMN pagination_prev TEXT;
+      ALTER TABLE urls ADD COLUMN is_paginated INTEGER NOT NULL DEFAULT 0;
+
+      -- JS rendering comparison columns
+      ALTER TABLE urls ADD COLUMN noindex_in_rendered INTEGER NOT NULL DEFAULT 0;
+      ALTER TABLE urls ADD COLUMN rendered_html_title TEXT;
+      ALTER TABLE urls ADD COLUMN rendered_html_meta_desc TEXT;
+      ALTER TABLE urls ADD COLUMN rendered_word_count INTEGER NOT NULL DEFAULT 0;
+      ALTER TABLE urls ADD COLUMN html_word_count INTEGER NOT NULL DEFAULT 0;
+      ALTER TABLE urls ADD COLUMN word_count_change REAL NOT NULL DEFAULT 0;
+      ALTER TABLE urls ADD COLUMN js_redirect_url TEXT;
+      ALTER TABLE urls ADD COLUMN total_transferred_bytes INTEGER NOT NULL DEFAULT 0;
+      ALTER TABLE urls ADD COLUMN dom_content_loaded_ms REAL;
+      ALTER TABLE urls ADD COLUMN network_idle_ms REAL;
+
+      -- Anchor text over-optimization (per-URL)
+      ALTER TABLE urls ADD COLUMN anchor_text_over_optimized INTEGER NOT NULL DEFAULT 0;
+    `)
+
+    const existing = db.prepare(
+      'SELECT version FROM schema_migrations WHERE version = ?'
+    ).get(2) as { version?: number } | undefined
+    if (!existing) {
+      db.prepare(
+        "INSERT INTO schema_migrations (version, applied_at) VALUES (?, datetime('now'))"
+      ).run(2)
+    }
+  }
+
   // Version 1: Initial schema
   if (version >= 1) {
     db.exec(`

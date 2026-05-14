@@ -52,11 +52,9 @@ export default function CrawlSetup({ onComplete }: Props) {
       const excludePats = settings.excludePatterns.split('\n').filter(Boolean).map(s => s.trim())
       const payload = { ...settings, startUrl: settings.startUrl, includePatterns: includePats, excludePatterns: excludePats }
       console.log('[UI] Creating crawl... payload keys:', Object.keys(payload))
-      const crawl = await window.crawldesk.crawls.create(selectedProjectId, payload)
+     const crawl = await window.crawldesk.crawls.create(selectedProjectId, payload)
       console.log('[UI] Crawl created:', crawl?.id)
       setActiveCrawlId(crawl.id)
-      console.log('[UI] Starting crawl worker for', crawl.id, '...')
-      await window.crawldesk.crawls.start(crawl.id)
       console.log('[UI] Crawl started successfully!')
       onComplete()
     } catch (err: any) {
@@ -84,7 +82,7 @@ export default function CrawlSetup({ onComplete }: Props) {
         <div className="card">
           <h2 className="text-xs uppercase font-semibold text-primary-muted mb-4">Target Website</h2>
           <label className="block text-sm font-medium text-primary-muted mb-1">Start URL *</label>
-          <input value={settings.startUrl} onChange={input('startUrl')} placeholder="https://example.com" className="input-field" type="url" required />
+          <input value={settings.startUrl} onChange={input('startUrl')} placeholder="https://example.com" className="input-field" required />
         </div>
 
         {/* Limits */}

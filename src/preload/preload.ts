@@ -1,3 +1,16 @@
+/**
+ * @DEPRECATED - Electron Preload (Legacy)
+ * 
+ * This file is DEPRECATED and kept only for reference.
+ * The application now uses Tauri as its primary desktop framework.
+ * 
+ * Tauri implementation: src/renderer/tauri-api.ts + src-tauri/src/
+ * 
+ * DO NOT use this file - it references Electron APIs that are no longer loaded.
+ */
+
+// @ts-nocheck - This file is deprecated and not actively maintained
+
 import { contextBridge, ipcRenderer } from 'electron'
 import type { Project, CreateProjectInput, UpdateProjectInput } from '../shared/types/project'
 import type { Crawl, CrawlSettingsInput, CrawlProgress as CrawlProgressType } from '../shared/types/crawl'

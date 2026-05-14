@@ -7,15 +7,18 @@ interface SidebarProps {
   hasProject: boolean
 }
 
-type NavItem = { id: string; label: string; icon: string }
+type NavItem = { id: string; label: string; icon: string; count?: string; disabled?: boolean }
 
 const projectNavItems: NavItem[] = [
-  { id: 'overview', label: 'Overview', icon: '⌂' },
-  { id: 'setup', label: 'Crawls', icon: '☁' },
-  { id: 'results', label: 'URLs', icon: '◉' },
-  { id: 'issues', label: 'Issues', icon: '△' },
-  { id: 'links', label: 'Links', icon: '↗' },
-  { id: 'exports', label: 'Exports', icon: '▧' },
+  { id: 'overview', label: 'Overview', icon: '▦' },
+  { id: 'results', label: 'All URLs', icon: '│', count: '10,431' },
+  { id: 'issues', label: 'Issues', icon: '△', count: '256' },
+  { id: 'setup', label: 'Pages', icon: '▧', count: '10,431' },
+  { id: 'links', label: 'Links', icon: '↗', count: '32,921' },
+  { id: 'exports', label: 'Images', icon: '□', count: '4,289' },
+  { id: 'javascript', label: 'JavaScript', icon: '┼', count: '1,102', disabled: true },
+  { id: 'sitemaps', label: 'Sitemaps', icon: '⊕', count: '8', disabled: true },
+  { id: 'performance', label: 'Performance', icon: '◉' },
 ]
 
 export default function Sidebar({ currentRoute, onNavigate }: SidebarProps) {
@@ -38,71 +41,77 @@ export default function Sidebar({ currentRoute, onNavigate }: SidebarProps) {
   }
 
   return (
-    <aside className="w-[240px] min-w-[240px] bg-sidebar border-r border-lumen flex flex-col h-full">
-      {/* Logo */}
-      <div className="px-5 pt-6 pb-2">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-teal-accent flex items-center justify-center relative overflow-hidden" aria-hidden="true">
-            <div className="w-4 h-4 rounded-full bg-[#063b37]" />
-          </div>
-          <div>
-            <h1 className="text-lg font-bold text-primary-text tracking-tight leading-none">LumenCrawl</h1>
-            <p className="text-[11px] text-primary-muted mt-0.5 font-medium">Enterprise Edition</p>
-          </div>
+    <aside className="fixed inset-y-0 left-0 z-20 flex w-[260px] min-w-[260px] flex-col border-r border-lumen bg-sidebar/95 shadow-2xl shadow-black/25">
+      <div className="px-6 pb-4 pt-5">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="brand-mark" aria-hidden="true">☘</div>
+          <h1 className="truncate text-[18px] font-bold leading-none tracking-normal text-primary-text">OpenCrawler</h1>
+          <span className="rounded-full border border-lumen bg-panel-dark px-2 py-0.5 text-[11px] font-semibold text-primary-muted">v1.0.0</span>
         </div>
       </div>
 
-      {/* Project selector */}
-      <div className="px-3 py-2">
-        <button
-          data-sidebar-nav
-          onClick={() => onNavigate('projects')}
-          className={`w-full text-left px-3 py-2 rounded-xl text-sm transition-all ${currentRoute === 'projects' ? 'bg-teal-bg border border-lumen' : 'hover:bg-midnight/40'} border-transparent focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-accent`}
-        >
-          <span className="text-primary-muted text-xs uppercase tracking-wider font-semibold">Projects</span>
-          {project && (
-            <p className="text-sm font-semibold text-primary-text truncate mt-0.5">{project.name}</p>
-          )}
-        </button>
-      </div>
-
-      {/* Divider */}
-      <div className="mx-5 my-2 border-t border-lumen/60" />
-
-      {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto px-3 space-y-[2px]" onKeyDown={handleKeyDown}>
+      <nav className="flex-1 overflow-y-auto px-4 space-y-1" onKeyDown={handleKeyDown}>
         {projectNavItems.map(item => {
           const isActive = currentRoute === item.id
+          const disabled = item.disabled || !selectedProjectId
           return (
             <button
               key={item.id}
               data-sidebar-nav
-              onClick={() => onNavigate(item.id)}
-              disabled={!selectedProjectId}
+              onClick={() => !item.disabled && onNavigate(item.id)}
+              disabled={disabled}
               aria-current={isActive ? 'page' : undefined}
-              className={`relative w-full flex items-center gap-3 pl-3 pr-3 py-2.5 rounded-[12px] text-sm transition-all ${isActive ? 'bg-teal-bg' : 'hover:bg-midnight/30'} ${!selectedProjectId ? 'opacity-40 cursor-not-allowed' : ''} focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-accent`}
+              className={`sidebar-item ${isActive ? 'sidebar-item-active' : ''} ${disabled ? 'opacity-40 cursor-not-allowed' : ''}`}
             >
-              {isActive && <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full bg-teal-accent" />}
-              <span className={`${isActive ? 'text-teal-accent' : 'text-primary-muted'} text-lg leading-none`} aria-hidden="true">{item.icon}</span>
-              <span className={`${isActive ? 'text-primary-text font-semibold' : 'text-primary-muted font-medium'}`}>
-                {item.label}
-              </span>
+              <span className="sidebar-icon" aria-hidden="true">{item.icon}</span>
+              <span className="truncate">{item.label}</span>
+              {item.count && <span className="sidebar-count">{item.count}</span>}
             </button>
           )
         })}
-      </nav>
 
-      {/* Settings at bottom */}
-      <div className="p-3 border-t border-lumen/60">
         <button
           data-sidebar-nav
           onClick={() => onNavigate('settings')}
           aria-current={currentRoute === 'settings' ? 'page' : undefined}
-          className={`relative w-full flex items-center gap-3 pl-3 pr-3 py-2.5 rounded-[12px] text-sm transition-all ${currentRoute === 'settings' ? 'bg-teal-bg' : 'hover:bg-midnight/30'} focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-accent`}
+          className={`sidebar-item ${currentRoute === 'settings' ? 'sidebar-item-active' : ''}`}
         >
-          {currentRoute === 'settings' && <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full bg-teal-accent" />}
-          <span className={currentRoute === 'settings' ? 'text-teal-accent' : 'text-primary-muted'} style={{ fontSize: '16px' }} aria-hidden="true">⚙</span>
-          <span className={currentRoute === 'settings' ? 'text-primary-text font-semibold' : 'text-primary-muted font-medium'}>Settings</span>
+          <span className="sidebar-icon" aria-hidden="true">⚙</span>
+          <span>Settings</span>
+        </button>
+      </nav>
+
+      <div className="px-4 pb-3">
+        <button
+          data-sidebar-nav
+          onClick={() => onNavigate('projects')}
+          className={`w-full rounded-md border border-lumen bg-panel-dark p-3 text-left transition-colors hover:bg-midnight/40 ${currentRoute === 'projects' ? 'ring-1 ring-teal-accent/50' : ''}`}
+        >
+          <div className="mb-2 flex items-center justify-between text-xs text-primary-muted">
+            <span>Projects</span>
+            <span>⌄</span>
+          </div>
+          {(projects.length ? projects : [{ id: 'demo', name: 'Aventerra Park', root_url: '', created_at: '', updated_at: '' }]).slice(0, 3).map((p) => (
+            <div key={p.id} className={`mt-1 flex items-center justify-between rounded px-2 py-1.5 text-[13px] ${p.id === selectedProjectId ? 'bg-teal-bg text-primary-text' : 'text-primary-muted'}`}>
+              <span className="truncate">▧ {p.name}</span>
+              {p.id === selectedProjectId && <span className="text-emerald">●</span>}
+            </div>
+          ))}
+        </button>
+      </div>
+
+      <div className="border-t border-lumen px-5 py-4">
+        <div className="mb-3 flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#303941] text-sm font-bold text-primary-text">AD</div>
+          <div className="min-w-0">
+            <div className="truncate text-sm font-semibold text-primary-text">Alex Developer</div>
+            <div className="truncate text-xs text-primary-muted">alex@example.com</div>
+          </div>
+          <span className="ml-auto text-primary-muted">⌄</span>
+        </div>
+        <button className="flex w-full items-center justify-between rounded-md border border-lumen bg-panel-dark px-3 py-2.5 text-sm text-primary-text">
+          <span>◔ Dark Mode</span>
+          <span>⌃</span>
         </button>
       </div>
     </aside>

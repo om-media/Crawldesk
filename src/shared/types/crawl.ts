@@ -55,7 +55,7 @@ export interface CrawlSummary {
 export const DEFAULT_CRAWL_SETTINGS: Omit<CrawlSettingsInput, 'includePatterns' | 'excludePatterns'> = {
   maxUrls: 10000,
   maxDepth: 10,
-  concurrency: 5,
+  concurrency: 10,
   requestTimeoutMs: 15000,
   respectRobotsTxt: true,
   crawlSubdomains: false,

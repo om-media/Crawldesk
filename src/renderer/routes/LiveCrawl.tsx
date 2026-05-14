@@ -17,11 +17,17 @@ export default function LiveCrawl({ onCompleted }: Props) {
   useEffect(() => {
     if (!activeCrawlId) return
     try {
+      window.crawldesk.crawls.get(activeCrawlId)
+        .then((data: any) => updateProgress({ ...data, crawlId: activeCrawlId }))
+        .catch(() => {})
+
       const unsub1 = window.crawldesk.crawls.onProgress((data: any) => {
+        if (data.crawlId && String(data.crawlId) !== String(activeCrawlId)) return
         updateProgress(data)
         setRecentUrls(prev => [...prev.slice(-49), ...(data.newUrls || [])])
       })
       const unsub2 = window.crawldesk.crawls.onStatus((event: any) => {
+        if (event.crawlId && String(event.crawlId) !== String(activeCrawlId)) return
         setStatus(event.status)
         if (event.status === 'failed') setError('Crawl failed. Check logs for details.')
         if (event.status === 'completed') onCompleted()

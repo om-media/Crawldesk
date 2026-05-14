@@ -4,7 +4,7 @@ exports.DEFAULT_CRAWL_SETTINGS = void 0;
 exports.DEFAULT_CRAWL_SETTINGS = {
     maxUrls: 10000,
     maxDepth: 10,
-    concurrency: 5,
+    concurrency: 10,
     requestTimeoutMs: 15000,
     respectRobotsTxt: true,
     crawlSubdomains: false,
