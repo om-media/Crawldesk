@@ -266,9 +266,11 @@ export default function IssuesScreen() {
         <div className="space-y-2">
           {filteredIssues.map(i => (
             <div key={i.issue_type} className={`card overflow-hidden transition-all ${selectedType === i.issue_type ? 'ring-1 ring-teal-accent/50' : ''}`}>
-              <div
+              <button
+                type="button"
                 onClick={() => handleIssueClick(i.issue_type)}
-                className="flex items-center gap-4 px-4 py-3 cursor-pointer hover:bg-[#0f1f2a] transition-colors"
+                className="flex w-full items-center gap-4 px-4 py-3 cursor-pointer hover:bg-[#0f1f2a] focus:bg-[#0f1f2a] focus:outline-none focus-visible:ring-1 focus-visible:ring-teal-accent transition-colors text-left"
+                aria-expanded={selectedType === i.issue_type}
               >
                 <span className={`${i.severity === 'critical' ? 'pill-error' : i.severity === 'warning' ? 'pill-warning' : 'pill-neutral'}`}>
                   {i.severity.toUpperCase()}
@@ -279,7 +281,7 @@ export default function IssuesScreen() {
                 </div>
                 <span className="text-lg font-bold text-primary-tabular">{i.count}</span>
                 <svg className={`w-4 h-4 text-primary-muted transition-transform ${selectedType === i.issue_type ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
-              </div>
+              </button>
 
               {/* Expanded detail */}
               {selectedType === i.issue_type && (

@@ -90,6 +90,7 @@ export default function App() {
         delayBetweenRequestsMs: 0,
         requestTimeoutMs: 15000,
         respectRobotsTxt: true,
+        respectSitemaps: true,
         crawlSubdomains: false,
         checkExternalLinks: true,
         crawlExternalLinks: false,
@@ -164,8 +165,7 @@ export default function App() {
             />
             <span className="url-caret">⌄</span>
           </div>
-          <button className="icon-button" title="Crawl settings">⚙</button>
-          <button className="icon-button" title="Add URL">＋</button>
+          <button className="icon-button" title="Crawl settings" onClick={() => selectedProjectId ? navigate('setup') : navigate('settings')}>⚙</button>
           <button className="start-button" onClick={startToolbarCrawl} disabled={isStarting}>
             <span>▷</span>{isStarting ? 'Starting' : 'Start Crawl'}
           </button>
@@ -182,7 +182,6 @@ export default function App() {
           {activeCrawlId && (
             <button className="toolbar-button" onClick={() => { useProjectStore.getState().setActiveCrawlId(null); resetCrawlProgress() }}>⌫ Clear</button>
           )}
-          <button className="icon-button">⋮</button>
           <div className="crawl-state">
             <span style={{ color: activeCrawlId ? (crawlProgress?.status === 'running' ? '#10b981' : crawlProgress?.status === 'paused' ? '#f59e0b' : '#89a4aa') : '#89a4aa' }}>
               ● {activeCrawlId ? (crawlProgress?.status === 'running' ? 'Crawling' : crawlProgress?.status === 'paused' ? 'Paused' : 'Completed') : 'Idle'}
@@ -196,7 +195,7 @@ export default function App() {
           </div>
         </div>
         <footer className="status-bar">
-          <span style={{ color: activeCrawlId ? (crawlProgress?.status === 'running' ? '#10b981' : '#f59e0b') : '#89a4aa' }}>
+          <span style={{ color: activeCrawlId ? (crawlProgress?.status === 'running' ? '#10b981' : crawlProgress?.status === 'paused' ? '#f59e0b' : '#89a4aa') : '#89a4aa' }}>
             ● {activeCrawlId ? (crawlProgress?.status === 'running' ? 'Crawling' : crawlProgress?.status === 'paused' ? 'Paused' : 'Completed') : 'Ready'}
           </span>
           <span>|</span>

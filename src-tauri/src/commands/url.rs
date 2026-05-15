@@ -22,9 +22,8 @@ pub fn query_urls(
     let project_id = match project_id {
         Some(id) => id,
         None => {
-            let crawl_id = crawl_id.ok_or_else(|| {
-                "query_urls requires either project_id or crawl_id".to_string()
-            })?;
+            let crawl_id = crawl_id
+                .ok_or_else(|| "query_urls requires either project_id or crawl_id".to_string())?;
             conn.query_row(
                 "SELECT project_id FROM crawls WHERE id = ?1",
                 [crawl_id],
@@ -71,7 +70,11 @@ pub fn get_url_details(url_id: i64) -> Result<Option<models::UrlRecord>, String>
 }
 
 /// Build a URL summary from a filter clause. Used by both project_id and crawl_id variants.
-fn build_summary(conn: &rusqlite::Connection, where_clause: &str, params: &[&dyn rusqlite::types::ToSql]) -> Result<models::UrlSummary, String> {
+fn build_summary(
+    conn: &rusqlite::Connection,
+    where_clause: &str,
+    params: &[&dyn rusqlite::types::ToSql],
+) -> Result<models::UrlSummary, String> {
     // Count by indexability
     let sql_indexability = format!(
         "SELECT indexability, COUNT(*) as count FROM urls WHERE {} GROUP BY indexability",
@@ -92,12 +95,11 @@ fn build_summary(conn: &rusqlite::Connection, where_clause: &str, params: &[&dyn
         indexable_count: None,
     };
 
-    let rows = stmt.query_map(params, |row| {
-        Ok((
-            row.get::<_, String>(0)?,
-            row.get::<_, i64>(1)?,
-        ))
-    }).map_err(|e| e.to_string())?;
+    let rows = stmt
+        .query_map(params, |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?))
+        })
+        .map_err(|e| e.to_string())?;
 
     for row in rows.filter_map(|r| r.ok()) {
         let (indexability, count) = row;
@@ -116,15 +118,25 @@ fn build_summary(conn: &rusqlite::Connection, where_clause: &str, params: &[&dyn
         "SELECT COUNT(*) FROM urls WHERE {} AND status_code >= 400",
         where_clause
     );
-    summary.non_200_status = conn.query_row(&sql_non200, params, |row| row.get(0)).unwrap_or(0);
+    summary.non_200_status = conn
+        .query_row(&sql_non200, params, |row| row.get(0))
+        .unwrap_or(0);
 
     // Average depth
     let sql_avg_depth = format!("SELECT AVG(depth) FROM urls WHERE {}", where_clause);
-    summary.average_depth = conn.query_row(&sql_avg_depth, params, |row| row.get(0)).unwrap_or(0.0);
+    summary.average_depth = conn
+        .query_row(&sql_avg_depth, params, |row| row.get(0))
+        .unwrap_or(0.0);
 
     // Average response time
-    let sql_avg_time = format!("SELECT AVG(response_time_ms) FROM urls WHERE {}", where_clause);
-    summary.avg_response_time_ms = Some(conn.query_row(&sql_avg_time, params, |row| row.get(0)).unwrap_or(0.0));
+    let sql_avg_time = format!(
+        "SELECT AVG(response_time_ms) FROM urls WHERE {}",
+        where_clause
+    );
+    summary.avg_response_time_ms = Some(
+        conn.query_row(&sql_avg_time, params, |row| row.get(0))
+            .unwrap_or(0.0),
+    );
 
     // Status code distribution
     let sql_status = format!(
@@ -132,9 +144,11 @@ fn build_summary(conn: &rusqlite::Connection, where_clause: &str, params: &[&dyn
         where_clause
     );
     let mut status_stmt = conn.prepare(&sql_status).map_err(|e| e.to_string())?;
-    let status_rows = status_stmt.query_map(params, |row| {
-        Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?))
-    }).map_err(|e| e.to_string())?;
+    let status_rows = status_stmt
+        .query_map(params, |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?))
+        })
+        .map_err(|e| e.to_string())?;
     let mut status_dist = HashMap::new();
     for row in status_rows.filter_map(|r| r.ok()) {
         status_dist.insert(row.0, row.1);
@@ -147,9 +161,11 @@ fn build_summary(conn: &rusqlite::Connection, where_clause: &str, params: &[&dyn
         where_clause
     );
     let mut depth_stmt = conn.prepare(&sql_depth).map_err(|e| e.to_string())?;
-    let depth_rows = depth_stmt.query_map(params, |row| {
-        Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?))
-    }).map_err(|e| e.to_string())?;
+    let depth_rows = depth_stmt
+        .query_map(params, |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?))
+        })
+        .map_err(|e| e.to_string())?;
     let mut depth_dist = HashMap::new();
     for row in depth_rows.filter_map(|r| r.ok()) {
         depth_dist.insert(row.0, row.1);

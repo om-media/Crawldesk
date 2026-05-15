@@ -261,10 +261,22 @@ pub fn delete_project_cascade(conn: &mut Connection, project_id: i64) -> Result<
             OR crawl_b_id IN (SELECT id FROM crawls WHERE project_id = ?1)",
         params![project_id],
     )?;
-    tx.execute("DELETE FROM robots_rules WHERE project_id = ?1", params![project_id])?;
-    tx.execute("DELETE FROM sitemaps WHERE project_id = ?1", params![project_id])?;
-    tx.execute("DELETE FROM urls WHERE project_id = ?1", params![project_id])?;
-    tx.execute("DELETE FROM crawls WHERE project_id = ?1", params![project_id])?;
+    tx.execute(
+        "DELETE FROM robots_rules WHERE project_id = ?1",
+        params![project_id],
+    )?;
+    tx.execute(
+        "DELETE FROM sitemaps WHERE project_id = ?1",
+        params![project_id],
+    )?;
+    tx.execute(
+        "DELETE FROM urls WHERE project_id = ?1",
+        params![project_id],
+    )?;
+    tx.execute(
+        "DELETE FROM crawls WHERE project_id = ?1",
+        params![project_id],
+    )?;
     tx.execute("DELETE FROM projects WHERE id = ?1", params![project_id])?;
 
     tx.commit()
@@ -1364,10 +1376,7 @@ pub fn query_links_by_crawl(
     };
 
     // Count total
-    let count_query = format!(
-        "SELECT COUNT(*) FROM links l WHERE {}",
-        where_clause
-    );
+    let count_query = format!("SELECT COUNT(*) FROM links l WHERE {}", where_clause);
     let total: i64 = conn.query_row(&count_query, params_from_iter(all_params.iter()), |row| {
         row.get(0)
     })?;
@@ -1550,4 +1559,158 @@ pub fn get_all_url_records_for_crawl(conn: &Connection, crawl_id: i64) -> Result
     let rows = stmt.query_map(params![crawl_id], map_url_row)?;
     let records: Vec<UrlRecord> = rows.filter_map(|r| r.ok()).collect();
     Ok(records)
+}
+
+#[cfg(test)]
+mod regression_tests {
+    use super::*;
+
+    #[test]
+    fn query_urls_by_crawl_maps_dedicated_columns() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(
+            "
+            CREATE TABLE urls (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                url TEXT NOT NULL,
+                project_id INTEGER NOT NULL,
+                crawl_id INTEGER,
+                normalized_url TEXT,
+                final_url TEXT,
+                status_code INTEGER,
+                content_type TEXT,
+                title TEXT,
+                title_length INTEGER,
+                meta_description TEXT,
+                meta_description_length INTEGER,
+                h1 TEXT,
+                h1_count INTEGER DEFAULT 0,
+                word_count INTEGER,
+                canonical_url TEXT,
+                meta_robots TEXT,
+                response_time_ms REAL,
+                size_bytes INTEGER,
+                language TEXT,
+                inlinks_count INTEGER DEFAULT 0,
+                outlinks_count INTEGER DEFAULT 0,
+                content_hash TEXT,
+                indexability TEXT NOT NULL DEFAULT 'unknown',
+                depth INTEGER NOT NULL DEFAULT 0,
+                fetch_result_json TEXT,
+                seo_data_json TEXT,
+                discovered_at TEXT,
+                fetched_at TEXT,
+                last_crawled_at TEXT
+            );
+            INSERT INTO urls (
+                url, project_id, crawl_id, normalized_url, final_url, status_code,
+                content_type, title, title_length, meta_description, meta_description_length,
+                h1, h1_count, word_count, canonical_url, meta_robots, response_time_ms,
+                size_bytes, language, inlinks_count, outlinks_count, content_hash,
+                indexability, depth, discovered_at, fetched_at, last_crawled_at
+            ) VALUES (
+                'https://example.com/', 42, 7, 'https://example.com/', 'https://example.com/',
+                200, 'text/html', 'Home', 4, 'Meta', 4, 'H1', 1, 123,
+                'https://example.com/', 'index,follow', 25.0, 2048, 'en', 0, 2,
+                'hash', 'indexable', 0,
+                '2026-05-15T00:00:00Z', '2026-05-15T00:00:01Z', '2026-05-15T00:00:01Z'
+            );
+            ",
+        )
+        .unwrap();
+
+        let (records, total) = query_urls_by_crawl(&conn, 7, 0, 50, None, "url", "asc").unwrap();
+
+        assert_eq!(total, 1);
+        assert_eq!(records.len(), 1);
+        assert_eq!(records[0].status_code, Some(200));
+        assert_eq!(records[0].title.as_deref(), Some("Home"));
+        assert_eq!(records[0].meta_description.as_deref(), Some("Meta"));
+    }
+
+    #[test]
+    fn delete_project_cascade_removes_dependent_rows() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(
+            "
+            PRAGMA foreign_keys = ON;
+            CREATE TABLE projects (id INTEGER PRIMARY KEY, name TEXT NOT NULL, root_url TEXT NOT NULL);
+            CREATE TABLE crawls (id INTEGER PRIMARY KEY, project_id INTEGER NOT NULL, FOREIGN KEY(project_id) REFERENCES projects(id));
+            CREATE TABLE crawl_settings (id INTEGER PRIMARY KEY, crawl_id INTEGER NOT NULL);
+            CREATE TABLE urls (id INTEGER PRIMARY KEY, project_id INTEGER NOT NULL, crawl_id INTEGER, url TEXT NOT NULL);
+            CREATE TABLE links (id INTEGER PRIMARY KEY, crawl_id INTEGER, source_url_id INTEGER, target_url_id INTEGER);
+            CREATE TABLE issues (id INTEGER PRIMARY KEY, url_id INTEGER, url TEXT NOT NULL);
+            CREATE TABLE robots_rules (id INTEGER PRIMARY KEY, project_id INTEGER NOT NULL);
+            CREATE TABLE sitemaps (id INTEGER PRIMARY KEY, project_id INTEGER NOT NULL);
+            CREATE TABLE crawl_diffs (id INTEGER PRIMARY KEY, project_id INTEGER NOT NULL, crawl_a_id INTEGER, crawl_b_id INTEGER);
+            CREATE TABLE psi_results (id INTEGER PRIMARY KEY, url_id INTEGER);
+
+            INSERT INTO projects VALUES (1, 'Delete Me', 'https://example.com/');
+            INSERT INTO crawls VALUES (10, 1);
+            INSERT INTO crawl_settings VALUES (100, 10);
+            INSERT INTO urls VALUES (20, 1, 10, 'https://example.com/');
+            INSERT INTO links VALUES (30, 10, 20, 20);
+            INSERT INTO issues VALUES (40, 20, 'https://example.com/');
+            INSERT INTO robots_rules VALUES (50, 1);
+            INSERT INTO sitemaps VALUES (60, 1);
+            INSERT INTO crawl_diffs VALUES (70, 1, 10, 10);
+            INSERT INTO psi_results VALUES (80, 20);
+            ",
+        )
+        .unwrap();
+
+        delete_project_cascade(&mut conn, 1).unwrap();
+
+        for table in [
+            "projects",
+            "crawls",
+            "crawl_settings",
+            "urls",
+            "links",
+            "issues",
+            "robots_rules",
+            "sitemaps",
+            "crawl_diffs",
+            "psi_results",
+        ] {
+            let count: i64 = conn
+                .query_row(&format!("SELECT COUNT(*) FROM {}", table), [], |row| {
+                    row.get(0)
+                })
+                .unwrap();
+            assert_eq!(count, 0, "{table} was not cleared");
+        }
+    }
+
+    #[test]
+    fn query_links_by_crawl_uses_link_crawl_id_without_source_join() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(
+            "
+            CREATE TABLE links (
+                id INTEGER PRIMARY KEY,
+                crawl_id INTEGER,
+                source_url_id INTEGER NOT NULL,
+                source_url TEXT NOT NULL,
+                target_url TEXT NOT NULL,
+                link_relation TEXT NOT NULL,
+                anchor_text TEXT,
+                is_internal INTEGER NOT NULL,
+                is_no_follow INTEGER NOT NULL,
+                detected_at TEXT NOT NULL
+            );
+            INSERT INTO links VALUES (
+                1, 7, 0, 'https://example.com/', 'https://example.com/about',
+                'html_a', 'About', 1, 0, '2026-05-15T00:00:00Z'
+            );
+            ",
+        )
+        .unwrap();
+
+        let (records, total) = query_links_by_crawl(&conn, Some(7), 0, 50, None, None).unwrap();
+
+        assert_eq!(total, 1);
+        assert_eq!(records.len(), 1);
+        assert_eq!(records[0].target_url, "https://example.com/about");
+    }
 }

@@ -8,6 +8,16 @@ use super::models::{IssueSeverity, SeoData, SeoIssue};
 pub fn detect_issues(fetch_result: &FetchResult, seo_data: &SeoData) -> Vec<SeoIssue> {
     let mut issues = Vec::new();
 
+    detect_non_200_status(fetch_result, &mut issues);
+
+    if fetch_result.status_code >= 400 {
+        return issues;
+    }
+
+    if !is_html_response(fetch_result) {
+        return issues;
+    }
+
     // Content issues
     detect_missing_title(fetch_result, seo_data, &mut issues);
     detect_title_too_long(fetch_result, seo_data, &mut issues);
@@ -21,7 +31,6 @@ pub fn detect_issues(fetch_result: &FetchResult, seo_data: &SeoData) -> Vec<SeoI
 
     // Technical issues
     detect_noindex(fetch_result, seo_data, &mut issues);
-    detect_non_200_status(fetch_result, &mut issues);
     detect_slow_response(fetch_result, &mut issues);
     detect_missing_canonical(fetch_result, seo_data, &mut issues);
 
@@ -29,6 +38,16 @@ pub fn detect_issues(fetch_result: &FetchResult, seo_data: &SeoData) -> Vec<SeoI
     detect_images_without_alt(fetch_result, seo_data, &mut issues);
 
     issues
+}
+
+fn is_html_response(fetch_result: &FetchResult) -> bool {
+    match fetch_result.content_type.as_deref().map(str::trim) {
+        Some(content_type) if !content_type.is_empty() => {
+            let content_type = content_type.to_ascii_lowercase();
+            content_type.contains("text/html") || content_type.contains("application/xhtml+xml")
+        }
+        _ => true,
+    }
 }
 
 fn detect_missing_title(
@@ -388,6 +407,17 @@ mod tests {
     }
 
     #[test]
+    fn non_html_success_response_skips_html_seo_issues() {
+        let mut fetch = fetch(200);
+        fetch.content_type = Some("image/png".to_string());
+        let seo = SeoData::default();
+
+        let issues = detect_issues(&fetch, &seo);
+
+        assert!(issues.is_empty());
+    }
+
+    #[test]
     fn detect_missing_title_does_not_fire_on_4xx() {
         let mut seo = SeoData::default();
         seo.title = None;
@@ -399,6 +429,14 @@ mod tests {
                 .any(|i| i.issue_type == IssueType::MissingTitle.id()),
             "4xx pages should not trigger MissingTitle"
         );
+    }
+
+    #[test]
+    fn detect_4xx_returns_only_http_status_issue() {
+        let issues = detect_issues(&fetch(404), &SeoData::default());
+
+        assert_eq!(issues.len(), 1);
+        assert_eq!(issues[0].issue_type, IssueType::Non200Status.id());
     }
 
     #[test]

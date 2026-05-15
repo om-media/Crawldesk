@@ -317,11 +317,13 @@ export default function ResultsScreen() {
                 const idx = visibleRange.start + virtualRows.indexOf(u)
                 const top = idx * ROW_HEIGHT
                 return (
-                  <div
+                  <button
+                    type="button"
                     key={u.id}
-                    className="absolute left-0 right-0 flex items-center border-b border-row hover:bg-[#0f1f2a] cursor-pointer transition-colors"
+                    className="absolute left-0 right-0 flex items-center border-b border-row hover:bg-[#0f1f2a] focus:bg-[#0f1f2a] focus:outline-none focus-visible:ring-1 focus-visible:ring-teal-accent cursor-pointer transition-colors text-left"
                     style={{ top, height: ROW_HEIGHT }}
                     onClick={() => setSelectedUrl(u)}
+                    aria-label={`Open URL details for ${u.url}`}
                   >
                     <div className="px-4 truncate text-primary-text text-sm" style={{ flex: 1, minWidth: 200 }}>
                       {u.url}
@@ -339,7 +341,7 @@ export default function ResultsScreen() {
                     <div className="px-4 text-primary-muted text-sm" style={{ width: 70, minWidth: 70, textAlign: 'right' }}>
                       {u.response_time_ms != null ? `${u.response_time_ms}ms` : '-'}
                     </div>
-                  </div>
+                  </button>
                 )
               })}
             </div>

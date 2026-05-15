@@ -17,8 +17,9 @@ pub fn parse_html(base_url: &str, html: &str) -> SeoData {
         .select(&Selector::parse("head > title").unwrap())
         .next()
     {
-        if let Some(text) = title_el.text().collect::<String>().strip_suffix("\n") {
-            seo_data.title = Some(text.trim().to_string());
+        let text = title_el.text().collect::<String>().trim().to_string();
+        if !text.is_empty() {
+            seo_data.title = Some(text);
         }
     }
 
@@ -58,7 +59,7 @@ pub fn parse_html(base_url: &str, html: &str) -> SeoData {
     }
 
     // Extract headings (H1-H6)
-    for (level, _) in [('h', 1), ('h', 2), ('h', 3), ('h', 4), ('h', 5), ('h', 6)] {
+    for level in 1..=6 {
         let selector_str = format!("h{}", level);
         let selector = Selector::parse(&selector_str).unwrap();
         let headings: Vec<String> = document
@@ -74,18 +75,18 @@ pub fn parse_html(base_url: &str, html: &str) -> SeoData {
             .collect();
 
         match level {
-            '1' => {
+            1 => {
                 seo_data.h1_count = headings.len() as i32;
                 seo_data.has_h1 = !headings.is_empty();
                 if let Some(first) = headings.first() {
                     seo_data.h1_text = Some(first.clone());
                 }
             }
-            '2' => seo_data.headings_h2 = headings,
-            '3' => seo_data.headings_h3 = headings,
-            '4' => seo_data.headings_h4 = headings,
-            '5' => seo_data.headings_h5 = headings,
-            '6' => seo_data.headings_h6 = headings,
+            2 => seo_data.headings_h2 = headings,
+            3 => seo_data.headings_h3 = headings,
+            4 => seo_data.headings_h4 = headings,
+            5 => seo_data.headings_h5 = headings,
+            6 => seo_data.headings_h6 = headings,
             _ => {}
         }
     }
@@ -406,6 +407,28 @@ pub fn parse_sitemap_index(content: &str) -> Result<Vec<String>, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn parse_html_extracts_title_without_trailing_newline_and_headings() {
+        let seo = parse_html(
+            "https://example.com/",
+            r#"
+            <html>
+              <head><title>Smoke Fixture Home</title></head>
+              <body>
+                <h1>Smoke Fixture</h1>
+                <h2>Section</h2>
+              </body>
+            </html>
+            "#,
+        );
+
+        assert_eq!(seo.title.as_deref(), Some("Smoke Fixture Home"));
+        assert!(seo.has_h1);
+        assert_eq!(seo.h1_count, 1);
+        assert_eq!(seo.h1_text.as_deref(), Some("Smoke Fixture"));
+        assert_eq!(seo.headings_h2, vec!["Section"]);
+    }
 
     #[test]
     fn parse_html_counts_images_missing_dimensions() {

@@ -50,10 +50,6 @@
     @apply ml-auto inline-flex h-10 shrink-0 items-center gap-2 rounded-md border border-lumen bg-panel-dark px-4 text-sm font-semibold text-primary-muted;
   }
 
-  .crawl-state span {
-    @apply h-2.5 w-2.5 rounded-full bg-emerald;
-  }
-
   .status-bar {
     @apply flex h-[30px] shrink-0 items-center gap-3 border-t border-lumen bg-[#0b1117] px-5 text-xs text-primary-muted;
   }
@@ -107,6 +103,55 @@
 
   /* Table overrides for dark theme */
   table thead tr { @apply border-b border-row; }
-  table thead th { @apply text-primary-muted text-xs font-semibold uppercase tracking-wider; }
+  table thead th { @apply text-primary-muted text-xs font-semibold; }
   table tbody tr { @apply border-b border-row hover:bg-midnight/40 transition-colors; }
+}
+
+@media (max-width: 700px) {
+  .app-shell > aside {
+    width: 72px !important;
+    min-width: 72px !important;
+  }
+
+  .app-shell > aside h1,
+  .app-shell > aside h1 + span,
+  .app-shell > aside .sidebar-item span:not(.sidebar-icon):not(.sidebar-count),
+  .app-shell > aside [data-sidebar-nav] div,
+  .app-shell > aside [data-sidebar-nav] p,
+  .app-shell > aside > div:last-child .min-w-0 {
+    display: none !important;
+  }
+
+  .app-shell > aside > div {
+    padding-left: 12px !important;
+    padding-right: 12px !important;
+  }
+
+  .app-shell > aside .sidebar-item {
+    justify-content: center;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+
+  .app-shell > main {
+    margin-left: 72px !important;
+  }
+
+  .app-topbar {
+    height: auto;
+    min-height: 58px;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 8px 10px;
+  }
+
+  .url-field {
+    flex-basis: 100%;
+    height: 38px;
+  }
+
+  .crawl-state,
+  .status-bar {
+    display: none;
+  }
 }

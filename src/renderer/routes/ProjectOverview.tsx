@@ -5,6 +5,19 @@ import type { Route } from '@shared/types/route'
 
 interface Props { crawlId?: string | null; onNavigate?: (route: Route) => void }
 
+function getStatusCode(url: any): number {
+  return Number(url.status_code ?? url.statusCode ?? 0)
+}
+
+function getUrlTitle(url: any): string {
+  return url.title ?? '-'
+}
+
+function formatMs(value: unknown): string {
+  const n = Number(value)
+  if (!Number.isFinite(n) || n <= 0) return '-'
+  return `${n.toFixed(n >= 100 ? 0 : n >= 10 ? 1 : 2)} ms`
+}
 
 export default function ProjectOverview({ crawlId, onNavigate }: Props) {
   const { selectedProjectId, projects } = useProjectStore()
@@ -74,8 +87,8 @@ export default function ProjectOverview({ crawlId, onNavigate }: Props) {
         <div className="w-16 h-16 rounded-full bg-teal-bg/50 flex items-center justify-center mb-4">
           <span className="text-3xl text-teal-accent">⌂</span>
         </div>
-        <h2 className="text-xl font-bold text-primary-text mb-2">Welcome to CrawlDesk</h2>
-        <p className="text-sm text-primary-muted max-w-md text-center mb-6">Start crawling websites locally with enterprise-grade SEO analysis. Create your first project to get started.</p>
+        <h2 className="text-xl font-bold text-primary-text mb-2">{project?.name || 'Project ready'}</h2>
+        <p className="text-sm text-primary-muted max-w-md text-center mb-6">Set up the first crawl for this project to start collecting URLs, issues, links, and crawl metrics.</p>
         <button onClick={() => onNavigate?.('setup')} className="btn-primary py-3 px-6 text-base">Start New Crawl</button>
       </div>
     )
@@ -113,7 +126,7 @@ export default function ProjectOverview({ crawlId, onNavigate }: Props) {
           { label: 'Total URLs', value: totalUrls.toLocaleString(), icon: '#3b82f6', trend: '', up: true },
           { label: 'Indexable Pages', value: indexableCount.toLocaleString(), icon: '#10b981', trend: '', up: true },
           { label: 'Critical Issues', value: criticalIssues.toString(), icon: '#ef4444', trend: '', up: false },
-          { label: 'Avg Response Time', value: avgResponseTime ? `${avgResponseTime} ms` : '-', icon: '#3b82f6', trend: '', up: true },
+          { label: 'Avg Response Time', value: formatMs(avgResponseTime), icon: '#3b82f6', trend: '', up: true },
           { label: 'Health Score', value: `${healthScore}/100`, icon: '#10b981', trend: '', up: healthScore > 80 }
         ].map(kpi => (
           <div key={kpi.label} className="kpi-card">
@@ -190,7 +203,7 @@ export default function ProjectOverview({ crawlId, onNavigate }: Props) {
                   </thead>
                   <tbody>
                     {recentUrls.map((u: any) => {
-                      const code = u.status_code ?? 0
+                      const code = getStatusCode(u)
                       return (
                         <tr key={u.id} className="border-b border-row hover:bg-[#0f1f2a] transition-colors cursor-pointer" onClick={() => onNavigate?.('results')}>
                           <td className="px-3 py-2 max-w-[280px] truncate text-teal-text">{u.url}</td>
@@ -200,7 +213,7 @@ export default function ProjectOverview({ crawlId, onNavigate }: Props) {
                           <td className="px-3 py-2">
                             <span className={`pill ${u.indexability === 'indexable' ? 'pill-success' : u.indexability === 'non_indexable' ? 'pill-error' : 'pill-neutral'}`}>{u.indexability || 'unknown'}</span>
                           </td>
-                          <td className="px-3 py-2 max-w-[200px] truncate text-primary-text">{u.title || '-'}</td>
+                          <td className="px-3 py-2 max-w-[200px] truncate text-primary-text">{getUrlTitle(u)}</td>
                           <td className="px-3 py-2 text-primary-text font-medium">{u.depth ?? '-'}</td>
                         </tr>
                       )

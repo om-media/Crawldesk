@@ -543,10 +543,7 @@ impl CrawlEngine {
 
     /// Fetch and parse sitemap.xml for the root hostname.
     async fn fetch_sitemap_urls(&self) -> Result<Vec<String>, anyhow::Error> {
-        let base_url = url::Url::parse(&self.config.root_url)?;
-        let hostname = base_url.host_str().unwrap_or("");
-        let scheme = base_url.scheme();
-        let sitemap_url = format!("{}://{}/sitemap.xml", scheme, hostname);
+        let sitemap_url = default_sitemap_url(&self.config.root_url)?;
         let fetcher = Fetcher::new(self.config.fetcher_config.clone());
 
         self.fetch_sitemap_tree(&fetcher, &sitemap_url, 0).await
@@ -611,9 +608,22 @@ impl CrawlEngine {
     }
 }
 
+fn default_sitemap_url(root_url: &str) -> Result<String, url::ParseError> {
+    let base_url = url::Url::parse(root_url)?;
+    Ok(base_url.join("/sitemap.xml")?.to_string())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn default_sitemap_url_preserves_port_and_uses_root_path() {
+        assert_eq!(
+            default_sitemap_url("http://127.0.0.1:61735/nested/page").unwrap(),
+            "http://127.0.0.1:61735/sitemap.xml"
+        );
+    }
 
     #[test]
     fn test_determine_indexability_indexable() {

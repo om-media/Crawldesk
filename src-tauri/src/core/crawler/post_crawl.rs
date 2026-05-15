@@ -37,9 +37,19 @@ pub fn run_post_crawl_analysis_with_sitemaps(
     sitemap_urls: &[String],
 ) -> Vec<SeoIssue> {
     let mut issues = Vec::new();
+    let html_seo_data_map: HashMap<String, SeoData> = seo_data_map
+        .iter()
+        .filter(|(url, _)| is_successful_html_fetch(fetch_results.get(url.as_str())))
+        .map(|(url, seo)| (url.clone(), seo.clone()))
+        .collect();
+    let analysis_seo_data = if fetch_results.is_empty() {
+        seo_data_map
+    } else {
+        &html_seo_data_map
+    };
 
     // ── Per-page detectors ──────────────────────────────────────
-    for (url, seo) in seo_data_map {
+    for (url, seo) in analysis_seo_data {
         let fetch = fetch_results.get(url);
 
         // Canonical Detector
@@ -71,19 +81,35 @@ pub fn run_post_crawl_analysis_with_sitemaps(
     }
 
     // ── Cross-page detectors ───────────────────────────────────
-    detect_duplicate_titles(seo_data_map, &mut issues);
-    detect_duplicate_meta_descriptions(seo_data_map, &mut issues);
-    detect_content_duplicates(seo_data_map, &mut issues);
-    detect_keyword_cannibalization(seo_data_map, &mut issues);
-    detect_canonical_clusters(seo_data_map, &mut issues);
-    detect_redirect_chains(seo_data_map, &mut issues);
-    detect_amp_cross_page_issues(seo_data_map, &mut issues);
-    detect_hreflang_cross_page_issues(seo_data_map, fetch_results, &mut issues);
+    detect_duplicate_titles(analysis_seo_data, &mut issues);
+    detect_duplicate_meta_descriptions(analysis_seo_data, &mut issues);
+    detect_content_duplicates(analysis_seo_data, &mut issues);
+    detect_keyword_cannibalization(analysis_seo_data, &mut issues);
+    detect_canonical_clusters(analysis_seo_data, &mut issues);
+    detect_redirect_chains(analysis_seo_data, &mut issues);
+    detect_amp_cross_page_issues(analysis_seo_data, &mut issues);
+    detect_hreflang_cross_page_issues(analysis_seo_data, fetch_results, &mut issues);
     detect_sitemap_comparison_from_records(urls, sitemap_urls, &mut issues);
 
     info!("Post-crawl analysis: {} issues found", issues.len());
 
     issues
+}
+
+fn is_successful_html_fetch(fetch: Option<&FetchResult>) -> bool {
+    let Some(fetch) = fetch else {
+        return true;
+    };
+    if fetch.status_code >= 400 {
+        return false;
+    }
+    match fetch.content_type.as_deref().map(str::trim) {
+        Some(content_type) if !content_type.is_empty() => {
+            let content_type = content_type.to_ascii_lowercase();
+            content_type.contains("text/html") || content_type.contains("application/xhtml+xml")
+        }
+        _ => true,
+    }
 }
 
 /// Convenience overload that only passes SEO data (no fetch results).
@@ -1864,6 +1890,58 @@ mod tests {
         assert!(issues
             .iter()
             .any(|issue| issue.issue_type == "hreflang_missing_reciprocal"));
+    }
+
+    #[test]
+    fn post_crawl_skips_non_html_resources_for_page_seo_issues() {
+        let url = "https://example.com/hero.jpg";
+        let mut seo = make_seo_data();
+        seo.title = None;
+        seo.meta_description = None;
+        seo.has_h1 = false;
+        seo.h1_count = 0;
+
+        let mut fetch = make_fetch_result(&[], None);
+        fetch.requested_url = url.to_string();
+        fetch.final_url = url.to_string();
+        fetch.content_type = Some("image/jpeg".to_string());
+
+        let issues = run_post_crawl_analysis(
+            &[],
+            &HashMap::from([(url.to_string(), seo)]),
+            &HashMap::from([(url.to_string(), fetch)]),
+        );
+
+        assert!(
+            issues.is_empty(),
+            "non-HTML resource should not receive page SEO issues: {issues:?}"
+        );
+    }
+
+    #[test]
+    fn post_crawl_skips_error_responses_for_page_seo_issues() {
+        let url = "https://example.com/missing";
+        let mut seo = make_seo_data();
+        seo.title = None;
+        seo.meta_description = None;
+        seo.has_h1 = false;
+        seo.h1_count = 0;
+
+        let mut fetch = make_fetch_result(&[], None);
+        fetch.requested_url = url.to_string();
+        fetch.final_url = url.to_string();
+        fetch.status_code = 404;
+
+        let issues = run_post_crawl_analysis(
+            &[],
+            &HashMap::from([(url.to_string(), seo)]),
+            &HashMap::from([(url.to_string(), fetch)]),
+        );
+
+        assert!(
+            issues.is_empty(),
+            "HTTP error page should not receive page SEO issues: {issues:?}"
+        );
     }
 
     #[test]

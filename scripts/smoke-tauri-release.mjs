@@ -54,6 +54,7 @@ async function startFixtureServer() {
   <url><loc>${origin}/</loc></url>
   <url><loc>${origin}/about</loc></url>
   <url><loc>${origin}/sitemap-only</loc></url>
+  <url><loc>${origin}/hero.jpg</loc></url>
   <url><loc>${origin}/missing</loc></url>
 </urlset>`)
       return
@@ -85,6 +86,12 @@ async function startFixtureServer() {
     if (url.pathname === '/sitemap-only') {
       res.writeHead(200, { 'content-type': 'text/html' })
       res.end(fixtureHtml('Sitemap Only', '<h1>Sitemap Only</h1><p>This URL is discovered from sitemap.xml.</p>'))
+      return
+    }
+    if (url.pathname === '/hero.jpg') {
+      const jpg = Buffer.from('/9j/4AAQSkZJRgABAQAAAQABAAD/2w==', 'base64')
+      res.writeHead(200, { 'content-type': 'image/jpeg', 'content-length': String(jpg.length) })
+      res.end(jpg)
       return
     }
     if (url.pathname === '/missing') {
@@ -200,31 +207,42 @@ async function runSmoke() {
 
       await new Promise((resolve) => setTimeout(resolve, 1000))
       const urls = await window.crawldesk.urls.list({ projectId: project.id, crawlId: crawl.id, page: 0, pageSize: 50 })
+      const urlsByCrawlOnly = await window.crawldesk.urls.list({ crawlId: crawl.id, page: 0, pageSize: 50 })
       const issues = await window.crawldesk.issues.summarize(crawl.id)
+      const issueRows = await window.crawldesk.issues.list({ crawlId: crawl.id, page: 0, pageSize: 100 })
       const links = await window.crawldesk.links.list({ crawlId: crawl.id, page: 0, pageSize: 50 })
       const definitions = await window.crawldesk.issues.definitions()
 
-      await window.crawldesk.projects.delete(project.id).catch(() => {})
+      await window.crawldesk.projects.delete(project.id)
+      const projectsAfterDelete = await window.crawldesk.projects.list()
 
       return {
         projectId: project.id,
         crawlId: crawl.id,
         status: latest?.status || null,
         urlTotal: urls.total ?? urls.items?.length ?? 0,
+        crawlOnlyUrlTotal: urlsByCrawlOnly.total ?? urlsByCrawlOnly.items?.length ?? 0,
         urls: (urls.items || []).map((item) => ({ url: item.url, status: item.status_code ?? item.statusCode })),
+        crawlOnlyUrls: (urlsByCrawlOnly.items || []).map((item) => ({ url: item.url, status: item.status_code ?? item.statusCode })),
         issueTypes: (issues || []).map((issue) => issue.issue_type),
+        issueRows: (issueRows.items || []).map((issue) => ({ url: issue.url, type: issue.issue_type ?? issue.issueType })),
         issueTotal: (issues || []).reduce((sum, issue) => sum + Number(issue.count || 0), 0),
         linkTotal: links.total ?? links.items?.length ?? 0,
         definitionCount: definitions.length,
+        projectDeleted: !projectsAfterDelete.some((item) => String(item.id) === String(project.id)),
       }
     }, { fixtureBase })
 
     record('release crawl completes', result.status === 'completed', `status=${result.status}`)
     record('release crawl stores URLs', result.urlTotal >= 3, `${result.urlTotal} urls`)
+    record('release crawl-only URL query returns rows', result.crawlOnlyUrlTotal >= 3, `${result.crawlOnlyUrlTotal} urls`)
     record('release crawl captures 404 fixture URL', result.urls.some((item) => item.status === 404), JSON.stringify(result.urls))
+    record('release sitemap image does not get missing-title issue', result.urls.some((item) => item.url.endsWith('/hero.jpg')) && !result.issueRows.some((item) => item.url.endsWith('/hero.jpg') && item.type === 'missing_title'), JSON.stringify(result.issueRows))
+    record('release 404 page only gets HTTP/sitemap issues', !result.issueRows.some((item) => item.url.endsWith('/missing') && ['missing_title', 'missing_h1', 'missing_meta_description'].includes(item.type)), JSON.stringify(result.issueRows))
     record('release post-crawl/issue summary returns issues', result.issueTotal > 0, `${result.issueTotal} issues: ${result.issueTypes.join(', ')}`)
     record('release crawl stores links', result.linkTotal > 0, `${result.linkTotal} links`)
     record('release issue registry command works', result.definitionCount > 20, `${result.definitionCount} definitions`)
+    record('release project delete cascades', result.projectDeleted, `projectId=${result.projectId}`)
 
     const failed = checks.filter((check) => !check.passed)
     if (failed.length > 0) throw new Error(`${failed.length} release smoke checks failed`)
