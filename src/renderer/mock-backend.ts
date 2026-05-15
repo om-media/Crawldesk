@@ -25,7 +25,7 @@ const MOCK_PROJECTS = [
 ]
 
 const MOCK_CRAWLS: any[] = [
-  { id: '1', project_id: '1', status: 'completed', settings_json: '{}', started_at: '2025-05-13T08:00:00Z', completed_at: '2025-05-13T08:30:00Z', error_message: null, url_count: 247, issue_count: 12, link_count: 1834, created_at: '2025-05-13T08:00:00Z' },
+  { id: '1', project_id: '1', status: 'completed', start_url: 'https://avanterrapark.com', settings_json: '{}', started_at: '2025-05-13T08:00:00Z', completed_at: '2025-05-13T08:30:00Z', error_message: null, url_count: 247, issue_count: 12, link_count: 1834, created_at: '2025-05-13T08:00:00Z' },
 ]
 
 function makeMockUrls(count: number) {

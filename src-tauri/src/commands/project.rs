@@ -68,9 +68,8 @@ pub fn update_project(
 
 #[tauri::command]
 pub fn delete_project(id: i64) -> Result<(), String> {
-    let conn = db::get_connection().map_err(|e| e.to_string())?;
-    conn.execute("DELETE FROM projects WHERE id = ?1", [id])
-        .map_err(|e| e.to_string())?;
+    let mut conn = db::get_connection().map_err(|e| e.to_string())?;
+    queries::delete_project_cascade(&mut conn, id).map_err(|e| e.to_string())?;
     info!("Deleted project: {}", id);
     Ok(())
 }

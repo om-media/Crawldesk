@@ -252,7 +252,7 @@ function setupCrawldesk() {
     },
     urls: {
       list: (input: any) => invoke('query_urls', {
-        projectId: toId(input.projectId ?? 1),
+        projectId: input.projectId != null ? toId(input.projectId) : undefined,
         crawlId: input.crawlId ? toId(input.crawlId) : undefined,
         page: input.page ?? 0,
         pageSize: input.pageSize ?? 50,

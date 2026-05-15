@@ -5,7 +5,7 @@ use std::collections::HashMap;
 
 #[tauri::command]
 pub fn query_urls(
-    project_id: i64,
+    project_id: Option<i64>,
     crawl_id: Option<i64>,
     page: i64,
     page_size: i64,
@@ -19,6 +19,20 @@ pub fn query_urls(
 
     let sort_by = sort_by.unwrap_or_else(|| "id".to_string());
     let sort_order = sort_order.unwrap_or_else(|| "desc".to_string());
+    let project_id = match project_id {
+        Some(id) => id,
+        None => {
+            let crawl_id = crawl_id.ok_or_else(|| {
+                "query_urls requires either project_id or crawl_id".to_string()
+            })?;
+            conn.query_row(
+                "SELECT project_id FROM crawls WHERE id = ?1",
+                [crawl_id],
+                |row| row.get::<_, i64>(0),
+            )
+            .map_err(|e| format!("Failed to resolve project for crawl {}: {}", crawl_id, e))?
+        }
+    };
 
     let (items, total) = queries::query_urls(
         &conn,

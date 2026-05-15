@@ -228,6 +228,48 @@ pub fn get_project_summary(conn: &Connection, id: i64) -> Result<ProjectSummary>
     })
 }
 
+pub fn delete_project_cascade(conn: &mut Connection, project_id: i64) -> Result<()> {
+    let tx = conn.transaction()?;
+
+    tx.execute(
+        "DELETE FROM psi_results
+         WHERE url_id IN (SELECT id FROM urls WHERE project_id = ?1)",
+        params![project_id],
+    )?;
+    tx.execute(
+        "DELETE FROM issues
+         WHERE url_id IN (SELECT id FROM urls WHERE project_id = ?1)
+            OR url IN (SELECT url FROM urls WHERE project_id = ?1)",
+        params![project_id],
+    )?;
+    tx.execute(
+        "DELETE FROM links
+         WHERE crawl_id IN (SELECT id FROM crawls WHERE project_id = ?1)
+            OR source_url_id IN (SELECT id FROM urls WHERE project_id = ?1)
+            OR target_url_id IN (SELECT id FROM urls WHERE project_id = ?1)",
+        params![project_id],
+    )?;
+    tx.execute(
+        "DELETE FROM crawl_settings
+         WHERE crawl_id IN (SELECT id FROM crawls WHERE project_id = ?1)",
+        params![project_id],
+    )?;
+    tx.execute(
+        "DELETE FROM crawl_diffs
+         WHERE project_id = ?1
+            OR crawl_a_id IN (SELECT id FROM crawls WHERE project_id = ?1)
+            OR crawl_b_id IN (SELECT id FROM crawls WHERE project_id = ?1)",
+        params![project_id],
+    )?;
+    tx.execute("DELETE FROM robots_rules WHERE project_id = ?1", params![project_id])?;
+    tx.execute("DELETE FROM sitemaps WHERE project_id = ?1", params![project_id])?;
+    tx.execute("DELETE FROM urls WHERE project_id = ?1", params![project_id])?;
+    tx.execute("DELETE FROM crawls WHERE project_id = ?1", params![project_id])?;
+    tx.execute("DELETE FROM projects WHERE id = ?1", params![project_id])?;
+
+    tx.commit()
+}
+
 // ─── Crawls ──────────────────────────────────────────────────────
 
 pub fn create_crawl(
@@ -1298,7 +1340,7 @@ pub fn query_links_by_crawl(
     filter_is_internal: Option<bool>,
 ) -> Result<(Vec<LinkRecord>, i64)> {
     let where_parts = match crawl_id {
-        Some(_cid) => vec!["u.crawl_id = ?1".to_string()],
+        Some(_cid) => vec!["l.crawl_id = ?".to_string()],
         None => vec![],
     };
 
@@ -1323,7 +1365,7 @@ pub fn query_links_by_crawl(
 
     // Count total
     let count_query = format!(
-        "SELECT COUNT(*) FROM links l JOIN urls u ON l.source_url_id = u.id WHERE {}",
+        "SELECT COUNT(*) FROM links l WHERE {}",
         where_clause
     );
     let total: i64 = conn.query_row(&count_query, params_from_iter(all_params.iter()), |row| {
@@ -1349,7 +1391,7 @@ pub fn query_links_by_crawl(
 
     let query = format!(
         "SELECT l.id, l.source_url_id, l.source_url, l.target_url, l.link_relation, l.anchor_text, l.is_internal, l.is_no_follow, l.detected_at
-         FROM links l JOIN urls u ON l.source_url_id = u.id WHERE {}
+         FROM links l WHERE {}
          ORDER BY l.detected_at DESC LIMIT ? OFFSET ?",
         select_clause
     );
@@ -1385,10 +1427,10 @@ pub fn summarize_links_by_crawl(conn: &Connection, crawl_id: i64) -> Result<Link
     let mut stmt = conn.prepare(
         "SELECT 
             COUNT(*) as total_links,
-            SUM(CASE WHEN is_internal = 1 THEN 1 ELSE 0 END) as internal_links,
-            SUM(CASE WHEN is_internal = 0 THEN 1 ELSE 0 END) as external_links,
-            SUM(CASE WHEN is_no_follow = 1 THEN 1 ELSE 0 END) as nofollow_links
-         FROM links l JOIN urls u ON l.source_url_id = u.id WHERE u.crawl_id = ?1",
+            COALESCE(SUM(CASE WHEN is_internal = 1 THEN 1 ELSE 0 END), 0) as internal_links,
+            COALESCE(SUM(CASE WHEN is_internal = 0 THEN 1 ELSE 0 END), 0) as external_links,
+            COALESCE(SUM(CASE WHEN is_no_follow = 1 THEN 1 ELSE 0 END), 0) as nofollow_links
+         FROM links l WHERE l.crawl_id = ?1",
     )?;
 
     let (total, internal, external, nofollow): (i64, i64, i64, i64) = stmt
@@ -1398,7 +1440,7 @@ pub fn summarize_links_by_crawl(conn: &Connection, crawl_id: i64) -> Result<Link
 
     // Get relation counts
     let mut rel_stmt = conn.prepare(
-        "SELECT link_relation, COUNT(*) as count FROM links l JOIN urls u ON l.source_url_id = u.id WHERE u.crawl_id = ?1 GROUP BY link_relation ORDER BY count DESC"
+        "SELECT link_relation, COUNT(*) as count FROM links l WHERE l.crawl_id = ?1 GROUP BY link_relation ORDER BY count DESC"
     )?;
 
     let relation_counts: Vec<LinkRelationCount> = rel_stmt
@@ -1416,13 +1458,12 @@ pub fn summarize_links_by_crawl(conn: &Connection, crawl_id: i64) -> Result<Link
         .query_row(
             "SELECT COUNT(DISTINCT l.target_url)
              FROM links l
-             JOIN urls u ON l.source_url_id = u.id
              JOIN urls t ON (
                  t.normalized_url = l.target_url
                  OR t.url = l.target_url
                  OR t.final_url = l.target_url
              )
-             WHERE u.crawl_id = ?1 AND t.status_code >= 400",
+             WHERE l.crawl_id = ?1 AND t.crawl_id = ?1 AND t.status_code >= 400",
             params![crawl_id],
             |row| row.get(0),
         )
@@ -1479,7 +1520,11 @@ pub fn query_urls_by_crawl(
     query_params.push(Value::Integer(skip));
 
     let mut stmt = conn.prepare(&format!(
-        "SELECT id, url, project_id, crawl_id, fetch_result_json, seo_data_json, indexability, depth, discovered_at, fetched_at, last_crawled_at
+        "SELECT id, url, project_id, crawl_id, normalized_url, final_url, status_code,
+                content_type, title, title_length, meta_description, meta_description_length,
+                h1, h1_count, word_count, canonical_url, meta_robots, response_time_ms,
+                size_bytes, language, inlinks_count, outlinks_count, content_hash,
+                indexability, depth, fetch_result_json, seo_data_json, discovered_at, fetched_at, last_crawled_at
          FROM urls u WHERE {}
          ORDER BY {} {} LIMIT ? OFFSET ?",
         where_clause, order_field, order_dir,

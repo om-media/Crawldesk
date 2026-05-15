@@ -7,7 +7,8 @@ interface Props { crawlId?: string | null; onNavigate?: (route: Route) => void }
 
 
 export default function ProjectOverview({ crawlId, onNavigate }: Props) {
-  const { selectedProjectId } = useProjectStore()
+  const { selectedProjectId, projects } = useProjectStore()
+  const project = projects.find(p => p.id === selectedProjectId)
   const [crawls, setCrawls] = useState<CrawlType[]>([])
   const [summary, setSummary] = useState<any>(null)
   const [issueSummary, setIssueSummary] = useState<any[]>([])
@@ -34,7 +35,7 @@ export default function ProjectOverview({ crawlId, onNavigate }: Props) {
         try { setIssueSummary((await window.crawldesk.issues.summarize(list[0].id)) || []) } catch (e) { console.error('[Overview] Failed to load issue summary:', e) }
         // Fetch recent URLs for the table
         try {
-          const urlsResult = await window.crawldesk.urls.list({ crawlId: list[0].id, page: 0, pageSize: 8 })
+          const urlsResult = await window.crawldesk.urls.list({ projectId: selectedProjectId, crawlId: list[0].id, page: 0, pageSize: 8 })
           setRecentUrls(urlsResult.items || [])
         } catch (e) { console.error('[Overview] Failed to load recent URLs:', e) }
         // Build depth distribution from summary or URL data
@@ -43,7 +44,7 @@ export default function ProjectOverview({ crawlId, onNavigate }: Props) {
           if (s?.depthDistribution) {
             Object.entries(s.depthDistribution).forEach(([k, v]) => { depthData[parseInt(k)] = Number(v) })
           } else {
-            const allForChart = await window.crawldesk.urls.list({ crawlId: list[0].id, page: 0, pageSize: 200 })
+            const allForChart = await window.crawldesk.urls.list({ projectId: selectedProjectId, crawlId: list[0].id, page: 0, pageSize: 200 })
             ;(allForChart.items || []).forEach((u: any) => { depthData[u.depth] = (depthData[u.depth] || 0) + 1 })
           }
           setDepthDist(depthData)
@@ -92,7 +93,7 @@ export default function ProjectOverview({ crawlId, onNavigate }: Props) {
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-[30px] font-bold text-primary-text tracking-tight leading-none">
-            {(() => { try { return lastCrawl?.start_url ? new URL(lastCrawl.start_url).hostname : selectedProjectId } catch { return selectedProjectId } })()}
+            {project?.name || (lastCrawl?.start_url ? (() => { try { return new URL(lastCrawl.start_url).hostname } catch { return selectedProjectId } })() : selectedProjectId)}
           </h1>
           <p className="text-sm text-primary-muted mt-1 font-normal">Technical health and crawl intelligence</p>
         </div>
