@@ -817,13 +817,6 @@ pub fn query_issues(
     filter_type: Option<&str>,
     filter_severity: Option<&str>,
 ) -> Result<(Vec<IssueRecord>, i64)> {
-    // Count total
-    let count_query = format!(
-        "SELECT COUNT(*) FROM issues i JOIN urls u ON i.url_id = u.id WHERE u.project_id = ?1 {} {}",
-        filter_type.map(|t| "AND i.issue_type = ?2").unwrap_or_default(),
-        filter_severity.map(|s| "AND i.severity = ?3").unwrap_or_default()
-    );
-
     let total: i64 = match (filter_type, filter_severity) {
         (Some(t), Some(s)) => conn.query_row(
             "SELECT COUNT(*) FROM issues i JOIN urls u ON i.url_id = u.id WHERE u.project_id = ?1 AND i.issue_type = ?2 AND i.severity = ?3",
@@ -919,11 +912,6 @@ pub fn query_links(
     page_size: i64,
     filter_relation: Option<&str>,
 ) -> Result<(Vec<LinkRecord>, i64)> {
-    let count_query = format!(
-        "SELECT COUNT(*) FROM links l JOIN urls u ON l.source_url_id = u.id WHERE u.project_id = ?1 {}",
-        filter_relation.map(|r| "AND l.link_relation = ?2").unwrap_or_default()
-    );
-
     let total: i64 = if let Some(rel) = filter_relation {
         conn.query_row(
             "SELECT COUNT(*) FROM links l JOIN urls u ON l.source_url_id = u.id WHERE u.project_id = ?1 AND l.link_relation = ?2",

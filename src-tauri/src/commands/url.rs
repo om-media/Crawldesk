@@ -1,7 +1,6 @@
 //! URL commands — querying and summarizing crawled URLs.
 
 use crate::core::storage::{db, models, queries};
-use tracing::info;
 use std::collections::HashMap;
 
 #[tauri::command]

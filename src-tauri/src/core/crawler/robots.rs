@@ -1,7 +1,7 @@
 //! Robots.txt parsing and compliance checking per PRD §8.5.
 
 use std::collections::HashMap;
-use tracing::{debug, warn};
+use tracing::debug;
 
 /// Represents a parsed robots.txt entry.
 #[derive(Debug, Clone)]
@@ -84,7 +84,7 @@ impl RobotsService {
             Some((true, pattern.trim()))
         } else if let Some(pattern) = line.strip_prefix("Disallow:") {
             Some((false, pattern.trim()))
-        } else if let Some(user_agent) = line.strip_prefix("User-agent:") {
+        } else if let Some(_user_agent) = line.strip_prefix("User-agent:") {
             // Skip User-agent lines (simplified — single agent)
             None
         } else {
