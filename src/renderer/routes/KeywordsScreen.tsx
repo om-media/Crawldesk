@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useProjectStore } from '../stores/project-store'
+import { useResolvedCrawl } from '../hooks/use-resolved-crawl'
 
 
 type TabKey = 'unigrams' | 'bigrams' | 'trigrams'
@@ -7,7 +7,7 @@ type TabKey = 'unigrams' | 'bigrams' | 'trigrams'
 interface KeywordEntry { phrase: string; count: number }
 
 export default function KeywordsScreen() {
-  const { activeCrawlId } = useProjectStore()
+  const { activeCrawlId, resolvingCrawl, resolveError } = useResolvedCrawl()
   const [activeTab, setActiveTab] = useState<TabKey>('unigrams')
   const [keywords, setKeywords] = useState<KeywordEntry[]>([])
   const [loading, setLoading] = useState(false)
@@ -28,8 +28,8 @@ export default function KeywordsScreen() {
 
   if (!activeCrawlId) return (
     <div className="card py-16 text-center">
-      <p className="text-lg font-semibold text-primary-muted">No keywords yet.</p>
-      <p className="text-sm text-primary-muted mt-2">Start a crawl first to extract keywords.</p>
+      <p className="text-lg font-semibold text-primary-muted">{resolvingCrawl ? 'Loading latest crawl...' : 'No keywords yet.'}</p>
+      <p className="text-sm text-primary-muted mt-2">{resolveError || (resolvingCrawl ? 'Finding the most recent crawl with keyword data.' : 'Start a crawl first to extract keywords.')}</p>
     </div>
   )
 

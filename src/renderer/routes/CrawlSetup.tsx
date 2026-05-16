@@ -14,6 +14,7 @@ export default function CrawlSetup({ onComplete }: Props) {
     concurrency: DEFAULT_CRAWL_SETTINGS.concurrency,
     requestTimeoutMs: DEFAULT_CRAWL_SETTINGS.requestTimeoutMs,
     respectRobotsTxt: true,
+    respectSitemaps: true,
     crawlSubdomains: false,
     checkExternalLinks: true,
     crawlExternalLinks: false,
@@ -94,6 +95,7 @@ export default function CrawlSetup({ onComplete }: Props) {
           <div className="space-y-3">
             {[
               { label: 'Respect robots.txt', key: 'respectRobotsTxt' },
+              { label: 'Respect XML sitemaps', key: 'respectSitemaps' },
               { label: 'Crawl Subdomains', key: 'crawlSubdomains' },
               { label: 'Check External Links', key: 'checkExternalLinks' },
               { label: 'Crawl External Links', key: 'crawlExternalLinks' },

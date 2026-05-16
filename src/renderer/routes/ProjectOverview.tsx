@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useProjectStore } from '../stores/project-store'
+import { selectBestCrawlId } from '../utils/crawl-selection'
 import type { Crawl as CrawlType } from '@shared/types/crawl'
 import type { Route } from '@shared/types/route'
 
@@ -28,8 +29,9 @@ export default function ProjectOverview({ crawlId, onNavigate }: Props) {
   const [recentUrls, setRecentUrls] = useState<any[]>([])
   const [depthDist, setDepthDist] = useState<Record<number, number>>({})
   const [loadError, setLoadError] = useState<string | null>(null)
-  const activeCrawl = crawls.find(c => c.id === crawlId && (c.status === 'running' || c.status === 'paused'))
-  const lastCrawl = crawls[0]
+  const selectedCrawlId = crawlId ?? selectBestCrawlId(crawls as any[])
+  const activeCrawl = crawls.find(c => c.id === selectedCrawlId && (c.status === 'running' || c.status === 'paused'))
+  const lastCrawl = crawls.find(c => c.id === selectedCrawlId) ?? crawls[0]
 
   useEffect(() => {
     if (!selectedProjectId) return
@@ -43,12 +45,13 @@ export default function ProjectOverview({ crawlId, onNavigate }: Props) {
       const list = await window.crawldesk.crawls.listByProject(selectedProjectId)
       setCrawls(list || [])
       if (list?.length > 0) {
+        const displayCrawlId = selectBestCrawlId(list as any[]) ?? list[0].id
         let s: any = null
-        try { s = await window.crawldesk.urls.summarize(list[0].id); setSummary(s) } catch (e) { console.error('[Overview] Failed to load URL summary:', e) }
-        try { setIssueSummary((await window.crawldesk.issues.summarize(list[0].id)) || []) } catch (e) { console.error('[Overview] Failed to load issue summary:', e) }
+        try { s = await window.crawldesk.urls.summarize(displayCrawlId); setSummary(s) } catch (e) { console.error('[Overview] Failed to load URL summary:', e) }
+        try { setIssueSummary((await window.crawldesk.issues.summarize(displayCrawlId)) || []) } catch (e) { console.error('[Overview] Failed to load issue summary:', e) }
         // Fetch recent URLs for the table
         try {
-          const urlsResult = await window.crawldesk.urls.list({ projectId: selectedProjectId, crawlId: list[0].id, page: 0, pageSize: 8 })
+          const urlsResult = await window.crawldesk.urls.list({ projectId: selectedProjectId, crawlId: displayCrawlId, page: 0, pageSize: 8 })
           setRecentUrls(urlsResult.items || [])
         } catch (e) { console.error('[Overview] Failed to load recent URLs:', e) }
         // Build depth distribution from summary or URL data
@@ -57,7 +60,7 @@ export default function ProjectOverview({ crawlId, onNavigate }: Props) {
           if (s?.depthDistribution) {
             Object.entries(s.depthDistribution).forEach(([k, v]) => { depthData[parseInt(k)] = Number(v) })
           } else {
-            const allForChart = await window.crawldesk.urls.list({ projectId: selectedProjectId, crawlId: list[0].id, page: 0, pageSize: 200 })
+            const allForChart = await window.crawldesk.urls.list({ projectId: selectedProjectId, crawlId: displayCrawlId, page: 0, pageSize: 200 })
             ;(allForChart.items || []).forEach((u: any) => { depthData[u.depth] = (depthData[u.depth] || 0) + 1 })
           }
           setDepthDist(depthData)
@@ -77,6 +80,10 @@ export default function ProjectOverview({ crawlId, onNavigate }: Props) {
   const highIssues = issueSummary.filter(i => i.severity === 'high').reduce((a, b) => a + b.count, 0)
   const avgResponseTime = summary?.avgResponseTimeMs ?? 0
   const healthScore = Math.max(0, Math.min(100, 100 - criticalIssues * 2 - highIssues))
+  const displayStatus = String(lastCrawl?.status ?? activeCrawl?.status ?? '').toLowerCase()
+  const statusLabel = displayStatus === 'completed' ? 'Completed' : displayStatus === 'running' || displayStatus === 'crawling' ? 'Crawling' : displayStatus === 'paused' ? 'Paused' : displayStatus || 'Unknown'
+  const statusColor = displayStatus === 'completed' ? 'text-emerald' : displayStatus === 'running' || displayStatus === 'crawling' ? 'text-amber' : displayStatus === 'failed' ? 'text-red-500' : 'text-primary-muted'
+  const statusDot = displayStatus === 'completed' ? 'bg-emerald' : displayStatus === 'running' || displayStatus === 'crawling' ? 'bg-amber' : displayStatus === 'failed' ? 'bg-red-500' : 'bg-primary-muted'
 
   // Status distribution from URL summary
   const statusDist: Record<string, number> = summary?.statusCodeDistribution ? summary.statusCodeDistribution : {}
@@ -112,8 +119,8 @@ export default function ProjectOverview({ crawlId, onNavigate }: Props) {
         </div>
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-emerald" />
-            <span className="text-xs font-semibold text-emerald">Completed</span>
+            <span className={`w-2 h-2 rounded-full ${statusDot}`} />
+            <span className={`text-xs font-semibold ${statusColor}`}>{statusLabel}</span>
           </div>
           <span className="text-xs text-primary-muted">{lastCrawl?.started_at ? new Date(lastCrawl.started_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) + ' at ' + new Date(lastCrawl.started_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : '-'}</span>
           <button onClick={() => onNavigate?.('setup')} className="btn-secondary py-2 px-3 rounded-lg text-xs">▶ Run Crawl</button>
@@ -296,10 +303,10 @@ export default function ProjectOverview({ crawlId, onNavigate }: Props) {
       <div className="card p-4 flex items-center justify-between" style={{ borderRadius: '14px', height: 'auto' }}>
         <div className="flex items-center gap-6">
           <div className="flex items-center gap-2">
-            <span className="w-5 h-5 rounded-full bg-emerald flex items-center justify-center">
+            <span className={`w-5 h-5 rounded-full ${statusDot} flex items-center justify-center`}>
               <span className="text-white text-xs font-bold">✓</span>
             </span>
-            <span className="text-sm font-semibold text-emerald">Crawl Completed Successfully</span>
+            <span className={`text-sm font-semibold ${statusColor}`}>Crawl {statusLabel}</span>
           </div>
           <div className="h-5 w-px bg-lumen" />
           <span className="text-xs text-primary-muted">Total URLs</span>

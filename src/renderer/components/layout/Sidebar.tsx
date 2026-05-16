@@ -14,14 +14,12 @@ const projectNavItems: NavItem[] = [
   { id: 'overview', label: 'Overview', icon: '▦' },
   { id: 'results', label: 'All URLs', icon: '│' },
   { id: 'issues', label: 'Issues', icon: '△' },
+  { id: 'client-errors', label: 'Client Errors', icon: '4' },
   { id: 'keywords', label: 'Keywords', icon: '#' },
   { id: 'clusters', label: 'Clusters', icon: '◎' },
   { id: 'setup', label: 'Crawl Setup', icon: '▧' },
   { id: 'links', label: 'Links', icon: '↗' },
   { id: 'exports', label: 'Exports', icon: '□' },
-  { id: 'javascript', label: 'JavaScript', icon: '┼', disabled: true },
-  { id: 'sitemaps', label: 'Sitemaps', icon: '⊕', disabled: true },
-  { id: 'performance', label: 'Performance', icon: '◉', disabled: true },
 ]
 
 export default function Sidebar({ currentRoute, onNavigate }: SidebarProps) {
@@ -69,7 +67,7 @@ export default function Sidebar({ currentRoute, onNavigate }: SidebarProps) {
       </div>
 
       <nav className="flex-1 overflow-y-auto px-4 space-y-1" onKeyDown={handleKeyDown}>
-        {projectNavItems.filter(item => !item.disabled).map(item => {
+        {projectNavItems.map(item => {
           const isActive = currentRoute === item.id
           const disabled = !selectedProjectId
           return (

@@ -1,16 +1,23 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useProjectStore } from '../stores/project-store'
 import { useCrawlStore } from '../stores/crawl-store'
 
 interface Props { onCompleted: () => void }
 
 export default function LiveCrawl({ onCompleted }: Props) {
-  const { activeCrawlId } = useProjectStore()
+  const { activeCrawlId, selectedProjectId } = useProjectStore()
   const progress = useCrawlStore(s => s.progress)
   const updateProgress = useCrawlStore(s => s.updateProgress)
   const setStatus = useCrawlStore(s => s.setStatus)
   const [recentUrls, setRecentUrls] = useState<any[]>([])
   const [error, setError] = useState<string | null>(null)
+  const completedRef = useRef(false)
+
+  useEffect(() => {
+    completedRef.current = false
+    setError(null)
+    setRecentUrls([])
+  }, [activeCrawlId])
 
   // Subscribe to IPC events
   useEffect(() => {
@@ -29,7 +36,8 @@ export default function LiveCrawl({ onCompleted }: Props) {
         if (event.crawlId && String(event.crawlId) !== String(activeCrawlId)) return
         setStatus(event.status)
         if (event.status === 'failed') setError('Crawl failed. Check logs for details.')
-        if (event.status === 'completed') {
+        if (event.status === 'completed' && !completedRef.current) {
+          completedRef.current = true
           onCompleted()
         }
       })
@@ -38,6 +46,43 @@ export default function LiveCrawl({ onCompleted }: Props) {
       setError(e?.message || 'Failed to connect to crawl process')
     }
   }, [activeCrawlId, updateProgress, setStatus, onCompleted])
+
+  useEffect(() => {
+    if (!activeCrawlId || !selectedProjectId || completedRef.current) return
+    if (['completed', 'failed', 'stopped'].includes(progress?.status ?? '')) return
+
+    let cancelled = false
+    const interval = window.setInterval(async () => {
+      try {
+        const crawls = await window.crawldesk.crawls.listByProject(selectedProjectId)
+        if (cancelled) return
+        const crawl = (crawls || []).find((item: any) => String(item.id) === String(activeCrawlId))
+        const status = String(crawl?.status ?? '').toLowerCase()
+        if (!status) return
+
+        if (['completed', 'failed', 'stopped'].includes(status)) {
+          updateProgress({
+            crawlId: activeCrawlId,
+            status,
+            totalCompleted: crawl.urlCount ?? crawl.url_count ?? progress?.total_completed ?? 0,
+            totalQueued: 0,
+          })
+          if (status === 'failed') setError('Crawl failed. Check logs for details.')
+          if (status === 'completed' && !completedRef.current) {
+            completedRef.current = true
+            onCompleted()
+          }
+        }
+      } catch {
+        // Event stream remains the primary source; polling is only a completion fallback.
+      }
+    }, 1000)
+
+    return () => {
+      cancelled = true
+      window.clearInterval(interval)
+    }
+  }, [activeCrawlId, selectedProjectId, progress?.status, progress?.total_completed, updateProgress, onCompleted])
 
   async function handlePause() { await window.crawldesk.crawls.pause(activeCrawlId); setStatus('paused') }
   async function handleResume() { await window.crawldesk.crawls.resume(activeCrawlId); setStatus('running') }

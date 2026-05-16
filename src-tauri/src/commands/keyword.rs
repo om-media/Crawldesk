@@ -4,8 +4,9 @@
 //! Extracts text from seo_data_json of URLs in a crawl, filters stop words,
 //! and counts unigrams/bigrams/trigrams.
 
-use crate::core::storage::{db, models};
+use crate::core::storage::db;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use std::collections::HashMap;
 
 // ─── Return Types ──────────────────────────────────────────────────
@@ -72,25 +73,63 @@ fn build_ngrams(tokens: &[String], n: usize) -> Vec<String> {
 
 /// Extract text fields from seo_data_json for keyword analysis.
 fn extract_text(seo_data_json: &Option<String>) -> String {
-    let seo: models::SeoData = match seo_data_json {
+    let seo: Value = match seo_data_json {
         Some(json) => match serde_json::from_str(json) {
-            Ok(s) => s,
+            Ok(value) => value,
             Err(_) => return String::new(),
         },
         None => return String::new(),
     };
 
-    let parts: Vec<String> = [
-        seo.title,
-        seo.h1_text,
-        seo.meta_description,
-        seo.extractable_text,
-    ]
-    .into_iter()
-    .flatten()
-    .collect();
+    let mut parts = Vec::new();
+    push_string_field(&seo, &["title"], &mut parts);
+    push_string_field(&seo, &["h1Text", "h1_text", "h1"], &mut parts);
+    push_string_field(&seo, &["metaDescription", "meta_description"], &mut parts);
+    push_string_field(&seo, &["extractableText", "extractable_text"], &mut parts);
+    push_string_or_array_field(&seo, &["headingsH2", "headings_h2"], &mut parts);
+    push_string_or_array_field(&seo, &["headingsH3", "headings_h3"], &mut parts);
 
     parts.join(" ")
+}
+
+fn push_string_field(seo: &Value, keys: &[&str], parts: &mut Vec<String>) {
+    for key in keys {
+        if let Some(value) = seo.get(*key).and_then(Value::as_str) {
+            let trimmed = value.trim();
+            if !trimmed.is_empty() {
+                parts.push(trimmed.to_string());
+            }
+            return;
+        }
+    }
+}
+
+fn push_string_or_array_field(seo: &Value, keys: &[&str], parts: &mut Vec<String>) {
+    for key in keys {
+        let Some(value) = seo.get(*key) else {
+            continue;
+        };
+
+        if let Some(text) = value.as_str() {
+            let trimmed = text.trim();
+            if !trimmed.is_empty() {
+                parts.push(trimmed.to_string());
+            }
+            return;
+        }
+
+        if let Some(items) = value.as_array() {
+            for item in items {
+                if let Some(text) = item.as_str() {
+                    let trimmed = text.trim();
+                    if !trimmed.is_empty() {
+                        parts.push(trimmed.to_string());
+                    }
+                }
+            }
+            return;
+        }
+    }
 }
 
 // ─── Main Command ──────────────────────────────────────────────────
@@ -174,4 +213,53 @@ pub fn analyze_keywords(
         keywords,
         total_words,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn extract_text_accepts_crawler_json_shape() {
+        let json = Some(
+            r#"{
+                "title": "Fixture Home",
+                "h1Text": "Crawler Fixture",
+                "metaDescription": "SEO audit content analysis",
+                "headingsH2": ["Primary Links", "Keyword Clusters"],
+                "socialMetaOpenGraph": { "title": "ignored object" },
+                "structuredDataJson": [{ "@type": "Article" }],
+                "extractableText": "Fixture seo audit content analysis cluster topic repeated"
+            }"#
+            .to_string(),
+        );
+
+        let text = extract_text(&json);
+
+        assert!(text.contains("Fixture Home"));
+        assert!(text.contains("Crawler Fixture"));
+        assert!(text.contains("Keyword Clusters"));
+        assert!(text.contains("cluster topic repeated"));
+    }
+
+    #[test]
+    fn extract_text_accepts_legacy_snake_case_shape() {
+        let json = Some(
+            r#"{
+                "title": "Legacy Home",
+                "h1_text": "Legacy Fixture",
+                "meta_description": "Legacy meta copy",
+                "headings_h2": "Legacy Heading",
+                "extractable_text": "legacy extractable body"
+            }"#
+            .to_string(),
+        );
+
+        let text = extract_text(&json);
+
+        assert!(text.contains("Legacy Home"));
+        assert!(text.contains("Legacy Fixture"));
+        assert!(text.contains("Legacy Heading"));
+        assert!(text.contains("legacy extractable body"));
+    }
 }

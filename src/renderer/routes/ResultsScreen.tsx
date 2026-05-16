@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
-import { useProjectStore } from '../stores/project-store'
 import ErrorBanner from '../components/ErrorBanner'
+import { useResolvedCrawl } from '../hooks/use-resolved-crawl'
 import type { UrlRecord } from '@shared/types/url'
 
 
@@ -66,6 +66,12 @@ function statusBadge(code?: number | null) {
   return <span className="pill-error">{code}</span>
 }
 
+function formatMs(value?: number | null) {
+  if (value == null || !Number.isFinite(Number(value))) return '-'
+  const rounded = Math.round(Number(value))
+  return `${rounded.toLocaleString()}ms`
+}
+
 // ── Constants ────────────────────────────────────────────────────────
 
 const PAGE_SIZE = 100
@@ -83,7 +89,7 @@ const COLUMNS: { key: keyof UrlRecord | string; label: string; sortable: boolean
 // ── Component ────────────────────────────────────────────────────────
 
 export default function ResultsScreen() {
-  const { selectedProjectId, activeCrawlId } = useProjectStore()
+  const { selectedProjectId, activeCrawlId, resolvingCrawl, resolveError } = useResolvedCrawl()
   const [urls, setUrls] = useState<UrlRecord[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(0)
@@ -106,6 +112,9 @@ export default function ResultsScreen() {
   const tableBodyRef = useRef<HTMLDivElement>(null)
   const [visibleRange, setVisibleRange] = useState({ start: 0, end: 20 })
   const ROW_HEIGHT = 36
+  const tableViewportHeight = urls.length > 0
+    ? Math.min(Math.max(urls.length * ROW_HEIGHT, ROW_HEIGHT * 6), ROW_HEIGHT * 14)
+    : ROW_HEIGHT * 6
 
   // Total pages
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
@@ -230,19 +239,19 @@ export default function ResultsScreen() {
 
   // ── Render ────────────────────────────────────────
 
-  if (!activeCrawlId) return (
-    <div className="bg-panel-dark border border-lumen rounded-lg py-16 text-center">
-      <p className="text-lg font-semibold text-primary-text">No results yet.</p>
-      <p className="text-sm text-primary-muted mt-2">Start a crawl to see your URLs here.</p>
-    </div>
-  )
-
   const virtualRows = useMemo(() => {
     return urls.slice(visibleRange.start, visibleRange.end)
   }, [urls, visibleRange])
 
+  if (!activeCrawlId) return (
+    <div className="bg-panel-dark border border-lumen rounded-lg py-16 text-center">
+      <p className="text-lg font-semibold text-primary-text">{resolvingCrawl ? 'Loading latest crawl...' : 'No results yet.'}</p>
+      <p className="text-sm text-primary-muted mt-2">{resolveError || (resolvingCrawl ? 'Finding the most recent crawl with URLs for this project.' : 'Start a crawl to see your URLs here.')}</p>
+    </div>
+  )
+
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col">
       <h1 className="text-[30px] font-bold text-primary-text tracking-tight mb-4">Results ({total.toLocaleString()} URLs)</h1>
 
       {loadError && (
@@ -283,7 +292,7 @@ export default function ResultsScreen() {
       </div>
 
       {/* Table */}
-      <div className="flex-1 overflow-hidden border border-lumen rounded-lg bg-panel-dark flex flex-col min-h-0">
+      <div className="overflow-hidden border border-lumen rounded-lg bg-panel-dark flex flex-col">
         {/* Header */}
         <div className="flex items-center bg-midnight border-b border-row shrink-0" style={{ height: ROW_HEIGHT }}>
           {COLUMNS.map(col => (
@@ -304,8 +313,8 @@ export default function ResultsScreen() {
         {/* Virtual-scrolled body */}
         <div
           ref={tableBodyRef}
-          className="flex-1 overflow-y-auto overflow-x-auto relative"
-          style={{ contain: 'strict' }}
+          className="overflow-y-auto overflow-x-auto relative"
+          style={{ contain: 'strict', height: tableViewportHeight }}
         >
           {loading && urls.length === 0 ? (
             <div className="flex items-center justify-center py-16">
@@ -339,7 +348,7 @@ export default function ResultsScreen() {
                     </div>
                     <div className="px-4 text-primary-text text-sm" style={{ width: 60, minWidth: 60, textAlign: 'right' }}>{u.depth}</div>
                     <div className="px-4 text-primary-muted text-sm" style={{ width: 70, minWidth: 70, textAlign: 'right' }}>
-                      {u.response_time_ms != null ? `${u.response_time_ms}ms` : '-'}
+                      {formatMs(u.response_time_ms)}
                     </div>
                   </button>
                 )
@@ -409,7 +418,7 @@ export default function ResultsScreen() {
               {drawerTab === 'Details' && (
                 <dl className="space-y-3 text-sm">
                   <div className="border-b border-row pb-2"><dt className="text-xs text-primary-muted uppercase tracking-wider">Status</dt><dd className="font-medium mt-0.5">{statusBadge(selectedUrl.status_code)}</dd></div>
-                  {[['Indexability', selectedUrl.indexability || 'unknown'], ['Title', selectedUrl.title || '-'], ['Meta Description', selectedUrl.meta_description || '-'], ['H1', selectedUrl.h1 || '-'], ['Canonical', selectedUrl.canonical || '-'], ['Word Count', selectedUrl.word_count ? String(selectedUrl.word_count) : '-'], ['Depth', String(selectedUrl.depth)], ['Response Time', `${selectedUrl.response_time_ms ?? '-'}ms`], ['Content Type', selectedUrl.content_type || '-'], ['Content Length', selectedUrl.content_length ? `${(selectedUrl.content_length / 1024).toFixed(1)} KB` : '-']].map(([label, value]) => (
+                  {[['Indexability', selectedUrl.indexability || 'unknown'], ['Title', selectedUrl.title || '-'], ['Meta Description', selectedUrl.meta_description || '-'], ['H1', selectedUrl.h1 || '-'], ['Canonical', selectedUrl.canonical || '-'], ['Word Count', selectedUrl.word_count ? String(selectedUrl.word_count) : '-'], ['Depth', String(selectedUrl.depth)], ['Response Time', formatMs(selectedUrl.response_time_ms)], ['Content Type', selectedUrl.content_type || '-'], ['Content Length', selectedUrl.content_length ? `${(selectedUrl.content_length / 1024).toFixed(1)} KB` : '-']].map(([label, value]) => (
                     <div key={String(label)} className="border-b border-row pb-2"><dt className="text-xs text-primary-muted uppercase tracking-wider">{label}</dt><dd className="font-medium mt-0.5 break-all text-primary-text">{value}</dd></div>
                   ))}
                 </dl>

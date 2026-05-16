@@ -239,6 +239,42 @@ fn test_status_code_filtering() {
         .query_row("SELECT COUNT(*) FROM urls", [], |row| row.get(0))
         .unwrap();
     assert_eq!(count_all, 6, "Should have all 6 URLs");
+
+    let (exact_404, exact_404_total) = queries::query_urls(
+        &conn,
+        1,
+        Some(1),
+        0,
+        50,
+        None,
+        Some("4xx"),
+        Some(404),
+        None,
+        None,
+        "url",
+        "asc",
+    )
+    .unwrap();
+    assert_eq!(exact_404_total, 1);
+    assert_eq!(exact_404[0].status_code, Some(404));
+
+    let (other_4xx, other_4xx_total) = queries::query_urls(
+        &conn,
+        1,
+        Some(1),
+        0,
+        50,
+        None,
+        Some("4xx"),
+        None,
+        Some(&[403, 404, 410]),
+        None,
+        "url",
+        "asc",
+    )
+    .unwrap();
+    assert_eq!(other_4xx_total, 0);
+    assert!(other_4xx.is_empty());
 }
 
 #[test]

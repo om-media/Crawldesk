@@ -1,12 +1,33 @@
 import { useState, useEffect } from 'react'
-import { useProjectStore } from '../stores/project-store'
+import { useResolvedCrawl } from '../hooks/use-resolved-crawl'
 
 
 interface ClusterMember { url: string; score: number }
 interface ContentCluster { id: number; size: number; representativeUrl: string; members: ClusterMember[]; keywords: string[] }
 
+function normalizeCluster(cluster: any): ContentCluster {
+  const urls = Array.isArray(cluster?.urls) ? cluster.urls : []
+  const members = Array.isArray(cluster?.members)
+    ? cluster.members.map((member: any, index: number) => ({
+        url: String(member.url ?? urls[index] ?? ''),
+        score: Number(member.score ?? (index === 0 ? 1 : 0)),
+      }))
+    : urls.map((url: string, index: number) => ({
+        url: String(url),
+        score: index === 0 ? 1 : 0,
+      }))
+
+  return {
+    id: Number(cluster?.id ?? cluster?.clusterId ?? cluster?.cluster_id ?? 0),
+    size: Number(cluster?.size ?? members.length),
+    representativeUrl: String(cluster?.representativeUrl ?? cluster?.representative_url ?? members[0]?.url ?? ''),
+    members,
+    keywords: Array.isArray(cluster?.keywords) ? cluster.keywords.map(String) : [],
+  }
+}
+
 export default function ClustersScreen() {
-  const { activeCrawlId } = useProjectStore()
+  const { activeCrawlId, resolvingCrawl, resolveError } = useResolvedCrawl()
   const [clusters, setClusters] = useState<ContentCluster[]>([])
   const [loading, setLoading] = useState(false)
   const [expandedCluster, setExpandedCluster] = useState<number | null>(null)
@@ -16,7 +37,7 @@ export default function ClustersScreen() {
     setLoading(true)
     try {
       const result = await window.crawldesk.clusters.find(activeCrawlId)
-      setClusters(result || [])
+      setClusters((Array.isArray(result) ? result : []).map(normalizeCluster))
     } catch (e: any) {
       console.error('[Clusters] Failed to cluster:', e.message)
     } finally {
@@ -28,8 +49,8 @@ export default function ClustersScreen() {
 
   if (!activeCrawlId) return (
     <div className="card py-16 text-center">
-      <p className="text-lg font-semibold text-primary-text">No data for clustering.</p>
-      <p className="text-sm text-primary-muted mt-2">Complete a crawl first, then view content clusters here.</p>
+      <p className="text-lg font-semibold text-primary-text">{resolvingCrawl ? 'Loading latest crawl...' : 'No data for clustering.'}</p>
+      <p className="text-sm text-primary-muted mt-2">{resolveError || (resolvingCrawl ? 'Finding the most recent crawl with content data.' : 'Complete a crawl first, then view content clusters here.')}</p>
     </div>
   )
 

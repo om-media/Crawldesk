@@ -662,6 +662,8 @@ pub fn query_urls(
     page_size: i64,
     filter_indexability: Option<&str>,
     filter_status_category: Option<&str>,
+    filter_status_code: Option<i64>,
+    excluded_status_codes: Option<&[i64]>,
     search: Option<&str>,
     sort_by: &str,
     sort_order: &str,
@@ -679,35 +681,14 @@ pub fn query_urls(
         params.push(Value::Text(filter.to_string()));
     }
 
-    // Filter by status code category (2xx, 3xx, 4xx, 5xx) — dedicated column instead of JSON extract
-    if let Some(cat) = filter_status_category {
-        match cat {
-            "2xx" => {
-                where_parts.push("u.status_code BETWEEN 200 AND 299".to_string());
-            }
-            "3xx" => {
-                where_parts.push("u.status_code BETWEEN 300 AND 399".to_string());
-            }
-            "4xx" => {
-                where_parts.push("u.status_code BETWEEN 400 AND 499".to_string());
-            }
-            "5xx" => {
-                where_parts.push("u.status_code >= 500".to_string());
-            }
-            _ => {}
-        }
-    }
-
-    // Search filter: match against url, title, meta_description — use dedicated columns
-    if let Some(search_term) = search {
-        if !search_term.is_empty() {
-            let like_pattern = format!("%{}%", search_term.replace('%', "\\%").replace('_', "\\_"));
-            where_parts.push("(u.url LIKE ? ESCAPE '\\' OR u.title LIKE ? ESCAPE '\\' OR u.meta_description LIKE ? ESCAPE '\\')".to_string());
-            params.push(Value::Text(like_pattern.clone()));
-            params.push(Value::Text(like_pattern.clone()));
-            params.push(Value::Text(like_pattern));
-        }
-    }
+    apply_url_status_filters(
+        &mut where_parts,
+        &mut params,
+        filter_status_category,
+        filter_status_code,
+        excluded_status_codes,
+    );
+    apply_url_search_filter(&mut where_parts, &mut params, search);
 
     let where_clause = where_parts.join(" AND ");
     let count_query = format!("SELECT COUNT(*) FROM urls u WHERE {}", where_clause);
@@ -723,6 +704,8 @@ pub fn query_urls(
         "indexability" => "u.indexability",
         "statusCode" | "status_code" => "u.status_code",
         "responseTimeMs" | "response_time_ms" => "u.response_time_ms",
+        "inlinksCount" | "inlinks_count" | "inlink_count" => "u.inlinks_count",
+        "outlinksCount" | "outlinks_count" | "outlink_count" => "u.outlinks_count",
         "title" => "u.title",
         _ => "u.id",
     };
@@ -748,6 +731,52 @@ pub fn query_urls(
     let records: Vec<UrlRecord> = rows.filter_map(|r| r.ok()).collect();
 
     Ok((records, total))
+}
+
+fn apply_url_status_filters(
+    where_parts: &mut Vec<String>,
+    params: &mut Vec<Value>,
+    filter_status_category: Option<&str>,
+    filter_status_code: Option<i64>,
+    excluded_status_codes: Option<&[i64]>,
+) {
+    if let Some(cat) = filter_status_category {
+        match cat {
+            "2xx" => where_parts.push("u.status_code BETWEEN 200 AND 299".to_string()),
+            "3xx" => where_parts.push("u.status_code BETWEEN 300 AND 399".to_string()),
+            "4xx" => where_parts.push("u.status_code BETWEEN 400 AND 499".to_string()),
+            "5xx" => where_parts.push("u.status_code >= 500".to_string()),
+            _ => {}
+        }
+    }
+
+    if let Some(code) = filter_status_code {
+        where_parts.push("u.status_code = ?".to_string());
+        params.push(Value::Integer(code));
+    }
+
+    if let Some(codes) = excluded_status_codes {
+        for code in codes {
+            where_parts.push("u.status_code != ?".to_string());
+            params.push(Value::Integer(*code));
+        }
+    }
+}
+
+fn apply_url_search_filter(
+    where_parts: &mut Vec<String>,
+    params: &mut Vec<Value>,
+    search: Option<&str>,
+) {
+    if let Some(search_term) = search {
+        if !search_term.is_empty() {
+            let like_pattern = format!("%{}%", search_term.replace('%', "\\%").replace('_', "\\_"));
+            where_parts.push("(u.url LIKE ? ESCAPE '\\' OR u.title LIKE ? ESCAPE '\\' OR u.meta_description LIKE ? ESCAPE '\\')".to_string());
+            params.push(Value::Text(like_pattern.clone()));
+            params.push(Value::Text(like_pattern.clone()));
+            params.push(Value::Text(like_pattern));
+        }
+    }
 }
 
 fn map_url_row(row: &rusqlite::Row) -> rusqlite::Result<UrlRecord> {
@@ -1496,6 +1525,10 @@ pub fn query_urls_by_crawl(
     page: i64,
     page_size: i64,
     filter_indexability: Option<&str>,
+    filter_status_category: Option<&str>,
+    filter_status_code: Option<i64>,
+    excluded_status_codes: Option<&[i64]>,
+    search: Option<&str>,
     sort_by: &str,
     sort_order: &str,
 ) -> Result<(Vec<UrlRecord>, i64)> {
@@ -1507,6 +1540,15 @@ pub fn query_urls_by_crawl(
         count_params.push(Value::Text(filter.to_string()));
     }
 
+    apply_url_status_filters(
+        &mut where_parts,
+        &mut count_params,
+        filter_status_category,
+        filter_status_code,
+        excluded_status_codes,
+    );
+    apply_url_search_filter(&mut where_parts, &mut count_params, search);
+
     let where_clause = where_parts.join(" AND ");
     let count_query = format!("SELECT COUNT(*) FROM urls u WHERE {}", where_clause);
     let total: i64 =
@@ -1516,10 +1558,15 @@ pub fn query_urls_by_crawl(
 
     let skip = page.max(0) * page_size;
     let order_field = match sort_by {
-        "fetched_at" => "u.fetched_at",
+        "fetched_at" | "fetchedAt" => "u.fetched_at",
         "depth" => "u.depth",
         "url" => "u.url",
         "indexability" => "u.indexability",
+        "statusCode" | "status_code" => "u.status_code",
+        "responseTimeMs" | "response_time_ms" => "u.response_time_ms",
+        "inlinksCount" | "inlinks_count" | "inlink_count" => "u.inlinks_count",
+        "outlinksCount" | "outlinks_count" | "outlink_count" => "u.outlinks_count",
+        "title" => "u.title",
         _ => "u.id",
     };
     let order_dir = if sort_order == "desc" { "DESC" } else { "ASC" };
@@ -1619,7 +1666,9 @@ mod regression_tests {
         )
         .unwrap();
 
-        let (records, total) = query_urls_by_crawl(&conn, 7, 0, 50, None, "url", "asc").unwrap();
+        let (records, total) =
+            query_urls_by_crawl(&conn, 7, 0, 50, None, None, None, None, None, "url", "asc")
+                .unwrap();
 
         assert_eq!(total, 1);
         assert_eq!(records.len(), 1);

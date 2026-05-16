@@ -121,6 +121,10 @@ pub fn export_urls_csv(
     crawl_id: i64,
     output_path: String,
     filter_indexability: Option<String>,
+    filter_status_category: Option<String>,
+    filter_status_code: Option<i64>,
+    excluded_status_codes: Option<Vec<i64>>,
+    search: Option<String>,
     sort_by: Option<String>,
     sort_order: Option<String>,
 ) -> Result<ExportResult, String> {
@@ -130,13 +134,24 @@ pub fn export_urls_csv(
     let page_size: i64 = 10_000;
     let sort = sort_by.as_deref().unwrap_or("id");
     let order = sort_order.as_deref().unwrap_or("asc");
-    let filter = filter_indexability.as_deref();
 
     let mut all_urls = Vec::new();
     let mut page: i64 = 0;
     loop {
         let (urls, _total) =
-            queries::query_urls_by_crawl(&conn, crawl_id, page, page_size, filter, sort, order)
+            queries::query_urls_by_crawl(
+                &conn,
+                crawl_id,
+                page,
+                page_size,
+                filter_indexability.as_deref(),
+                filter_status_category.as_deref(),
+                filter_status_code,
+                excluded_status_codes.as_deref(),
+                search.as_deref(),
+                sort,
+                order,
+            )
                 .map_err(|e| e.to_string())?;
 
         if urls.is_empty() {

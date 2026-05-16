@@ -11,12 +11,10 @@ import IssuesScreen from './routes/IssuesScreen'
 import LinksScreen from './routes/LinksScreen'
 import ExportsScreen from './routes/ExportsScreen'
 import SettingsScreen from './routes/SettingsScreen'
-import PerformanceScreen from './routes/PerformanceScreen'
 import ClientErrorsScreen from './routes/ClientErrorsScreen'
 import KeywordsScreen from './routes/KeywordsScreen'
 import ClustersScreen from './routes/ClustersScreen'
-import ExtractionsScreen from './routes/ExtractionsScreen'
-import SchedulesScreen from './routes/SchedulesScreen'
+import { selectBestCrawlId } from './utils/crawl-selection'
 
 import type { Route } from '@shared/types/route'
 
@@ -49,8 +47,7 @@ export default function App() {
     async function resolveLatestCrawl() {
       try {
         const crawls = await window.crawldesk.crawls.listByProject(selectedProjectId)
-        if (crawls && crawls.length > 0) useProjectStore.getState().setActiveCrawlId(crawls[0].id)
-        else useProjectStore.getState().setActiveCrawlId(null)
+        useProjectStore.getState().setActiveCrawlId(selectBestCrawlId(crawls as any[]))
       } catch (err) { console.error('[App] Failed to resolve latest crawl:', err) }
     }
     resolveLatestCrawl()
@@ -60,7 +57,8 @@ export default function App() {
     if (selectedProject?.root_url) setTargetUrl(selectedProject.root_url)
   }, [selectedProject?.root_url])
 
-  const navigate = (r: Route) => setRoute(r)
+  const navigate = useCallback((r: Route) => setRoute(r), [])
+  const handleLiveCompleted = useCallback(() => setRoute('results'), [])
 
   const startToolbarCrawl = async () => {
     setToolbarError(null)
@@ -123,18 +121,15 @@ export default function App() {
       case 'projects': return <ProjectsScreen onNavigate={navigate} />
       case 'overview': return <ProjectOverview crawlId={activeCrawlId} onNavigate={navigate} />
       case 'setup': return <CrawlSetup onComplete={() => navigate('live')} />
-      case 'live': return <LiveCrawl onCompleted={() => navigate('results')} />
+      case 'live': return <LiveCrawl onCompleted={handleLiveCompleted} />
       case 'results': return <ResultsScreen />
       case 'issues': return <IssuesScreen />
       case 'links': return <LinksScreen />
       case 'exports': return <ExportsScreen />
       case 'settings': return <SettingsScreen />
-      case 'performance': return <PerformanceScreen />
       case 'client-errors': return <ClientErrorsScreen />
       case 'keywords': return <KeywordsScreen />
       case 'clusters': return <ClustersScreen />
-      case 'extractions': return <ExtractionsScreen />
-      case 'schedules': return <SchedulesScreen />
       default: return <ProjectsScreen onNavigate={navigate} />
     }
   }

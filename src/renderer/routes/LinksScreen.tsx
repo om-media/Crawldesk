@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react'
-import { useProjectStore } from '../stores/project-store'
 import ErrorBanner from '../components/ErrorBanner'
+import { useResolvedCrawl } from '../hooks/use-resolved-crawl'
 
 
 export default function LinksScreen() {
-  const { activeCrawlId } = useProjectStore()
+  const { activeCrawlId, resolvingCrawl, resolveError } = useResolvedCrawl()
   const [links, setLinks] = useState<any[]>([])
   const [summary, setSummary] = useState<any>(null)
   const [filterInternal, setFilterInternal] = useState<boolean | null>(null)
@@ -35,8 +35,8 @@ export default function LinksScreen() {
 
   if (!activeCrawlId) return (
     <div className="rounded-xl border border-lumen bg-panel-dark p-6 shadow-lg py-16 text-center">
-      <p className="text-lg font-semibold text-primary-muted">No links yet.</p>
-      <p className="text-sm text-primary-muted mt-2">Start a crawl to discover links.</p>
+      <p className="text-lg font-semibold text-primary-muted">{resolvingCrawl ? 'Loading latest crawl...' : 'No links yet.'}</p>
+      <p className="text-sm text-primary-muted mt-2">{resolveError || (resolvingCrawl ? 'Finding the most recent crawl with link data.' : 'Start a crawl to discover links.')}</p>
     </div>
   )
 

@@ -3,8 +3,8 @@
  * with severity badges, category chips, and detailed recommendations.
  */
 import { useEffect, useState } from 'react'
-import { useProjectStore } from '../stores/project-store'
 import ErrorBanner from '../components/ErrorBanner'
+import { useResolvedCrawl } from '../hooks/use-resolved-crawl'
 import type { IssueCategory, IssueDefinition, IssueRecord, IssueSummary as IssueType, Severity } from '@shared/types/issue'
 
 
@@ -12,7 +12,7 @@ type SeverityFilter = 'all' | Severity
 type CategoryFilter = 'all' | IssueCategory
 
 export default function IssuesScreen() {
-  const { activeCrawlId } = useProjectStore()
+  const { activeCrawlId, resolvingCrawl, resolveError } = useResolvedCrawl()
   const [issues, setIssues] = useState<IssueType[]>([])
   const [definitions, setDefinitions] = useState<Record<string, IssueDefinition>>({})
   const [selectedType, setSelectedType] = useState<string | null>(null)
@@ -168,8 +168,8 @@ export default function IssuesScreen() {
 
   if (!activeCrawlId) return (
     <div className="card py-16 text-center">
-      <p className="text-lg font-semibold text-primary-text">No issues yet.</p>
-      <p className="text-sm text-primary-muted mt-2">Start a crawl to detect SEO issues.</p>
+      <p className="text-lg font-semibold text-primary-text">{resolvingCrawl ? 'Loading latest crawl...' : 'No issues yet.'}</p>
+      <p className="text-sm text-primary-muted mt-2">{resolveError || (resolvingCrawl ? 'Finding the most recent crawl with issue data.' : 'Start a crawl to detect SEO issues.')}</p>
     </div>
   )
 
