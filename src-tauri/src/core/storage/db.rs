@@ -361,6 +361,9 @@ fn create_v2_schema(conn: &Connection) -> Result<()> {
         [],
     )?;
 
+    create_extraction_rules_table(conn)?;
+    create_crawl_schedules_table(conn)?;
+
     // Create psi_results table
     conn.execute(
         "CREATE TABLE IF NOT EXISTS psi_results (
@@ -441,6 +444,9 @@ fn create_v3_schema(conn: &Connection) -> Result<()> {
 /// and then marked schema_migrations as current, so version checks alone are
 /// not enough.
 fn ensure_current_schema(conn: &Connection) -> Result<()> {
+    create_extraction_rules_table(conn)?;
+    create_crawl_schedules_table(conn)?;
+
     let url_columns = [
         ("normalized_url", "TEXT"),
         ("final_url", "TEXT"),
@@ -569,10 +575,53 @@ fn ensure_current_schema(conn: &Connection) -> Result<()> {
          CREATE INDEX IF NOT EXISTS idx_links_target_norm ON links(target_normalized_url);
          CREATE INDEX IF NOT EXISTS idx_links_target_url_id ON links(target_url_id);
          CREATE INDEX IF NOT EXISTS idx_links_type ON links(link_type);
-         CREATE INDEX IF NOT EXISTS idx_issues_type_severity ON issues(issue_type, severity);",
+         CREATE INDEX IF NOT EXISTS idx_issues_type_severity ON issues(issue_type, severity);
+         CREATE INDEX IF NOT EXISTS idx_extraction_rules_crawl ON extraction_rules(crawl_id);
+         CREATE INDEX IF NOT EXISTS idx_extraction_rules_active ON extraction_rules(crawl_id, active);
+         CREATE INDEX IF NOT EXISTS idx_crawl_schedules_project ON crawl_schedules(project_id);
+         CREATE INDEX IF NOT EXISTS idx_crawl_schedules_enabled ON crawl_schedules(enabled, next_run_at);",
     )?;
 
     Ok(())
+}
+
+fn create_extraction_rules_table(conn: &Connection) -> Result<()> {
+    conn.execute_batch(
+        "CREATE TABLE IF NOT EXISTS extraction_rules (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            crawl_id INTEGER NOT NULL,
+            name TEXT NOT NULL,
+            selector TEXT NOT NULL,
+            rule_type TEXT NOT NULL CHECK (rule_type IN ('css', 'xpath', 'regex')),
+            attribute TEXT,
+            active INTEGER NOT NULL DEFAULT 1,
+            created_at TEXT NOT NULL DEFAULT (datetime('now')),
+            updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+            FOREIGN KEY (crawl_id) REFERENCES crawls(id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_extraction_rules_crawl ON extraction_rules(crawl_id);
+        CREATE INDEX IF NOT EXISTS idx_extraction_rules_active ON extraction_rules(crawl_id, active);",
+    )
+}
+
+fn create_crawl_schedules_table(conn: &Connection) -> Result<()> {
+    conn.execute_batch(
+        "CREATE TABLE IF NOT EXISTS crawl_schedules (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            project_id INTEGER NOT NULL,
+            start_url TEXT NOT NULL,
+            crawl_settings_json TEXT NOT NULL DEFAULT '{}',
+            cron_expression TEXT NOT NULL,
+            enabled INTEGER NOT NULL DEFAULT 1,
+            last_run_at TEXT,
+            next_run_at TEXT,
+            created_at TEXT NOT NULL DEFAULT (datetime('now')),
+            updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+            FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_crawl_schedules_project ON crawl_schedules(project_id);
+        CREATE INDEX IF NOT EXISTS idx_crawl_schedules_enabled ON crawl_schedules(enabled, next_run_at);",
+    )
 }
 
 fn add_columns_if_missing(conn: &Connection, table_name: &str, columns: &[(&str, &str)]) {

@@ -1,8 +1,11 @@
 //! HTML parser — extracts links, meta tags, structured data, and SEO fields from page content.
 
-use super::models::{ExtractedLink, HreflangLink, LinkType, SeoData};
+use super::models::{
+    CustomExtractionResult, CustomExtractionRule, ExtractedLink, HreflangLink, LinkType, SeoData,
+};
 use super::normalizer::{are_same_url, extract_hostname, resolve_url};
 use crate::core::crawler::sitemap;
+use regex::Regex;
 use scraper::{ElementRef, Html, Selector};
 use sha2::{Digest, Sha256};
 use tracing::debug;
@@ -315,6 +318,169 @@ pub fn parse_html(base_url: &str, html: &str) -> SeoData {
     seo_data
 }
 
+pub fn apply_custom_extractions(
+    html: &str,
+    rules: &[CustomExtractionRule],
+) -> Vec<serde_json::Value> {
+    if rules.is_empty() {
+        return Vec::new();
+    }
+
+    rules
+        .iter()
+        .map(|rule| {
+            serde_json::to_value(extract_custom_rule(html, rule)).unwrap_or_else(|_| {
+                serde_json::json!({
+                    "ruleId": rule.id,
+                    "name": rule.name,
+                    "selector": rule.selector,
+                    "ruleType": rule.rule_type,
+                    "attribute": rule.attribute,
+                    "values": [],
+                    "value": null,
+                    "matchCount": 0,
+                    "error": "Failed to serialize extraction result"
+                })
+            })
+        })
+        .collect()
+}
+
+fn extract_custom_rule(html: &str, rule: &CustomExtractionRule) -> CustomExtractionResult {
+    let normalized_type = rule.rule_type.trim().to_ascii_lowercase();
+    let extracted = match normalized_type.as_str() {
+        "css" => extract_css_values(html, &rule.selector, rule.attribute.as_deref()),
+        "xpath" => match xpath_to_css(&rule.selector) {
+            Some((selector, attribute)) => {
+                let attribute = rule.attribute.as_deref().or(attribute.as_deref());
+                extract_css_values(html, &selector, attribute)
+            }
+            None => Err("Unsupported XPath expression".to_string()),
+        },
+        "regex" => extract_regex_values(html, &rule.selector),
+        _ => Err("Unsupported extraction rule type".to_string()),
+    };
+
+    let (values, error) = match extracted {
+        Ok(values) => (values, None),
+        Err(error) => (Vec::new(), Some(error)),
+    };
+
+    CustomExtractionResult {
+        rule_id: rule.id,
+        name: rule.name.clone(),
+        selector: rule.selector.clone(),
+        rule_type: normalized_type,
+        attribute: rule.attribute.clone(),
+        value: values.first().cloned(),
+        match_count: values.len(),
+        values,
+        error,
+    }
+}
+
+fn extract_css_values(
+    html: &str,
+    selector: &str,
+    attribute: Option<&str>,
+) -> Result<Vec<String>, String> {
+    let document = Html::parse_document(html);
+    let selector = Selector::parse(selector).map_err(|_| "Invalid CSS selector".to_string())?;
+    let values = document
+        .select(&selector)
+        .filter_map(|element| element_extraction_value(&element, attribute))
+        .take(20)
+        .collect();
+    Ok(values)
+}
+
+fn extract_regex_values(html: &str, pattern: &str) -> Result<Vec<String>, String> {
+    let regex = Regex::new(pattern).map_err(|e| format!("Invalid regex: {}", e))?;
+    let values = regex
+        .captures_iter(html)
+        .filter_map(|captures| {
+            captures
+                .get(1)
+                .or_else(|| captures.get(0))
+                .map(|matched| normalize_text(matched.as_str()))
+        })
+        .filter(|value| !value.is_empty())
+        .take(20)
+        .collect();
+    Ok(values)
+}
+
+fn element_extraction_value(element: &ElementRef<'_>, attribute: Option<&str>) -> Option<String> {
+    if let Some(attribute) = attribute.map(str::trim).filter(|value| !value.is_empty()) {
+        return element
+            .value()
+            .attr(attribute)
+            .map(normalize_text)
+            .filter(|value| !value.is_empty());
+    }
+
+    let text = element.text().collect::<String>();
+    let normalized = normalize_text(&text);
+    if normalized.is_empty() {
+        None
+    } else {
+        Some(normalized)
+    }
+}
+
+fn normalize_text(value: &str) -> String {
+    value.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
+fn xpath_to_css(xpath: &str) -> Option<(String, Option<String>)> {
+    let mut value = xpath.trim();
+    if value.starts_with('(') {
+        value = value.trim_start_matches('(');
+        if let Some((inner, _rest)) = value.split_once(')') {
+            value = inner.trim();
+        }
+    }
+
+    let value = value.strip_prefix("//")?;
+    let (value, attribute) = match value.rsplit_once("/@") {
+        Some((path, attribute)) => (path, Some(attribute.trim().to_string())),
+        None => (value, None),
+    };
+
+    let (tag, predicate) = match value.split_once('[') {
+        Some((tag, rest)) => (tag.trim(), Some(rest.trim_end_matches(']').trim())),
+        None => (value.trim(), None),
+    };
+
+    if tag.is_empty()
+        || !tag
+            .chars()
+            .all(|ch| ch.is_ascii_alphanumeric() || ch == '-' || ch == '_')
+    {
+        return None;
+    }
+
+    let mut selector = tag.to_string();
+    if let Some(predicate) = predicate {
+        if let Some(predicate) = predicate.strip_prefix('@') {
+            let (name, raw_value) = predicate.split_once('=')?;
+            let name = name.trim();
+            let raw_value = raw_value.trim().trim_matches('\'').trim_matches('"');
+            if name.is_empty() || raw_value.is_empty() {
+                return None;
+            }
+            selector.push_str(&format!("[{}=\"{}\"]", name, raw_value));
+        } else if predicate.parse::<usize>().is_ok() {
+            // Positional XPath can still use the broad tag selector; callers get
+            // the first 20 values and can narrow with a CSS rule if needed.
+        } else {
+            return None;
+        }
+    }
+
+    Some((selector, attribute))
+}
+
 fn schema_type_from_itemtype(itemtype: &str) -> Option<&str> {
     itemtype
         .split_whitespace()
@@ -407,6 +573,83 @@ pub fn parse_sitemap_index(content: &str) -> Result<Vec<String>, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn custom_extractions_support_css_attribute_text_and_regex() {
+        let rules = vec![
+            CustomExtractionRule {
+                id: 1,
+                name: "Meta description".to_string(),
+                selector: "meta[name=\"description\"]".to_string(),
+                rule_type: "css".to_string(),
+                attribute: Some("content".to_string()),
+            },
+            CustomExtractionRule {
+                id: 2,
+                name: "Hero heading".to_string(),
+                selector: "h1".to_string(),
+                rule_type: "css".to_string(),
+                attribute: None,
+            },
+            CustomExtractionRule {
+                id: 3,
+                name: "SKU".to_string(),
+                selector: r#"SKU:\s*([A-Z0-9-]+)"#.to_string(),
+                rule_type: "regex".to_string(),
+                attribute: None,
+            },
+        ];
+
+        let rows = apply_custom_extractions(
+            r#"
+            <html>
+              <head><meta name="description" content="Custom extraction meta"></head>
+              <body><h1>  Hero   Title </h1><p>SKU: ABC-123</p></body>
+            </html>
+            "#,
+            &rules,
+        );
+
+        assert_eq!(rows.len(), 3);
+        assert_eq!(rows[0].get("value").and_then(|v| v.as_str()), Some("Custom extraction meta"));
+        assert_eq!(rows[1].get("value").and_then(|v| v.as_str()), Some("Hero Title"));
+        assert_eq!(rows[2].get("value").and_then(|v| v.as_str()), Some("ABC-123"));
+    }
+
+    #[test]
+    fn custom_extractions_support_simple_xpath_attribute() {
+        let rules = vec![CustomExtractionRule {
+            id: 4,
+            name: "Canonical".to_string(),
+            selector: "//link[@rel='canonical']/@href".to_string(),
+            rule_type: "xpath".to_string(),
+            attribute: None,
+        }];
+
+        let rows = apply_custom_extractions(
+            r#"<html><head><link rel="canonical" href="https://example.com/page"></head></html>"#,
+            &rules,
+        );
+
+        assert_eq!(rows[0].get("value").and_then(|v| v.as_str()), Some("https://example.com/page"));
+        assert!(rows[0].get("error").and_then(|v| v.as_str()).is_none());
+    }
+
+    #[test]
+    fn custom_extractions_return_errors_for_invalid_rules() {
+        let rules = vec![CustomExtractionRule {
+            id: 5,
+            name: "Broken".to_string(),
+            selector: "div[".to_string(),
+            rule_type: "css".to_string(),
+            attribute: None,
+        }];
+
+        let rows = apply_custom_extractions("<html></html>", &rules);
+
+        assert_eq!(rows[0].get("matchCount").and_then(|v| v.as_u64()), Some(0));
+        assert_eq!(rows[0].get("error").and_then(|v| v.as_str()), Some("Invalid CSS selector"));
+    }
 
     #[test]
     fn parse_html_extracts_title_without_trailing_newline_and_headings() {

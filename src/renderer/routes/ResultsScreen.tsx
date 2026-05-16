@@ -21,6 +21,19 @@ function parseJson(value: unknown) {
   try { return JSON.parse(value) } catch { return null }
 }
 
+function normalizeExtractionResults(record: any, seo: any) {
+  const raw = record.extractionResults ?? record.extraction_results ?? seo.extractionResults ?? seo.extraction_results ?? []
+  const parsed = typeof raw === 'string' ? parseJson(raw) : raw
+  return Array.isArray(parsed) ? parsed : []
+}
+
+function formatExtractionValue(result: any) {
+  const values = Array.isArray(result?.values)
+    ? result.values.filter((value: unknown) => typeof value === 'string' && value.trim().length > 0)
+    : []
+  return result?.value || values.join(', ') || '-'
+}
+
 function normalizeUrlRecord(record: any): UrlRecord {
   // Prefer dedicated columns (populated by Rust backend via serde camelCase)
   // Fall back to JSON blobs only for fields not yet in dedicated columns
@@ -50,6 +63,7 @@ function normalizeUrlRecord(record: any): UrlRecord {
     language: record.language ?? null,
     inlinks_count: record.inlinksCount ?? record.inlinks_count ?? null,
     outlinks_count: record.outlinksCount ?? record.outlinks_count ?? null,
+    extraction_results: normalizeExtractionResults(record, seo),
     indexability: record.indexability || 'unknown',
     depth: record.depth ?? 0,
     is_internal: record.isInternal ?? record.is_internal ?? false,
@@ -82,6 +96,7 @@ const COLUMNS: { key: keyof UrlRecord | string; label: string; sortable: boolean
   { key: 'status_code', label: 'Status', sortable: true, width: '80px' },
   { key: 'indexability', label: 'Indexability', sortable: true, width: '110px' },
   { key: 'title', label: 'Title', sortable: true, width: 'minmax(120px, 200px)' },
+  { key: 'word_count', label: 'Words', sortable: true, width: '80px' },
   { key: 'depth', label: 'Depth', sortable: true, width: '60px' },
   { key: 'response_time_ms', label: 'Resp.', sortable: true, width: '70px' },
 ]
@@ -242,6 +257,7 @@ export default function ResultsScreen() {
   const virtualRows = useMemo(() => {
     return urls.slice(visibleRange.start, visibleRange.end)
   }, [urls, visibleRange])
+  const selectedExtractions = selectedUrl?.extraction_results ?? []
 
   if (!activeCrawlId) return (
     <div className="bg-panel-dark border border-lumen rounded-lg py-16 text-center">
@@ -346,6 +362,9 @@ export default function ResultsScreen() {
                     <div className="px-4 truncate text-primary-muted text-sm" style={{ width: 200, minWidth: 120, flex: 1 }}>
                       {u.title || '-'}
                     </div>
+                    <div className="px-4 text-primary-text text-sm" style={{ width: 80, minWidth: 80, textAlign: 'right' }}>
+                      {u.word_count != null ? Number(u.word_count).toLocaleString() : '-'}
+                    </div>
                     <div className="px-4 text-primary-text text-sm" style={{ width: 60, minWidth: 60, textAlign: 'right' }}>{u.depth}</div>
                     <div className="px-4 text-primary-muted text-sm" style={{ width: 70, minWidth: 70, textAlign: 'right' }}>
                       {formatMs(u.response_time_ms)}
@@ -418,9 +437,32 @@ export default function ResultsScreen() {
               {drawerTab === 'Details' && (
                 <dl className="space-y-3 text-sm">
                   <div className="border-b border-row pb-2"><dt className="text-xs text-primary-muted uppercase tracking-wider">Status</dt><dd className="font-medium mt-0.5">{statusBadge(selectedUrl.status_code)}</dd></div>
-                  {[['Indexability', selectedUrl.indexability || 'unknown'], ['Title', selectedUrl.title || '-'], ['Meta Description', selectedUrl.meta_description || '-'], ['H1', selectedUrl.h1 || '-'], ['Canonical', selectedUrl.canonical || '-'], ['Word Count', selectedUrl.word_count ? String(selectedUrl.word_count) : '-'], ['Depth', String(selectedUrl.depth)], ['Response Time', formatMs(selectedUrl.response_time_ms)], ['Content Type', selectedUrl.content_type || '-'], ['Content Length', selectedUrl.content_length ? `${(selectedUrl.content_length / 1024).toFixed(1)} KB` : '-']].map(([label, value]) => (
+                  {[['Indexability', selectedUrl.indexability || 'unknown'], ['Title', selectedUrl.title || '-'], ['Meta Description', selectedUrl.meta_description || '-'], ['H1', selectedUrl.h1 || '-'], ['Canonical', selectedUrl.canonical || '-'], ['Word Count', selectedUrl.word_count != null ? Number(selectedUrl.word_count).toLocaleString() : '-'], ['Depth', String(selectedUrl.depth)], ['Response Time', formatMs(selectedUrl.response_time_ms)], ['Content Type', selectedUrl.content_type || '-'], ['Content Length', selectedUrl.content_length != null ? `${(selectedUrl.content_length / 1024).toFixed(1)} KB` : '-']].map(([label, value]) => (
                     <div key={String(label)} className="border-b border-row pb-2"><dt className="text-xs text-primary-muted uppercase tracking-wider">{label}</dt><dd className="font-medium mt-0.5 break-all text-primary-text">{value}</dd></div>
                   ))}
+                  {selectedExtractions.length > 0 && (
+                    <div className="border-b border-row pb-2">
+                      <dt className="text-xs text-primary-muted uppercase tracking-wider">Custom Extractions</dt>
+                      <dd className="mt-2 space-y-2">
+                        {selectedExtractions.map((result, index) => (
+                          <div key={`${result.ruleId ?? index}-${result.name ?? 'extraction'}`} className="rounded border border-row bg-midnight/40 p-2">
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="font-medium text-primary-text truncate">{result.name || `Rule ${result.ruleId ?? index + 1}`}</span>
+                              <span className="text-[11px] uppercase text-primary-muted shrink-0">{result.ruleType || 'rule'}</span>
+                            </div>
+                            {result.error ? (
+                              <p className="mt-1 text-xs text-red-300 break-words">{result.error}</p>
+                            ) : (
+                              <p className="mt-1 text-xs text-teal-text break-words">{formatExtractionValue(result)}</p>
+                            )}
+                            <p className="mt-1 text-[11px] text-primary-muted">
+                              {Number(result.matchCount ?? 0).toLocaleString()} matches
+                            </p>
+                          </div>
+                        ))}
+                      </dd>
+                    </div>
+                  )}
                 </dl>
               )}
 

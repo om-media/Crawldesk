@@ -101,6 +101,19 @@ export interface UrlRecord {
   language?: string | null
   inlinks_count?: number | null
   outlinks_count?: number | null
+  extraction_results?: CustomExtractionResult[]
+}
+
+export interface CustomExtractionResult {
+  ruleId?: number
+  name?: string
+  selector?: string
+  ruleType?: string
+  attribute?: string | null
+  values?: string[]
+  value?: string | null
+  matchCount?: number
+  error?: string | null
 }
 
 export interface FetchResult {

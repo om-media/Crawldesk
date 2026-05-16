@@ -4,6 +4,8 @@ use super::issue_registry::{issue, IssueType};
 use super::models::FetchResult;
 use super::models::{IssueSeverity, SeoData, SeoIssue};
 
+const THIN_CONTENT_WORD_THRESHOLD: i32 = 300;
+
 /// Run all incremental issue detectors on a fetched page result.
 pub fn detect_issues(fetch_result: &FetchResult, seo_data: &SeoData) -> Vec<SeoIssue> {
     let mut issues = Vec::new();
@@ -23,6 +25,7 @@ pub fn detect_issues(fetch_result: &FetchResult, seo_data: &SeoData) -> Vec<SeoI
     detect_title_too_long(fetch_result, seo_data, &mut issues);
     detect_missing_meta_description(fetch_result, seo_data, &mut issues);
     detect_meta_description_too_long(fetch_result, seo_data, &mut issues);
+    detect_thin_content(fetch_result, seo_data, &mut issues);
 
     // Structure issues
     detect_missing_h1(fetch_result, seo_data, &mut issues);
@@ -130,6 +133,30 @@ fn detect_meta_description_too_long(
                     len
                 ),
                 serde_json::json!({"length": len, "url": fetch_result.final_url}),
+            ));
+        }
+    }
+}
+
+fn detect_thin_content(fetch_result: &FetchResult, seo_data: &SeoData, issues: &mut Vec<SeoIssue>) {
+    if seo_data.noindex {
+        return;
+    }
+
+    if let Some(word_count) = seo_data.word_count {
+        if word_count < THIN_CONTENT_WORD_THRESHOLD {
+            issues.push(issue(
+                &fetch_result.final_url,
+                IssueType::ThinContent,
+                format!(
+                    "Page has {} words (recommended: at least {})",
+                    word_count, THIN_CONTENT_WORD_THRESHOLD
+                ),
+                serde_json::json!({
+                    "word_count": word_count,
+                    "threshold": THIN_CONTENT_WORD_THRESHOLD,
+                    "url": fetch_result.final_url
+                }),
             ));
         }
     }
@@ -320,7 +347,7 @@ mod tests {
             canonical_url: Some("https://example.com/page".to_string()),
             self_referencing_canonical: true,
             noindex: false,
-            word_count: Some(200),
+            word_count: Some(500),
             images_with_alt: 5,
             images_without_alt: 0,
             image_count: 5,
@@ -482,6 +509,56 @@ mod tests {
                 .iter()
                 .any(|i| i.issue_type == IssueType::MetaDescriptionTooLong.id()),
             "200-char meta description should trigger issue"
+        );
+    }
+
+    #[test]
+    fn detect_thin_content_below_threshold() {
+        let mut seo = good_seo();
+        seo.word_count = Some(120);
+
+        let issues = detect_issues(&fetch(200), &seo);
+
+        let thin_content = issues
+            .iter()
+            .find(|i| i.issue_type == IssueType::ThinContent.id())
+            .expect("short indexable page should trigger ThinContent");
+        assert_eq!(thin_content.severity, IssueSeverity::Warning);
+        assert_eq!(thin_content.details["word_count"], 120);
+        assert_eq!(
+            thin_content.details["threshold"],
+            THIN_CONTENT_WORD_THRESHOLD
+        );
+    }
+
+    #[test]
+    fn detect_thin_content_not_triggered_at_threshold() {
+        let mut seo = good_seo();
+        seo.word_count = Some(THIN_CONTENT_WORD_THRESHOLD);
+
+        let issues = detect_issues(&fetch(200), &seo);
+
+        assert!(
+            !issues
+                .iter()
+                .any(|i| i.issue_type == IssueType::ThinContent.id()),
+            "page at threshold should not trigger ThinContent"
+        );
+    }
+
+    #[test]
+    fn detect_thin_content_skips_noindex_page() {
+        let mut seo = good_seo();
+        seo.word_count = Some(80);
+        seo.noindex = true;
+
+        let issues = detect_issues(&fetch(200), &seo);
+
+        assert!(
+            !issues
+                .iter()
+                .any(|i| i.issue_type == IssueType::ThinContent.id()),
+            "noindex pages should not trigger ThinContent"
         );
     }
 

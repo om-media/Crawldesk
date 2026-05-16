@@ -74,6 +74,18 @@ pub fn run() {
             commands::export::export_urls_csv,
             commands::export::export_issues_csv,
             commands::export::export_links_csv,
+            // Custom extraction commands
+            commands::extraction::list_extraction_rules,
+            commands::extraction::create_extraction_rule,
+            commands::extraction::update_extraction_rule,
+            commands::extraction::delete_extraction_rule,
+            // Schedule commands
+            commands::schedule::list_crawl_schedules,
+            commands::schedule::create_crawl_schedule,
+            commands::schedule::update_crawl_schedule,
+            commands::schedule::delete_crawl_schedule,
+            // Diff commands
+            commands::diff::list_crawl_diffs,
             // Settings commands
             commands::settings::get_settings,
             commands::settings::update_settings,

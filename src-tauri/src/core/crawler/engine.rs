@@ -12,7 +12,7 @@ use super::frontier::UrlFrontier;
 use super::issues::detect_issues;
 use super::models::*;
 use super::normalizer::normalize_url;
-use super::parser::{extract_html_links, parse_html};
+use super::parser::{apply_custom_extractions, extract_html_links, parse_html};
 use super::robots::RobotsService;
 use super::scope::ScopeService;
 use super::sitemap;
@@ -33,6 +33,7 @@ pub struct CrawlEngineConfig {
     pub respect_robots_txt: bool,
     pub respect_sitemaps: bool,
     pub custom_headers: Option<Vec<(String, String)>>,
+    pub custom_extraction_rules: Vec<CustomExtractionRule>,
 }
 
 /// Result of crawling a single URL.
@@ -354,7 +355,13 @@ impl CrawlEngine {
                 }
 
                 let fetcher = Arc::clone(&fetcher);
-                in_flight.push(Self::crawl_entry(entry, fetcher, timeout_seconds));
+                let custom_extraction_rules = self.config.custom_extraction_rules.clone();
+                in_flight.push(Self::crawl_entry(
+                    entry,
+                    fetcher,
+                    timeout_seconds,
+                    custom_extraction_rules,
+                ));
 
                 if self.config.delay_between_requests_ms > 0 {
                     sleep(Duration::from_millis(self.config.delay_between_requests_ms)).await;
@@ -461,6 +468,7 @@ impl CrawlEngine {
         entry: FrontierEntry,
         fetcher: Arc<Fetcher>,
         timeout_seconds: u64,
+        custom_extraction_rules: Vec<CustomExtractionRule>,
     ) -> CrawlResult {
         let url = entry.url;
         let depth = entry.depth;
@@ -492,7 +500,12 @@ impl CrawlEngine {
         // Parse crawlable HTML; still record failed/non-HTML attempts so progress never goes silent.
         let (seo_data, extracted_links) = if Self::is_crawlable(&fetch_result) {
             match &fetch_result.html_content {
-                Some(html) => (parse_html(&url, html), extract_html_links(&url, html)),
+                Some(html) => {
+                    let mut seo_data = parse_html(&url, html);
+                    seo_data.extraction_results =
+                        apply_custom_extractions(html, &custom_extraction_rules);
+                    (seo_data, extract_html_links(&url, html))
+                }
                 None => {
                     warn!("No HTML content for: {}", url);
                     (SeoData::default(), Vec::new())

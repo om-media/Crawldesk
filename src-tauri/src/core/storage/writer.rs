@@ -244,6 +244,10 @@ fn insert_page_crawled(conn: &mut Connection, data: &PageCrawledData) -> Result<
         .get("contentHash")
         .and_then(|v| v.as_str())
         .unwrap_or("");
+    let extraction_results = seo
+        .get("extractionResults")
+        .map(|value| value.to_string())
+        .unwrap_or_else(|| "[]".to_string());
     let language = seo.get("language").and_then(|v| v.as_str()).unwrap_or("");
 
     // HTTP-level fields come from fetch_result (always present) with seo_data as fallback
@@ -290,11 +294,11 @@ fn insert_page_crawled(conn: &mut Connection, data: &PageCrawledData) -> Result<
         "INSERT INTO urls (url, project_id, crawl_id, normalized_url, final_url, status_code,
              content_type, title, title_length, meta_description, meta_description_length,
              h1, h1_count, word_count, canonical_url, meta_robots, response_time_ms, size_bytes,
-             language, inlinks_count, outlinks_count, content_hash, crawl_source,
+             language, inlinks_count, outlinks_count, content_hash, extraction_results, crawl_source,
              fetch_result_json, seo_data_json, indexability, depth,
              discovered_at, fetched_at, last_crawled_at)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16,
-                 ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26, ?27, ?28, ?28, ?28)
+                 ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26, ?27, ?28, ?29, ?29, ?29)
          ON CONFLICT(crawl_id, url) DO UPDATE SET
              normalized_url = excluded.normalized_url,
              final_url = excluded.final_url,
@@ -315,6 +319,7 @@ fn insert_page_crawled(conn: &mut Connection, data: &PageCrawledData) -> Result<
              inlinks_count = excluded.inlinks_count,
              outlinks_count = excluded.outlinks_count,
              content_hash = excluded.content_hash,
+             extraction_results = excluded.extraction_results,
              fetch_result_json = excluded.fetch_result_json,
              seo_data_json = excluded.seo_data_json,
              indexability = excluded.indexability,
@@ -346,6 +351,7 @@ fn insert_page_crawled(conn: &mut Connection, data: &PageCrawledData) -> Result<
             // outlinks_count: total links FROM this page (internal + external)
             (internal_link_count + external_link_count) as i32,
             content_hash,
+            extraction_results,
             "spider", // crawl_source
             data.fetch_result_json,
             data.seo_data_json,
@@ -528,7 +534,7 @@ mod tests {
             depth: 1,
             indexability: "indexable".to_string(),
             fetch_result_json: r#"{"statusCode":200,"finalUrl":"https://example.com/page1","contentType":"text/html","contentLength":12345,"responseTimeMs":342.5}"#.to_string(),
-            seo_data_json: r#"{"title":"Page 1 - Example","metaDescription":"A test page","h1Text":"Welcome","h1Count":1,"wordCount":567,"canonicalUrl":"https://example.com/page1","robotsMeta":"index, follow","contentHash":"abc123","language":"en","finalUrl":"https://example.com/page1","internalLinkCount":12,"externalLinkCount":3}"#.to_string(),
+            seo_data_json: r#"{"title":"Page 1 - Example","metaDescription":"A test page","h1Text":"Welcome","h1Count":1,"wordCount":567,"canonicalUrl":"https://example.com/page1","robotsMeta":"index, follow","contentHash":"abc123","language":"en","finalUrl":"https://example.com/page1","internalLinkCount":12,"externalLinkCount":3,"extractionResults":[{"ruleId":1,"name":"Hero","value":"Welcome","values":["Welcome"],"matchCount":1}]}"#.to_string(),
             issues: Vec::new(),
             links: Vec::new(),
         }
@@ -569,6 +575,7 @@ mod tests {
             language,
             outlinks_count,
             content_hash,
+            extraction_results,
             normalized_url,
             final_url,
             indexability,
@@ -593,13 +600,14 @@ mod tests {
             String,
             String,
             String,
+            String,
             i32,
         ) = conn
             .query_row(
                 "SELECT title, title_length, meta_description, meta_description_length,
                         h1, h1_count, word_count, canonical_url, meta_robots,
                         status_code, content_type, response_time_ms, size_bytes,
-                        language, outlinks_count, content_hash, normalized_url, final_url,
+                        language, outlinks_count, content_hash, extraction_results, normalized_url, final_url,
                         indexability, depth FROM urls WHERE id = ?1",
                 rusqlite::params![url_id],
                 |row| {
@@ -624,6 +632,7 @@ mod tests {
                         row.get(17)?,
                         row.get(18)?,
                         row.get(19)?,
+                        row.get(20)?,
                     ))
                 },
             )
@@ -645,6 +654,15 @@ mod tests {
         assert_eq!(language, "en");
         assert_eq!(outlinks_count, 15); // 12 internal + 3 external
         assert_eq!(content_hash, "abc123");
+        let extraction_json: serde_json::Value =
+            serde_json::from_str(&extraction_results).expect("extraction results JSON");
+        assert_eq!(
+            extraction_json
+                .get(0)
+                .and_then(|row| row.get("value"))
+                .and_then(|value| value.as_str()),
+            Some("Welcome")
+        );
         assert_eq!(normalized_url, "https://example.com/page1");
         assert_eq!(final_url, "https://example.com/page1");
         assert_eq!(indexability, "indexable");

@@ -51,6 +51,30 @@ pub struct HreflangLink {
     pub href: String,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct CustomExtractionRule {
+    pub id: i64,
+    pub name: String,
+    pub selector: String,
+    pub rule_type: String,
+    pub attribute: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct CustomExtractionResult {
+    pub rule_id: i64,
+    pub name: String,
+    pub selector: String,
+    pub rule_type: String,
+    pub attribute: Option<String>,
+    pub values: Vec<String>,
+    pub value: Option<String>,
+    pub match_count: usize,
+    pub error: Option<String>,
+}
+
 /// SEO data extracted from HTML
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

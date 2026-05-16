@@ -18,6 +18,8 @@ function delay(ms: number = MOCK_DELAY): Promise<void> {
 
 let nextProjectId = 3
 let nextCrawlId = 2
+let nextExtractionRuleId = 1
+let nextScheduleId = 1
 
 const MOCK_PROJECTS = [
   { id: '1', name: 'Avanterra Park', root_url: 'https://avanterrapark.com', created_at: '2025-05-10T10:00:00Z', updated_at: '2025-05-13T08:30:00Z', lastCrawlDate: '2025-05-13T08:30:00Z', lastCrawlUrlCount: 247, lastCrawlIssueCount: 12 },
@@ -90,6 +92,24 @@ const MOCK_LINKS = Array.from({ length: 50 }, (_, i) => ({
   link_type: i % 3 !== 0 ? 'internal' : 'external',
 }))
 
+const MOCK_EXTRACTION_RULES: any[] = []
+const MOCK_SCHEDULES: any[] = []
+const MOCK_DIFFS = [
+  {
+    id: '1:2',
+    project_id: '1',
+    crawl_a_id: '1',
+    crawl_b_id: '2',
+    url_count_delta: 12,
+    new_urls_count: 18,
+    removed_urls_count: 6,
+    broken_links_delta: -2,
+    issues_delta: -5,
+    critical_issues_delta: -1,
+    created_at: '2026-05-16T08:00:00Z',
+  },
+]
+
 const MOCK_URL_SUMMARY = {
   totalUrls: 247,
   total_urls: 247,
@@ -159,6 +179,9 @@ export function setupMockCrawldesk() {
         // Also clean up associated crawls
         for (let i = MOCK_CRAWLS.length - 1; i >= 0; i--) {
           if (MOCK_CRAWLS[i].project_id === id) MOCK_CRAWLS.splice(i, 1)
+        }
+        for (let i = MOCK_SCHEDULES.length - 1; i >= 0; i--) {
+          if (MOCK_SCHEDULES[i].project_id === id) MOCK_SCHEDULES.splice(i, 1)
         }
       },
     },
@@ -479,9 +502,97 @@ export function setupMockCrawldesk() {
         ]
       },
     },
-    extractions: { list: async () => [], create: async () => ({}), update: async () => ({}), delete: async () => ({}) },
-    schedules: { list: async () => [], create: async () => ({}), update: async () => ({}), delete: async () => ({}) },
-    diff: { get: async () => null, listByProject: async () => [] },
+    extractions: {
+      list: async (crawlId: string | number) => {
+        await delay()
+        return MOCK_EXTRACTION_RULES.filter(rule => String(rule.crawl_id) === String(crawlId))
+      },
+      create: async (input: any) => {
+        await delay()
+        const now = new Date().toISOString()
+        const rule = {
+          id: String(nextExtractionRuleId++),
+          crawl_id: String(input.crawlId),
+          name: input.name,
+          selector: input.selector,
+          rule_type: input.ruleType,
+          attribute: input.attribute || null,
+          active: input.active === false ? 0 : 1,
+          created_at: now,
+          updated_at: now,
+        }
+        MOCK_EXTRACTION_RULES.unshift(rule)
+        return rule
+      },
+      update: async (id: string | number, patch: any) => {
+        await delay()
+        const rule = MOCK_EXTRACTION_RULES.find(rule => String(rule.id) === String(id))
+        if (!rule) throw new Error('Extraction rule not found')
+        if (patch.name !== undefined) rule.name = patch.name
+        if (patch.selector !== undefined) rule.selector = patch.selector
+        if (patch.ruleType !== undefined) rule.rule_type = patch.ruleType
+        if (patch.attribute !== undefined) rule.attribute = patch.attribute || null
+        if (patch.active !== undefined) rule.active = patch.active ? 1 : 0
+        rule.updated_at = new Date().toISOString()
+        return rule
+      },
+      delete: async (id: string | number) => {
+        await delay()
+        const idx = MOCK_EXTRACTION_RULES.findIndex(rule => String(rule.id) === String(id))
+        if (idx >= 0) MOCK_EXTRACTION_RULES.splice(idx, 1)
+        return {}
+      },
+    },
+    schedules: {
+      list: async (projectId: string | number) => {
+        await delay()
+        return MOCK_SCHEDULES.filter(schedule => String(schedule.project_id) === String(projectId))
+      },
+      create: async (input: any) => {
+        await delay()
+        const now = new Date().toISOString()
+        const nextRun = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+        const schedule = {
+          id: String(nextScheduleId++),
+          project_id: String(input.projectId),
+          start_url: input.startUrl,
+          crawl_settings_json: input.crawlSettingsJson || '{}',
+          cron_expression: input.cronExpression,
+          enabled: 1,
+          last_run_at: null,
+          next_run_at: nextRun,
+          created_at: now,
+          updated_at: now,
+        }
+        MOCK_SCHEDULES.unshift(schedule)
+        return schedule
+      },
+      update: async (id: string | number, patch: any) => {
+        await delay()
+        const schedule = MOCK_SCHEDULES.find(schedule => String(schedule.id) === String(id))
+        if (!schedule) throw new Error('Crawl schedule not found')
+        if (patch.cronExpression !== undefined) schedule.cron_expression = patch.cronExpression
+        if (patch.enabled !== undefined) {
+          schedule.enabled = patch.enabled ? 1 : 0
+          schedule.next_run_at = patch.enabled ? new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() : null
+        }
+        schedule.updated_at = new Date().toISOString()
+        return schedule
+      },
+      delete: async (id: string | number) => {
+        await delay()
+        const idx = MOCK_SCHEDULES.findIndex(schedule => String(schedule.id) === String(id))
+        if (idx >= 0) MOCK_SCHEDULES.splice(idx, 1)
+        return {}
+      },
+    },
+    diff: {
+      get: async () => null,
+      listByProject: async (projectId: string | number) => {
+        await delay()
+        return MOCK_DIFFS.filter(diff => String(diff.project_id) === String(projectId))
+      },
+    },
     psi: { listByCrawl: async () => [], summarize: async () => null },
   }
 

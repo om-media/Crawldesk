@@ -178,7 +178,7 @@ async function runSmoke() {
     const result = await page.evaluate(async ({ fixtureBase }) => {
       const name = `Packaged Smoke ${Date.now()}`
       const project = await window.crawldesk.projects.create({ name, rootUrl: fixtureBase })
-      const crawl = await window.crawldesk.crawls.create(project.id, {
+      const crawlSettings = {
         startUrl: fixtureBase,
         maxUrls: 10,
         maxDepth: 2,
@@ -194,16 +194,22 @@ async function runSmoke() {
         userAgent: 'CrawlDeskPackagedSmoke/1.0',
         includePatterns: [],
         excludePatterns: [],
-      })
-
-      const deadline = Date.now() + 30000
-      let latest = null
-      while (Date.now() < deadline) {
-        const crawls = await window.crawldesk.crawls.listByProject(project.id)
-        latest = crawls.find((item) => String(item.id) === String(crawl.id)) || crawls[0] || null
-        if (latest && ['completed', 'failed', 'stopped'].includes(latest.status)) break
-        await new Promise((resolve) => setTimeout(resolve, 500))
       }
+
+      async function waitForCrawl(crawlId) {
+        const deadline = Date.now() + 30000
+        let latest = null
+        while (Date.now() < deadline) {
+          const crawls = await window.crawldesk.crawls.listByProject(project.id)
+          latest = crawls.find((item) => String(item.id) === String(crawlId)) || crawls[0] || null
+          if (latest && ['completed', 'failed', 'stopped'].includes(latest.status)) break
+          await new Promise((resolve) => setTimeout(resolve, 500))
+        }
+        return latest
+      }
+
+      const crawl = await window.crawldesk.crawls.create(project.id, crawlSettings)
+      const latest = await waitForCrawl(crawl.id)
 
       await new Promise((resolve) => setTimeout(resolve, 1000))
       const urls = await window.crawldesk.urls.list({ projectId: project.id, crawlId: crawl.id, page: 0, pageSize: 50 })
@@ -212,6 +218,75 @@ async function runSmoke() {
       const issueRows = await window.crawldesk.issues.list({ crawlId: crawl.id, page: 0, pageSize: 100 })
       const links = await window.crawldesk.links.list({ crawlId: crawl.id, page: 0, pageSize: 50 })
       const definitions = await window.crawldesk.issues.definitions()
+      const extractionRule = await window.crawldesk.extractions.create({
+        crawlId: crawl.id,
+        name: 'Smoke title',
+        selector: 'title',
+        ruleType: 'css',
+        attribute: '',
+        active: true,
+      })
+      const extractionRuleUpdated = await window.crawldesk.extractions.update(extractionRule.id, {
+        name: 'Smoke meta description',
+        selector: 'meta[name="description"]',
+        ruleType: 'css',
+        attribute: 'content',
+        active: 0,
+      })
+      const extractionRulesBeforeDelete = await window.crawldesk.extractions.list(crawl.id)
+      await window.crawldesk.extractions.delete(extractionRule.id)
+      const extractionRulesAfterDelete = await window.crawldesk.extractions.list(crawl.id)
+      const schedule = await window.crawldesk.schedules.create({
+        projectId: project.id,
+        startUrl: fixtureBase,
+        crawlSettingsJson: JSON.stringify({ maxUrls: 10, maxDepth: 1 }),
+        cronExpression: '0 2 * * *',
+      })
+      const scheduleUpdated = await window.crawldesk.schedules.update(schedule.id, { enabled: false })
+      const schedulesBeforeDelete = await window.crawldesk.schedules.list(project.id)
+      await window.crawldesk.schedules.delete(schedule.id)
+      const schedulesAfterDelete = await window.crawldesk.schedules.list(project.id)
+      const activeExtractionRule = await window.crawldesk.extractions.create({
+        crawlId: crawl.id,
+        name: 'Smoke H1',
+        selector: 'h1',
+        ruleType: 'css',
+        attribute: '',
+        active: true,
+      })
+      const secondCrawl = await window.crawldesk.crawls.create(project.id, crawlSettings)
+      const latestSecond = await waitForCrawl(secondCrawl.id)
+      await new Promise((resolve) => setTimeout(resolve, 1000))
+      const secondExtractionRules = await window.crawldesk.extractions.list(secondCrawl.id)
+      const secondUrls = await window.crawldesk.urls.list({ projectId: project.id, crawlId: secondCrawl.id, page: 0, pageSize: 50 })
+      const diffRows = await window.crawldesk.diff.listByProject(project.id)
+
+      function parseJson(value) {
+        if (typeof value !== 'string') return value
+        try {
+          return JSON.parse(value)
+        } catch {
+          return null
+        }
+      }
+
+      function extractionResultsForUrl(item) {
+        const seo = parseJson(item.seoDataJson ?? item.seo_data_json) || {}
+        const raw = item.extractionResults ?? item.extraction_results ?? seo.extractionResults ?? seo.extraction_results ?? []
+        const parsed = parseJson(raw) || raw
+        return Array.isArray(parsed) ? parsed : []
+      }
+
+      const secondExtractionResults = (secondUrls.items || []).flatMap((item) => (
+        extractionResultsForUrl(item).map((result) => ({
+          url: item.url,
+          name: result.name,
+          value: result.value,
+          values: result.values,
+          matchCount: result.matchCount,
+          error: result.error,
+        }))
+      ))
 
       await window.crawldesk.projects.delete(project.id)
       const projectsAfterDelete = await window.crawldesk.projects.list()
@@ -220,6 +295,8 @@ async function runSmoke() {
         projectId: project.id,
         crawlId: crawl.id,
         status: latest?.status || null,
+        secondCrawlId: secondCrawl.id,
+        secondStatus: latestSecond?.status || null,
         urlTotal: urls.total ?? urls.items?.length ?? 0,
         crawlOnlyUrlTotal: urlsByCrawlOnly.total ?? urlsByCrawlOnly.items?.length ?? 0,
         urls: (urls.items || []).map((item) => ({ url: item.url, status: item.status_code ?? item.statusCode })),
@@ -229,6 +306,17 @@ async function runSmoke() {
         issueTotal: (issues || []).reduce((sum, issue) => sum + Number(issue.count || 0), 0),
         linkTotal: links.total ?? links.items?.length ?? 0,
         definitionCount: definitions.length,
+        definitionIds: definitions.map((definition) => definition.id),
+        extractionRuleUpdated,
+        extractionRulesBeforeDelete,
+        extractionRulesAfterDelete,
+        activeExtractionRule,
+        secondExtractionRules,
+        secondExtractionResults,
+        scheduleUpdated,
+        schedulesBeforeDelete,
+        schedulesAfterDelete,
+        diffRows,
         projectDeleted: !projectsAfterDelete.some((item) => String(item.id) === String(project.id)),
       }
     }, { fixtureBase })
@@ -239,9 +327,15 @@ async function runSmoke() {
     record('release crawl captures 404 fixture URL', result.urls.some((item) => item.status === 404), JSON.stringify(result.urls))
     record('release sitemap image does not get missing-title issue', result.urls.some((item) => item.url.endsWith('/hero.jpg')) && !result.issueRows.some((item) => item.url.endsWith('/hero.jpg') && item.type === 'missing_title'), JSON.stringify(result.issueRows))
     record('release 404 page only gets HTTP/sitemap issues', !result.issueRows.some((item) => item.url.endsWith('/missing') && ['missing_title', 'missing_h1', 'missing_meta_description'].includes(item.type)), JSON.stringify(result.issueRows))
+    record('release thin content detector finds short HTML pages', result.issueRows.some((item) => item.type === 'thin_content'), JSON.stringify(result.issueRows))
     record('release post-crawl/issue summary returns issues', result.issueTotal > 0, `${result.issueTotal} issues: ${result.issueTypes.join(', ')}`)
     record('release crawl stores links', result.linkTotal > 0, `${result.linkTotal} links`)
     record('release issue registry command works', result.definitionCount > 20, `${result.definitionCount} definitions`)
+    record('release issue registry includes thin content', result.definitionIds.includes('thin_content'), result.definitionIds.join(', '))
+    record('release extraction rules CRUD works', result.extractionRuleUpdated?.name === 'Smoke meta description' && result.extractionRuleUpdated?.active === 0 && result.extractionRulesBeforeDelete.length === 1 && result.extractionRulesAfterDelete.length === 0, JSON.stringify({ updated: result.extractionRuleUpdated, before: result.extractionRulesBeforeDelete, after: result.extractionRulesAfterDelete }))
+    record('release custom extraction results are applied during crawl', result.activeExtractionRule?.name === 'Smoke H1' && result.secondExtractionRules.length >= 1 && result.secondExtractionResults.some((item) => item.name === 'Smoke H1' && Array.isArray(item.values) && item.values.some((value) => value.includes('Smoke Fixture'))), JSON.stringify({ rules: result.secondExtractionRules, results: result.secondExtractionResults }))
+    record('release crawl schedules CRUD works', result.scheduleUpdated?.enabled === 0 && result.scheduleUpdated?.next_run_at == null && result.schedulesBeforeDelete.length === 1 && result.schedulesAfterDelete.length === 0, JSON.stringify({ updated: result.scheduleUpdated, before: result.schedulesBeforeDelete, after: result.schedulesAfterDelete }))
+    record('release crawl diff command compares completed crawls', result.secondStatus === 'completed' && result.diffRows.length >= 1 && result.diffRows.some((item) => String(item.crawl_b_id) === String(result.secondCrawlId)), JSON.stringify({ secondStatus: result.secondStatus, diffs: result.diffRows }))
     record('release project delete cascades', result.projectDeleted, `projectId=${result.projectId}`)
 
     const failed = checks.filter((check) => !check.passed)

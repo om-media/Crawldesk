@@ -39,6 +39,31 @@ pub async fn start_crawl(
 
     let root_url = settings.start_url.clone().unwrap_or(project.root_url);
 
+    let copied_rule_count =
+        match crate::commands::extraction::copy_latest_project_rules_to_crawl(
+            &conn, project_id, crawl_id,
+        ) {
+            Ok(count) => count,
+            Err(error) => {
+                warn!(
+                    "Failed to copy custom extraction rules into crawl {}: {}",
+                    crawl_id, error
+                );
+                0
+            }
+        };
+    let custom_extraction_rules =
+        crate::commands::extraction::list_active_custom_extraction_rules(&conn, crawl_id)
+            .map_err(|e| e.to_string())?;
+    if !custom_extraction_rules.is_empty() {
+        info!(
+            "Loaded {} custom extraction rule(s) for crawl {} ({} copied from previous crawl)",
+            custom_extraction_rules.len(),
+            crawl_id,
+            copied_rule_count
+        );
+    }
+
     // Update crawl status to initializing
     crate::core::storage::queries::update_crawl_status(&conn, crawl_id, "initializing")
         .map_err(|e| e.to_string())?;
@@ -95,6 +120,7 @@ pub async fn start_crawl(
         respect_robots_txt: settings.respect_robots_txt,
         respect_sitemaps: settings.respect_sitemaps,
         custom_headers: None,
+        custom_extraction_rules,
     };
 
     // Start the SQLite writer task — runs on a dedicated thread per PRD §9.3

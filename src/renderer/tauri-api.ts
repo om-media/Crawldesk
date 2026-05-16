@@ -172,6 +172,51 @@ function normalizeIssueSummary(record: any) {
   }
 }
 
+function normalizeExtractionRule(record: any) {
+  return {
+    id: String(record.id ?? ''),
+    crawl_id: String(record.crawlId ?? record.crawl_id ?? ''),
+    name: record.name ?? '',
+    selector: record.selector ?? '',
+    rule_type: record.ruleType ?? record.rule_type ?? 'css',
+    attribute: record.attribute ?? null,
+    active: Number(record.active ?? 0),
+    created_at: record.createdAt ?? record.created_at ?? '',
+    updated_at: record.updatedAt ?? record.updated_at ?? '',
+  }
+}
+
+function normalizeSchedule(record: any) {
+  return {
+    id: String(record.id ?? ''),
+    project_id: String(record.projectId ?? record.project_id ?? ''),
+    start_url: record.startUrl ?? record.start_url ?? '',
+    crawl_settings_json: record.crawlSettingsJson ?? record.crawl_settings_json ?? '{}',
+    cron_expression: record.cronExpression ?? record.cron_expression ?? '',
+    enabled: Number(record.enabled ?? 0),
+    last_run_at: record.lastRunAt ?? record.last_run_at ?? null,
+    next_run_at: record.nextRunAt ?? record.next_run_at ?? null,
+    created_at: record.createdAt ?? record.created_at ?? '',
+    updated_at: record.updatedAt ?? record.updated_at ?? '',
+  }
+}
+
+function normalizeCrawlDiff(record: any) {
+  return {
+    id: String(record.id ?? ''),
+    project_id: String(record.projectId ?? record.project_id ?? ''),
+    crawl_a_id: String(record.crawlAId ?? record.crawl_a_id ?? ''),
+    crawl_b_id: String(record.crawlBId ?? record.crawl_b_id ?? ''),
+    url_count_delta: Number(record.urlCountDelta ?? record.url_count_delta ?? 0),
+    new_urls_count: Number(record.newUrlsCount ?? record.new_urls_count ?? 0),
+    removed_urls_count: Number(record.removedUrlsCount ?? record.removed_urls_count ?? 0),
+    broken_links_delta: Number(record.brokenLinksDelta ?? record.broken_links_delta ?? 0),
+    issues_delta: Number(record.issuesDelta ?? record.issues_delta ?? 0),
+    critical_issues_delta: Number(record.criticalIssuesDelta ?? record.critical_issues_delta ?? 0),
+    created_at: record.createdAt ?? record.created_at ?? '',
+  }
+}
+
 function normalizeProjectRecord(record: any) {
   return {
     id: String(record.id ?? ''),
@@ -373,20 +418,72 @@ function setupCrawldesk() {
         invoke('find_clusters', { crawlId: toId(crawlId) }),
     },
     extractions: {
-      list: () => unavailable('Extraction rules'),
-      create: () => unavailable('Extraction rules'),
-      update: () => unavailable('Extraction rules'),
-      delete: () => unavailable('Extraction rules'),
+      list: async (crawlId: string | number) => {
+        const rows = await invoke<Array<any>>('list_extraction_rules', { crawlId: toId(crawlId) })
+        return (rows || []).map(normalizeExtractionRule)
+      },
+      create: async (input: any) => {
+        const row = await invoke('create_extraction_rule', {
+          input: {
+            crawlId: toId(input.crawlId),
+            name: input.name,
+            selector: input.selector,
+            ruleType: input.ruleType,
+            attribute: input.attribute || null,
+            active: input.active ?? true,
+          },
+        })
+        return normalizeExtractionRule(row)
+      },
+      update: async (id: string | number, patch: any) => {
+        const row = await invoke('update_extraction_rule', {
+          id: toId(id),
+          input: {
+            name: patch.name,
+            selector: patch.selector,
+            ruleType: patch.ruleType,
+            attribute: patch.attribute,
+            active: typeof patch.active === 'number' ? patch.active === 1 : patch.active,
+          },
+        })
+        return normalizeExtractionRule(row)
+      },
+      delete: (id: string | number) => invoke('delete_extraction_rule', { id: toId(id) }),
     },
     schedules: {
-      list: () => unavailable('Crawl schedules'),
-      create: () => unavailable('Crawl schedules'),
-      update: () => unavailable('Crawl schedules'),
-      delete: () => unavailable('Crawl schedules'),
+      list: async (projectId: string | number) => {
+        const rows = await invoke<Array<any>>('list_crawl_schedules', { projectId: toId(projectId) })
+        return (rows || []).map(normalizeSchedule)
+      },
+      create: async (input: any) => {
+        const row = await invoke('create_crawl_schedule', {
+          input: {
+            projectId: toId(input.projectId),
+            startUrl: input.startUrl,
+            crawlSettingsJson: input.crawlSettingsJson ?? '{}',
+            cronExpression: input.cronExpression,
+          },
+        })
+        return normalizeSchedule(row)
+      },
+      update: async (id: string | number, patch: any) => {
+        const row = await invoke('update_crawl_schedule', {
+          id: toId(id),
+          input: {
+            enabled: patch.enabled,
+            cronExpression: patch.cronExpression,
+          },
+        })
+        return normalizeSchedule(row)
+      },
+      delete: (id: string | number) => invoke('delete_crawl_schedule', { id: toId(id) }),
     },
     diff: {
-      get: () => unavailable('Crawl diff'),
-      listByProject: () => unavailable('Crawl diff'),
+      get: () => unavailable('Single crawl diff'),
+      listByProject: async (projectId: string | number) => {
+        const rows = await invoke<Array<any>>('list_crawl_diffs', { projectId: toId(projectId) })
+        return (rows || []).map(normalizeCrawlDiff)
+      },
     },
     psi: {
       listByCrawl: () => unavailable('PageSpeed results'),
