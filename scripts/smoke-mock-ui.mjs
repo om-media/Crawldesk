@@ -206,10 +206,28 @@ async function runSmoke() {
     await clickText(page, 'Internal', 'button')
     await page.waitForFunction(() => document.body.textContent?.includes('Internal Links'))
     const internalCellsOk = await page.evaluate(() => {
-      const cells = Array.from(document.querySelectorAll('tbody tr td:nth-child(5)'))
-      return cells.length > 0 && cells.every((cell) => cell.textContent?.includes('Yes'))
+      const rows = Array.from(document.querySelectorAll('tbody tr')).filter((row) => {
+        const firstCell = row.querySelector('td')
+        return firstCell?.textContent?.includes('http')
+      })
+      return rows.length > 0 && rows.every((row) => {
+        const cells = row.querySelectorAll('td')
+        return cells[4]?.textContent?.includes('Yes')
+      })
     })
     record('internal link filter applies', internalCellsOk)
+
+    await clickText(page, 'Performance', 'button')
+    await page.waitForFunction(() => document.body.textContent?.includes('URLs Analyzed'))
+    record('performance screen is reachable', await bodyIncludes(page, 'URLs Analyzed'))
+
+    await clickText(page, 'Extractions', 'button')
+    await page.waitForFunction(() => document.body.textContent?.includes('Custom Extractions'))
+    record('extractions screen is reachable', await bodyIncludes(page, 'New Extraction Rule'))
+
+    await clickText(page, 'Schedules', 'button')
+    await page.waitForFunction(() => document.body.textContent?.includes('Crawl Scheduling'))
+    record('schedules screen is reachable', await bodyIncludes(page, 'New Schedule'))
 
     record('no uncaught browser errors', pageErrors.length === 0, pageErrors.join('; '))
 

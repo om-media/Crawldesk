@@ -7,6 +7,8 @@ export type Route =
   | 'issues'
   | 'links'
   | 'performance'
+  | 'extractions'
+  | 'schedules'
   | 'exports'
   | 'settings'
   | 'client-errors'

@@ -10,6 +10,8 @@ import ResultsScreen from './routes/ResultsScreen'
 import IssuesScreen from './routes/IssuesScreen'
 import LinksScreen from './routes/LinksScreen'
 import PerformanceScreen from './routes/PerformanceScreen'
+import ExtractionsScreen from './routes/ExtractionsScreen'
+import SchedulesScreen from './routes/SchedulesScreen'
 import ExportsScreen from './routes/ExportsScreen'
 import SettingsScreen from './routes/SettingsScreen'
 import ClientErrorsScreen from './routes/ClientErrorsScreen'
@@ -128,6 +130,8 @@ export default function App() {
       case 'issues': return <IssuesScreen />
       case 'links': return <LinksScreen />
       case 'performance': return <PerformanceScreen />
+      case 'extractions': return <ExtractionsScreen />
+      case 'schedules': return <SchedulesScreen />
       case 'exports': return <ExportsScreen />
       case 'settings': return <SettingsScreen />
       case 'client-errors': return <ClientErrorsScreen />
