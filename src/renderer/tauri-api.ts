@@ -55,6 +55,14 @@ function normalizeExportResult(result: any) {
   }
 }
 
+function normalizeKeywordResult(result: any) {
+  return {
+    keywords: Array.isArray(result?.keywords) ? result.keywords : [],
+    totalWords: Number(result?.totalWords ?? result?.total_words ?? 0),
+    totalPhrases: Number(result?.totalPhrases ?? result?.total_phrases ?? 0),
+  }
+}
+
 function normalizeCrawlSettings(settings: any) {
   const timeoutSeconds =
     settings.timeoutSeconds != null
@@ -416,8 +424,10 @@ function setupCrawldesk() {
       update: (settings: Record<string, unknown>) => invoke('update_settings', { settings }),
     },
     keywords: {
-      analyze: (crawlId: string | number, gramType: 'unigrams' | 'bigrams' | 'trigrams') =>
-        invoke('analyze_keywords', { crawlId: toId(crawlId), gramType }),
+      analyze: async (crawlId: string | number, gramType: 'unigrams' | 'bigrams' | 'trigrams') => {
+        const result = await invoke('analyze_keywords', { crawlId: toId(crawlId), gramType })
+        return normalizeKeywordResult(result)
+      },
     },
     content: {
       audit: (crawlId: string | number, limit = 250) =>

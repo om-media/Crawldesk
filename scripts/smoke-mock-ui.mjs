@@ -229,6 +229,20 @@ async function runSmoke() {
     })
     record('internal link filter applies', internalCellsOk)
 
+    await clickText(page, 'Keywords', 'button')
+    await page.waitForFunction(() => document.body.textContent?.includes('Total Words Analyzed'))
+    await page.waitForFunction(() => document.body.textContent?.includes('adventure'))
+    record('keywords screen shows unigram data', await bodyIncludes(page, 'adventure'))
+
+    await clickText(page, 'Bigrams', 'button')
+    await page.waitForFunction(() => document.body.textContent?.includes('adventure park'))
+    record('keywords bigram tab loads data', await bodyIncludes(page, 'adventure park'))
+
+    await clickText(page, 'Clusters', 'button')
+    await page.waitForFunction(() => document.body.textContent?.includes('Content Clusters'))
+    await page.waitForFunction(() => document.body.textContent?.includes('zip'))
+    record('clusters screen shows cluster data', await bodyIncludes(page, 'zip'))
+
     await clickText(page, 'Sitemaps', 'button')
     await page.waitForFunction(() => document.body.textContent?.includes('Sitemap Coverage'))
     record('sitemaps screen is reachable', await bodyIncludes(page, 'Sitemap URLs Not Crawled'))
