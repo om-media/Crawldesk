@@ -9,6 +9,7 @@ import LiveCrawl from './routes/LiveCrawl'
 import ResultsScreen from './routes/ResultsScreen'
 import IssuesScreen from './routes/IssuesScreen'
 import LinksScreen from './routes/LinksScreen'
+import SitemapsScreen from './routes/SitemapsScreen'
 import PerformanceScreen from './routes/PerformanceScreen'
 import ExtractionsScreen from './routes/ExtractionsScreen'
 import SchedulesScreen from './routes/SchedulesScreen'
@@ -129,6 +130,7 @@ export default function App() {
       case 'results': return <ResultsScreen />
       case 'issues': return <IssuesScreen />
       case 'links': return <LinksScreen />
+      case 'sitemaps': return <SitemapsScreen />
       case 'performance': return <PerformanceScreen />
       case 'extractions': return <ExtractionsScreen />
       case 'schedules': return <SchedulesScreen />

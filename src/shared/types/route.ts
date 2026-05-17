@@ -6,6 +6,7 @@ export type Route =
   | 'results'
   | 'issues'
   | 'links'
+  | 'sitemaps'
   | 'performance'
   | 'extractions'
   | 'schedules'

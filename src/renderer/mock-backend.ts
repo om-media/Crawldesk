@@ -314,6 +314,9 @@ export function setupMockCrawldesk() {
           { id: 'duplicate_title', severity: 'warning', category: 'content', label: 'Duplicate title', explanation: 'Multiple pages share the same title.', recommendation: 'Give each indexable page a unique title.' },
           { id: 'missing_meta_description', severity: 'warning', category: 'content', label: 'Missing meta description', explanation: 'The page has no meta description.', recommendation: 'Add a concise meta description.' },
           { id: 'internal_link_to_4xx', severity: 'critical', category: 'links', label: 'Internal link to 4xx', explanation: 'An internal link points to a client error URL.', recommendation: 'Update or remove the broken internal link.' },
+          { id: 'sitemap_url_not_crawled', severity: 'info', category: 'technical', label: 'Sitemap URL not crawled', explanation: 'A URL declared in the sitemap was not reached by the crawl.', recommendation: 'Check crawl scope, robots rules, redirects, and crawl limits.' },
+          { id: 'crawled_url_missing_from_sitemap', severity: 'warning', category: 'technical', label: 'Crawled URL missing from sitemap', explanation: 'A crawled indexable URL was not found in the discovered sitemap set.', recommendation: 'Add important indexable URLs to XML sitemaps.' },
+          { id: 'sitemap_url_error_status', severity: 'critical', category: 'technical', label: 'Sitemap URL error status', explanation: 'A URL listed in the sitemap returned an error or non-indexable status.', recommendation: 'Remove, redirect, or repair broken sitemap URLs.' },
         ]
       },
       summarize: async () => {
@@ -324,6 +327,9 @@ export function setupMockCrawldesk() {
           { issue_type: 'duplicate_title', severity: 'warning', category: 'content', count: 5, label: 'Duplicate Title Tag', explanation: 'Multiple pages share the same title', recommendation: 'Make each title unique' },
           { issue_type: 'missing_meta_description', severity: 'warning', category: 'content', count: 4, label: 'Missing Meta Description', explanation: 'Pages have no meta description', recommendation: 'Add meta descriptions' },
           { issue_type: 'internal_link_to_4xx', severity: 'critical', category: 'links', count: 2, label: 'Internal Link To 4xx', explanation: 'Internal links return 404', recommendation: 'Fix or remove broken links' },
+          { issue_type: 'sitemap_url_not_crawled', severity: 'info', category: 'technical', count: 2, label: 'Sitemap URLs Not Crawled', explanation: 'Sitemap URLs were not reached by the crawl', recommendation: 'Check crawl scope, robots rules, redirects, or crawl limits' },
+          { issue_type: 'crawled_url_missing_from_sitemap', severity: 'warning', category: 'technical', count: 3, label: 'Crawled URLs Missing From Sitemap', explanation: 'Indexable crawled URLs are absent from XML sitemaps', recommendation: 'Add important indexable URLs to sitemap files' },
+          { issue_type: 'sitemap_url_error_status', severity: 'critical', category: 'technical', count: 1, label: 'Sitemap URLs With Error Status', explanation: 'Sitemap URLs returned error statuses', recommendation: 'Remove or fix broken sitemap URLs' },
         ]
       },
       list: async (input: any) => {
@@ -350,6 +356,18 @@ export function setupMockCrawldesk() {
           duplicate_title: [
             { id: '20', issue_type: 'duplicate_title', category: 'content', url: '/products/a', severity: 'warning', message: 'Duplicate of /products/b title' },
             { id: '21', issue_type: 'duplicate_title', category: 'content', url: '/products/b', severity: 'warning', message: 'Duplicate of /products/a title' },
+          ],
+          sitemap_url_not_crawled: [
+            { id: '30', issue_type: 'sitemap_url_not_crawled', category: 'technical', url: 'https://avanterrapark.com/private-from-sitemap', severity: 'info', message: 'Listed in sitemap but not reached by the crawler' },
+            { id: '31', issue_type: 'sitemap_url_not_crawled', category: 'technical', url: 'https://avanterrapark.com/old-campaign', severity: 'info', message: 'Listed in sitemap but outside crawl results' },
+          ],
+          crawled_url_missing_from_sitemap: [
+            { id: '32', issue_type: 'crawled_url_missing_from_sitemap', category: 'technical', url: 'https://avanterrapark.com/activities/zip-line', severity: 'warning', message: 'Indexable crawled URL missing from sitemap' },
+            { id: '33', issue_type: 'crawled_url_missing_from_sitemap', category: 'technical', url: 'https://avanterrapark.com/birthday-parties', severity: 'warning', message: 'Indexable crawled URL missing from sitemap' },
+            { id: '34', issue_type: 'crawled_url_missing_from_sitemap', category: 'technical', url: 'https://avanterrapark.com/team-building', severity: 'warning', message: 'Indexable crawled URL missing from sitemap' },
+          ],
+          sitemap_url_error_status: [
+            { id: '35', issue_type: 'sitemap_url_error_status', category: 'technical', url: 'https://avanterrapark.com/removed-from-sitemap', severity: 'critical', message: 'Sitemap URL returned 404' },
           ],
         }
         let urls: any[] = (issueType && issueUrls[issueType]) || [

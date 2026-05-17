@@ -217,6 +217,10 @@ async function runSmoke() {
     })
     record('internal link filter applies', internalCellsOk)
 
+    await clickText(page, 'Sitemaps', 'button')
+    await page.waitForFunction(() => document.body.textContent?.includes('Sitemap Coverage'))
+    record('sitemaps screen is reachable', await bodyIncludes(page, 'Sitemap URLs Not Crawled'))
+
     await clickText(page, 'Performance', 'button')
     await page.waitForFunction(() => document.body.textContent?.includes('URLs Analyzed'))
     record('performance screen is reachable', await bodyIncludes(page, 'URLs Analyzed'))
