@@ -359,6 +359,7 @@ function setupCrawldesk() {
         return { items, total: result[1] ?? 0 }
       },
       summarize: (crawlId: string) => invoke('summarize_links', { crawlId: toId(crawlId) }),
+      anchorSummary: (crawlId: string | number, limit = 25) => invoke('summarize_anchor_text', { crawlId: toId(crawlId), limit }),
     },
     exports: {
       exportUrls: async (input: any) => {

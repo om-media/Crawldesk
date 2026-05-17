@@ -73,6 +73,8 @@ async function startFixtureServer() {
          <p>Adventure planning content cluster topic verifies the packaged crawl pipeline.</p>
          <p>Adventure planning content cluster topic repeats for keyword analysis.</p>
          <a href="/about">About</a>
+         <a href="/about">Learn more</a>
+         <a href="/sitemap-only">Learn more</a>
          <a href="/missing">Missing page</a>
          <img src="/hero.jpg">`,
         `<script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"Smoke Fixture Home"}</script>`
@@ -81,12 +83,12 @@ async function startFixtureServer() {
     }
     if (url.pathname === '/about') {
       res.writeHead(200, { 'content-type': 'text/html' })
-      res.end(fixtureHtml('Smoke Fixture About', '<h1>About Fixture</h1><p>Adventure planning content cluster topic supports grouped crawl analysis.</p><p>Adventure planning content cluster topic repeats on the about page.</p><a href="/">Home</a>'))
+      res.end(fixtureHtml('Smoke Fixture About', '<h1>About Fixture</h1><p>Adventure planning content cluster topic supports grouped crawl analysis.</p><p>Adventure planning content cluster topic repeats on the about page.</p><a href="/">Home</a><a href="/">Learn more</a>'))
       return
     }
     if (url.pathname === '/sitemap-only') {
       res.writeHead(200, { 'content-type': 'text/html' })
-      res.end(fixtureHtml('Sitemap Only', '<h1>Sitemap Only</h1><p>Adventure planning content cluster topic appears from sitemap discovery.</p><p>Adventure planning content cluster topic repeats on sitemap content.</p>'))
+      res.end(fixtureHtml('Sitemap Only', '<h1>Sitemap Only</h1><p>Adventure planning content cluster topic appears from sitemap discovery.</p><p>Adventure planning content cluster topic repeats on sitemap content.</p><a href="/">Learn more</a>'))
       return
     }
     if (url.pathname === '/hero.jpg') {
@@ -218,6 +220,7 @@ async function runSmoke() {
       const issues = await window.crawldesk.issues.summarize(crawl.id)
       const issueRows = await window.crawldesk.issues.list({ crawlId: crawl.id, page: 0, pageSize: 100 })
       const links = await window.crawldesk.links.list({ crawlId: crawl.id, page: 0, pageSize: 50 })
+      const anchorSummary = await window.crawldesk.links.anchorSummary(crawl.id, 10)
       const definitions = await window.crawldesk.issues.definitions()
       const keywordUnigrams = await window.crawldesk.keywords.analyze(crawl.id, 'unigrams')
       const keywordBigrams = await window.crawldesk.keywords.analyze(crawl.id, 'bigrams')
@@ -310,6 +313,7 @@ async function runSmoke() {
         issueRows: (issueRows.items || []).map((issue) => ({ url: issue.url, type: issue.issue_type ?? issue.issueType })),
         issueTotal: (issues || []).reduce((sum, issue) => sum + Number(issue.count || 0), 0),
         linkTotal: links.total ?? links.items?.length ?? 0,
+        anchorSummary,
         definitionCount: definitions.length,
         definitionIds: definitions.map((definition) => definition.id),
         keywordUnigrams,
@@ -339,6 +343,7 @@ async function runSmoke() {
     record('release thin content detector finds short HTML pages', result.issueRows.some((item) => item.type === 'thin_content'), JSON.stringify(result.issueRows))
     record('release post-crawl/issue summary returns issues', result.issueTotal > 0, `${result.issueTotal} issues: ${result.issueTypes.join(', ')}`)
     record('release crawl stores links', result.linkTotal > 0, `${result.linkTotal} links`)
+    record('release anchor text aggregation works', result.anchorSummary?.some((item) => item.anchorText === 'learn more' && item.count >= 4 && item.targetUrlCount >= 2), JSON.stringify(result.anchorSummary))
     record('release issue registry command works', result.definitionCount > 20, `${result.definitionCount} definitions`)
     record('release issue registry includes thin content', result.definitionIds.includes('thin_content'), result.definitionIds.join(', '))
     record('release keyword analysis returns unigrams', result.keywordUnigrams?.totalWords > 0 && result.keywordUnigrams?.totalPhrases > 0 && result.keywordUnigrams?.keywords?.some((item) => item.phrase === 'adventure' && item.count >= 3), JSON.stringify(result.keywordUnigrams))

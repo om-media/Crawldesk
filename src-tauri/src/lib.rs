@@ -70,6 +70,7 @@ pub fn run() {
             // Link commands
             commands::link::query_links,
             commands::link::summarize_links,
+            commands::link::summarize_anchor_text,
             // Export commands
             commands::export::export_urls_csv,
             commands::export::export_issues_csv,

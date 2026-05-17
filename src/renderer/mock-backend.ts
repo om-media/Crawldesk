@@ -415,6 +415,14 @@ export function setupMockCrawldesk() {
         return { items, total: filtered.length }
       },
       summarize: async () => { await delay(); return MOCK_LINK_SUMMARY },
+      anchorSummary: async (_crawlId: string, _limit = 25) => {
+        await delay()
+        return [
+          { anchorText: 'click here', count: 89, internalCount: 82, externalCount: 7, sourceUrlCount: 41, targetUrlCount: 19 },
+          { anchorText: 'read more', count: 67, internalCount: 64, externalCount: 3, sourceUrlCount: 38, targetUrlCount: 24 },
+          { anchorText: 'learn more', count: 52, internalCount: 50, externalCount: 2, sourceUrlCount: 31, targetUrlCount: 17 },
+        ]
+      },
     },
     exports: {
       exportUrls: async () => { await delay(); return { filePath: '/tmp/urls-1.csv', rowCount: 247 } },

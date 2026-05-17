@@ -7,13 +7,14 @@ export default function LinksScreen() {
   const { activeCrawlId, resolvingCrawl, resolveError } = useResolvedCrawl()
   const [links, setLinks] = useState<any[]>([])
   const [summary, setSummary] = useState<any>(null)
+  const [anchorSummary, setAnchorSummary] = useState<any[]>([])
   const [filterInternal, setFilterInternal] = useState<boolean | null>(null)
   const [page, setPage] = useState(0)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const pageSize = 50
 
-  useEffect(() => { loadLinks(); loadSummary() }, [activeCrawlId, filterInternal, page])
+  useEffect(() => { loadLinks(); loadSummary(); loadAnchorSummary() }, [activeCrawlId, filterInternal, page])
 
   async function loadLinks() {
     if (!activeCrawlId) return
@@ -29,6 +30,17 @@ export default function LinksScreen() {
   async function loadSummary() {
     if (!activeCrawlId) return
     try { const s = await window.crawldesk.links.summarize(activeCrawlId); setSummary(s) } catch (e) { console.error('[Links] Failed to load summary:', e) }
+  }
+
+  async function loadAnchorSummary() {
+    if (!activeCrawlId) return
+    try {
+      const rows = await window.crawldesk.links.anchorSummary(activeCrawlId, 10)
+      setAnchorSummary(Array.isArray(rows) ? rows : [])
+    } catch (e) {
+      console.error('[Links] Failed to load anchor summary:', e)
+      setAnchorSummary([])
+    }
   }
 
   async function retry() { setLoadError(null); loadLinks() }
@@ -93,6 +105,35 @@ export default function LinksScreen() {
             <button onClick={() => setFilterInternal(false)} className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${filterInternal === false ? 'bg-teal-accent text-white' : 'text-primary-muted hover:text-primary-text'}`}>External</button>
             <button onClick={async () => { if (activeCrawlId) await window.crawldesk.exports.exportLinks({ crawlId: activeCrawlId }) }} className="btn-primary ml-auto">Export CSV</button>
           </div>
+          {anchorSummary.length > 0 && (
+            <div className="mb-6 border border-lumen rounded-lg bg-panel-dark overflow-hidden">
+              <div className="px-4 py-3 border-b border-lumen">
+                <h2 className="text-sm font-semibold text-primary-text">Top Anchor Text</h2>
+              </div>
+              <table className="w-full text-sm text-left">
+                <thead>
+                  <tr className="border-b border-lumen">
+                    <th className="px-4 py-2 font-medium text-primary-muted">Anchor</th>
+                    <th className="px-4 py-2 font-medium text-primary-muted text-right w-24">Links</th>
+                    <th className="px-4 py-2 font-medium text-primary-muted text-right w-28">Sources</th>
+                    <th className="px-4 py-2 font-medium text-primary-muted text-right w-28">Targets</th>
+                    <th className="px-4 py-2 font-medium text-primary-muted text-right w-28">External</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {anchorSummary.map(row => (
+                    <tr key={row.anchorText} className="border-b border-row hover:bg-[#0c1820]">
+                      <td className="px-4 py-2 text-primary-text">{row.anchorText || '-'}</td>
+                      <td className="px-4 py-2 text-right text-primary-text font-mono">{Number(row.count ?? 0).toLocaleString()}</td>
+                      <td className="px-4 py-2 text-right text-primary-muted font-mono">{Number(row.sourceUrlCount ?? 0).toLocaleString()}</td>
+                      <td className="px-4 py-2 text-right text-primary-muted font-mono">{Number(row.targetUrlCount ?? 0).toLocaleString()}</td>
+                      <td className="px-4 py-2 text-right text-primary-muted font-mono">{Number(row.externalCount ?? 0).toLocaleString()}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
           {/* Table */}
           <table className="w-full text-sm text-left border border-lumen rounded-lg bg-panel-dark overflow-hidden">
             <thead><tr className="border-b border-lumen"><th className="px-4 py-2 font-medium text-primary-muted">Source URL</th><th className="px-4 py-2 font-medium text-primary-muted">Target URL</th><th className="px-4 py-2 font-medium text-primary-muted w-32">Anchor Text</th><th className="px-4 py-2 font-medium text-primary-muted w-24">Type</th><th className="px-4 py-2 font-medium text-primary-muted w-20">Internal</th></tr></thead>
