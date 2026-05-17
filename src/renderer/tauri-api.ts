@@ -2,6 +2,8 @@
  * Tauri API bridge — typed wrapper around window.crawldesk for invocations
  * and event listeners. Falls back to mock backend when Tauri is unavailable.
  */
+import { normalizePagedResult } from './utils/paged-result'
+
 type TauriGlobal = NonNullable<Window['__TAURI__']>
 
 const READY_EVENT = 'crawldesk:ready'
@@ -296,19 +298,22 @@ function setupCrawldesk() {
       },
     },
     urls: {
-      list: (input: any) => invoke('query_urls', {
-        projectId: input.projectId != null ? toId(input.projectId) : undefined,
-        crawlId: input.crawlId ? toId(input.crawlId) : undefined,
-        page: input.page ?? 0,
-        pageSize: input.pageSize ?? 50,
-        filterIndexability: input.filters?.indexability || undefined,
-        filterStatusCategory: input.filters?.statusCategory || undefined,
-        filterStatusCode: input.filters?.statusCode || undefined,
-        excludedStatusCodes: input.filters?.excludedStatusCodes || undefined,
-        search: input.filters?.search || undefined,
-        sortBy: input.sort?.field,
-        sortOrder: input.sort?.direction,
-      }),
+      list: async (input: any) => {
+        const result = await invoke('query_urls', {
+          projectId: input.projectId != null ? toId(input.projectId) : undefined,
+          crawlId: input.crawlId ? toId(input.crawlId) : undefined,
+          page: input.page ?? 0,
+          pageSize: input.pageSize ?? 50,
+          filterIndexability: input.filters?.indexability || undefined,
+          filterStatusCategory: input.filters?.statusCategory || undefined,
+          filterStatusCode: input.filters?.statusCode || undefined,
+          excludedStatusCodes: input.filters?.excludedStatusCodes || undefined,
+          search: input.filters?.search || undefined,
+          sortBy: input.sort?.field,
+          sortOrder: input.sort?.direction,
+        })
+        return normalizePagedResult(result)
+      },
       get: (urlId: string) => invoke('get_url_details', { urlId: toId(urlId) }),
       summarize: (crawlId: string) => invoke('summarize_urls_by_crawl', { crawlId: toId(crawlId) }),
     },
