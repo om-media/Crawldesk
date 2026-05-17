@@ -61,6 +61,8 @@ pub fn run() {
             commands::keyword::analyze_keywords,
             // Content clustering commands
             commands::cluster::find_clusters,
+            // Content audit commands
+            commands::content::audit_content,
             // Issue commands
             commands::issue::get_issue_summary,
             commands::issue::query_issues,

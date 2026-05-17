@@ -414,6 +414,10 @@ function setupCrawldesk() {
       analyze: (crawlId: string | number, gramType: 'unigrams' | 'bigrams' | 'trigrams') =>
         invoke('analyze_keywords', { crawlId: toId(crawlId), gramType }),
     },
+    content: {
+      audit: (crawlId: string | number, limit = 250) =>
+        invoke('audit_content', { crawlId: toId(crawlId), limit }),
+    },
     clusters: {
       find: (crawlId: string | number) =>
         invoke('find_clusters', { crawlId: toId(crawlId) }),

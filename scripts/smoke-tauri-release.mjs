@@ -226,6 +226,7 @@ async function runSmoke() {
       const keywordBigrams = await window.crawldesk.keywords.analyze(crawl.id, 'bigrams')
       const keywordTrigrams = await window.crawldesk.keywords.analyze(crawl.id, 'trigrams')
       const clusters = await window.crawldesk.clusters.find(crawl.id)
+      const contentAudit = await window.crawldesk.content.audit(crawl.id, 25)
       const extractionRule = await window.crawldesk.extractions.create({
         crawlId: crawl.id,
         name: 'Smoke title',
@@ -320,6 +321,7 @@ async function runSmoke() {
         keywordBigrams,
         keywordTrigrams,
         clusters,
+        contentAudit,
         extractionRuleUpdated,
         extractionRulesBeforeDelete,
         extractionRulesAfterDelete,
@@ -350,6 +352,7 @@ async function runSmoke() {
     record('release keyword analysis returns bigrams', result.keywordBigrams?.totalWords > result.keywordBigrams?.totalPhrases && result.keywordBigrams?.keywords?.some((item) => item.phrase === 'adventure planning' && item.count >= 3), JSON.stringify(result.keywordBigrams))
     record('release keyword analysis returns trigrams', result.keywordTrigrams?.totalWords > result.keywordTrigrams?.totalPhrases && result.keywordTrigrams?.keywords?.some((item) => item.phrase === 'adventure planning content' && item.count >= 3), JSON.stringify(result.keywordTrigrams))
     record('release content clustering returns grouped pages', Array.isArray(result.clusters) && result.clusters.some((cluster) => Number(cluster.size) >= 2 && cluster.keywords?.includes('adventure')), JSON.stringify(result.clusters))
+    record('release content audit returns readability metrics', result.contentAudit?.totalPages >= 3 && result.contentAudit?.pages?.some((page) => page.fleschReadingEase !== undefined && page.readingLevel), JSON.stringify(result.contentAudit))
     record('release extraction rules CRUD works', result.extractionRuleUpdated?.name === 'Smoke meta description' && result.extractionRuleUpdated?.active === 0 && result.extractionRulesBeforeDelete.length === 1 && result.extractionRulesAfterDelete.length === 0, JSON.stringify({ updated: result.extractionRuleUpdated, before: result.extractionRulesBeforeDelete, after: result.extractionRulesAfterDelete }))
     record('release custom extraction results are applied during crawl', result.activeExtractionRule?.name === 'Smoke H1' && result.secondExtractionRules.length >= 1 && result.secondExtractionResults.some((item) => item.name === 'Smoke H1' && Array.isArray(item.values) && item.values.some((value) => value.includes('Smoke Fixture'))), JSON.stringify({ rules: result.secondExtractionRules, results: result.secondExtractionResults }))
     record('release crawl schedules CRUD works', result.scheduleUpdated?.enabled === 0 && result.scheduleUpdated?.next_run_at == null && result.schedulesBeforeDelete.length === 1 && result.schedulesAfterDelete.length === 0, JSON.stringify({ updated: result.scheduleUpdated, before: result.schedulesBeforeDelete, after: result.schedulesAfterDelete }))

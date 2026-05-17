@@ -468,6 +468,24 @@ export function setupMockCrawldesk() {
         return { keywords: data, totalWords: 14832 }
       },
     },
+    content: {
+      audit: async () => {
+        await delay()
+        const pages = [
+          { urlId: 1, url: 'https://avanterrapark.com/', title: 'Adventure Park Home', statusCode: 200, wordCount: 842, sentenceCount: 38, syllableCount: 1240, avgWordsPerSentence: 22.2, fleschReadingEase: 58.4, fleschKincaidGrade: 9.1, readingLevel: 'Standard' },
+          { urlId: 2, url: 'https://avanterrapark.com/activities/zip-line', title: 'Zip Line Experience', statusCode: 200, wordCount: 416, sentenceCount: 21, syllableCount: 588, avgWordsPerSentence: 19.8, fleschReadingEase: 66.2, fleschKincaidGrade: 7.8, readingLevel: 'Standard' },
+          { urlId: 3, url: 'https://avanterrapark.com/corporate-team-building', title: 'Corporate Team Building', statusCode: 200, wordCount: 279, sentenceCount: 9, syllableCount: 489, avgWordsPerSentence: 31.0, fleschReadingEase: 27.6, fleschKincaidGrade: 13.2, readingLevel: 'Very difficult' },
+        ]
+        return {
+          pages,
+          totalPages: pages.length,
+          averageReadingEase: 50.7,
+          averageGradeLevel: 10.0,
+          difficultPages: 1,
+          thinPages: 1,
+        }
+      },
+    },
     clusters: {
       find: async (_crawlId: string) => {
         await delay()

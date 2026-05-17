@@ -1,6 +1,7 @@
 // Tauri IPC command modules.
 pub mod app;
 pub mod cluster;
+pub mod content;
 pub mod crawl;
 pub mod diff;
 pub mod export;

@@ -10,4 +10,5 @@ export type Route =
   | 'settings'
   | 'client-errors'
   | 'keywords'
+  | 'content'
   | 'clusters'

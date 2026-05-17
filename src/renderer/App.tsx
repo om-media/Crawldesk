@@ -13,6 +13,7 @@ import ExportsScreen from './routes/ExportsScreen'
 import SettingsScreen from './routes/SettingsScreen'
 import ClientErrorsScreen from './routes/ClientErrorsScreen'
 import KeywordsScreen from './routes/KeywordsScreen'
+import ContentAuditScreen from './routes/ContentAuditScreen'
 import ClustersScreen from './routes/ClustersScreen'
 import { selectBestCrawlId } from './utils/crawl-selection'
 
@@ -129,6 +130,7 @@ export default function App() {
       case 'settings': return <SettingsScreen />
       case 'client-errors': return <ClientErrorsScreen />
       case 'keywords': return <KeywordsScreen />
+      case 'content': return <ContentAuditScreen />
       case 'clusters': return <ClustersScreen />
       default: return <ProjectsScreen onNavigate={navigate} />
     }
