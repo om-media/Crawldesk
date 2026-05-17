@@ -619,7 +619,32 @@ export function setupMockCrawldesk() {
         return MOCK_DIFFS.filter(diff => String(diff.project_id) === String(projectId))
       },
     },
-    psi: { listByCrawl: async () => [], summarize: async () => null },
+    psi: {
+      listByCrawl: async () => {
+        await delay()
+        return [
+          { id: '1', url: 'https://avanterrapark.com/', strategy: 'crawl', performanceScore: 90, performance_score: 90, accessibilityScore: null, accessibility_score: null, bestPracticesScore: null, best_practices_score: null, seoScore: null, seo_score: null, lcpMs: null, lcp_ms: null, fidMs: null, fid_ms: null, cls: null, fcpMs: 180, fcp_ms: 180, ttfbMs: 180, ttfb_ms: 180, speedIndex: 180, speed_index: 180, sizeBytes: 82000, size_bytes: 82000, fetchedAt: new Date().toISOString(), fetched_at: new Date().toISOString() },
+          { id: '2', url: 'https://avanterrapark.com/activities/zip-line', strategy: 'crawl', performanceScore: 70, performance_score: 70, accessibilityScore: null, accessibility_score: null, bestPracticesScore: null, best_practices_score: null, seoScore: null, seo_score: null, lcpMs: null, lcp_ms: null, fidMs: null, fid_ms: null, cls: null, fcpMs: 760, fcp_ms: 760, ttfbMs: 760, ttfb_ms: 760, speedIndex: 760, speed_index: 760, sizeBytes: 240000, size_bytes: 240000, fetchedAt: new Date().toISOString(), fetched_at: new Date().toISOString() },
+          { id: '3', url: 'https://avanterrapark.com/gallery', strategy: 'crawl', performanceScore: 45, performance_score: 45, accessibilityScore: null, accessibility_score: null, bestPracticesScore: null, best_practices_score: null, seoScore: null, seo_score: null, lcpMs: null, lcp_ms: null, fidMs: null, fid_ms: null, cls: null, fcpMs: 1320, fcp_ms: 1320, ttfbMs: 1320, ttfb_ms: 1320, speedIndex: 1320, speed_index: 1320, sizeBytes: 1440000, size_bytes: 1440000, fetchedAt: new Date().toISOString(), fetched_at: new Date().toISOString() },
+        ]
+      },
+      summarize: async () => {
+        await delay()
+        return {
+          avgPerformance: 68,
+          avgAccessibility: null,
+          avgBestPractices: null,
+          avgSeo: null,
+          avgLcpMs: null,
+          avgCls: null,
+          avgTtfbMs: 753,
+          avgSizeBytes: 587333,
+          totalUrlsWithPsi: 3,
+          slowPages: 1,
+          largePages: 1,
+        }
+      },
+    },
   }
 
   window.dispatchEvent(new Event('crawldesk:ready'))

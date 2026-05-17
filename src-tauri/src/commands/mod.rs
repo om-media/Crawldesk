@@ -9,6 +9,7 @@ pub mod extraction;
 pub mod issue;
 pub mod keyword;
 pub mod link;
+pub mod performance;
 pub mod project;
 pub mod schedule;
 pub mod settings;

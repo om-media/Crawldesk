@@ -6,6 +6,7 @@ export type Route =
   | 'results'
   | 'issues'
   | 'links'
+  | 'performance'
   | 'exports'
   | 'settings'
   | 'client-errors'

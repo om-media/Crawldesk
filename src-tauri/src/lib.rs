@@ -73,6 +73,9 @@ pub fn run() {
             commands::link::query_links,
             commands::link::summarize_links,
             commands::link::summarize_anchor_text,
+            // Performance commands
+            commands::performance::list_performance_by_crawl,
+            commands::performance::summarize_performance,
             // Export commands
             commands::export::export_urls_csv,
             commands::export::export_issues_csv,

@@ -491,8 +491,10 @@ function setupCrawldesk() {
       },
     },
     psi: {
-      listByCrawl: () => unavailable('PageSpeed results'),
-      summarize: () => unavailable('PageSpeed results'),
+      listByCrawl: (crawlId: string | number) =>
+        invoke('list_performance_by_crawl', { crawlId: toId(crawlId) }),
+      summarize: (crawlId: string | number) =>
+        invoke('summarize_performance', { crawlId: toId(crawlId) }),
     },
   }
 
