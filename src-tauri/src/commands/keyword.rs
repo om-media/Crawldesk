@@ -72,65 +72,147 @@ fn build_ngrams(tokens: &[String], n: usize) -> Vec<String> {
 
 // ─── SEO Data Extraction ──────────────────────────────────────────
 
-/// Extract text fields from seo_data_json for keyword analysis.
-fn extract_text(seo_data_json: &Option<String>) -> String {
+/// Extract text fields from normalized URL columns, with seo_data_json as a fallback.
+fn extract_text_from_fields(
+    title: &Option<String>,
+    meta_description: &Option<String>,
+    h1: &Option<String>,
+    headings_h2: &Option<String>,
+    headings_h3: &Option<String>,
+    extractable_text: &Option<String>,
+    seo_data_json: &Option<String>,
+) -> String {
+    let mut parts = Vec::new();
+    let has_title = push_optional_text(title, &mut parts);
+    let has_meta = push_optional_text(meta_description, &mut parts);
+    let has_h1 = push_optional_text(h1, &mut parts);
+    let has_h2 = push_optional_jsonish_text(headings_h2, &mut parts);
+    let has_h3 = push_optional_jsonish_text(headings_h3, &mut parts);
+    let has_extractable = push_optional_text(extractable_text, &mut parts);
+
     let seo: Value = match seo_data_json {
         Some(json) => match serde_json::from_str(json) {
             Ok(value) => value,
-            Err(_) => return String::new(),
+            Err(_) => return parts.join(" "),
         },
-        None => return String::new(),
+        None => return parts.join(" "),
     };
 
-    let mut parts = Vec::new();
-    push_string_field(&seo, &["title"], &mut parts);
-    push_string_field(&seo, &["h1Text", "h1_text", "h1"], &mut parts);
-    push_string_field(&seo, &["metaDescription", "meta_description"], &mut parts);
-    push_string_field(&seo, &["extractableText", "extractable_text"], &mut parts);
-    push_string_or_array_field(&seo, &["headingsH2", "headings_h2"], &mut parts);
-    push_string_or_array_field(&seo, &["headingsH3", "headings_h3"], &mut parts);
+    if !has_title {
+        push_string_field(&seo, &["title"], &mut parts);
+    }
+    if !has_h1 {
+        push_string_field(&seo, &["h1Text", "h1_text", "h1"], &mut parts);
+    }
+    if !has_meta {
+        push_string_field(&seo, &["metaDescription", "meta_description"], &mut parts);
+    }
+    if !has_extractable {
+        push_string_field(&seo, &["extractableText", "extractable_text"], &mut parts);
+    }
+    if !has_h2 {
+        push_string_or_array_field(&seo, &["headingsH2", "headings_h2"], &mut parts);
+    }
+    if !has_h3 {
+        push_string_or_array_field(&seo, &["headingsH3", "headings_h3"], &mut parts);
+    }
 
     parts.join(" ")
 }
 
-fn push_string_field(seo: &Value, keys: &[&str], parts: &mut Vec<String>) {
+#[cfg(test)]
+fn extract_text(seo_data_json: &Option<String>) -> String {
+    extract_text_from_fields(
+        &None,
+        &None,
+        &None,
+        &None,
+        &None,
+        &None,
+        seo_data_json,
+    )
+}
+
+fn push_optional_text(value: &Option<String>, parts: &mut Vec<String>) -> bool {
+    let Some(value) = value else {
+        return false;
+    };
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        return false;
+    }
+    parts.push(trimmed.to_string());
+    true
+}
+
+fn push_optional_jsonish_text(value: &Option<String>, parts: &mut Vec<String>) -> bool {
+    let Some(value) = value else {
+        return false;
+    };
+    let trimmed = value.trim();
+    if trimmed.is_empty() || trimmed == "[]" {
+        return false;
+    }
+    if let Ok(parsed) = serde_json::from_str::<Value>(trimmed) {
+        let before = parts.len();
+        push_value_text(&parsed, parts);
+        return parts.len() > before;
+    }
+    parts.push(trimmed.to_string());
+    true
+}
+
+fn push_value_text(value: &Value, parts: &mut Vec<String>) {
+    if let Some(text) = value.as_str() {
+        let trimmed = text.trim();
+        if !trimmed.is_empty() {
+            parts.push(trimmed.to_string());
+        }
+        return;
+    }
+
+    if let Some(items) = value.as_array() {
+        for item in items {
+            push_value_text(item, parts);
+        }
+    }
+}
+
+fn push_string_field(seo: &Value, keys: &[&str], parts: &mut Vec<String>) -> bool {
     for key in keys {
         if let Some(value) = seo.get(*key).and_then(Value::as_str) {
             let trimmed = value.trim();
             if !trimmed.is_empty() {
                 parts.push(trimmed.to_string());
+                return true;
             }
-            return;
+            return false;
         }
     }
+    false
 }
 
-fn push_string_or_array_field(seo: &Value, keys: &[&str], parts: &mut Vec<String>) {
+fn push_string_or_array_field(seo: &Value, keys: &[&str], parts: &mut Vec<String>) -> bool {
     for key in keys {
         let Some(value) = seo.get(*key) else {
             continue;
         };
 
+        let before = parts.len();
         if let Some(text) = value.as_str() {
             let trimmed = text.trim();
             if !trimmed.is_empty() {
                 parts.push(trimmed.to_string());
             }
-            return;
+            return parts.len() > before;
         }
 
         if let Some(items) = value.as_array() {
-            for item in items {
-                if let Some(text) = item.as_str() {
-                    let trimmed = text.trim();
-                    if !trimmed.is_empty() {
-                        parts.push(trimmed.to_string());
-                    }
-                }
-            }
-            return;
+            push_value_text(&Value::Array(items.clone()), parts);
+            return parts.len() > before;
         }
     }
+    false
 }
 
 // ─── Main Command ──────────────────────────────────────────────────
@@ -152,10 +234,17 @@ pub fn analyze_keywords(
         _ => 1, // default to unigrams
     };
 
-    // Fetch all URLs with seo_data_json for this crawl
+    // Fetch normalized text columns first; seo_data_json remains a fallback for older rows.
     let mut stmt = conn
         .prepare(
-            "SELECT id, seo_data_json FROM urls WHERE crawl_id = ?1 AND seo_data_json IS NOT NULL",
+            "SELECT id, title, meta_description, h1, headings_h2, headings_h3, extractable_text, seo_data_json
+             FROM urls
+             WHERE crawl_id = ?1
+               AND (
+                 title IS NOT NULL OR meta_description IS NOT NULL OR h1 IS NOT NULL
+                 OR headings_h2 IS NOT NULL OR headings_h3 IS NOT NULL
+                 OR extractable_text IS NOT NULL OR seo_data_json IS NOT NULL
+               )",
         )
         .map_err(|e| e.to_string())?;
 
@@ -163,13 +252,31 @@ pub fn analyze_keywords(
 
     let rows = stmt
         .query_map(rusqlite::params![crawl_id], |row| {
-            Ok((row.get::<_, i64>(0)?, row.get::<_, Option<String>>(1)?))
+            Ok((
+                row.get::<_, i64>(0)?,
+                row.get::<_, Option<String>>(1)?,
+                row.get::<_, Option<String>>(2)?,
+                row.get::<_, Option<String>>(3)?,
+                row.get::<_, Option<String>>(4)?,
+                row.get::<_, Option<String>>(5)?,
+                row.get::<_, Option<String>>(6)?,
+                row.get::<_, Option<String>>(7)?,
+            ))
         })
         .map_err(|e| e.to_string())?;
 
     for row_result in rows.filter_map(|r| r.ok()) {
-        let (_url_id, seo_json) = row_result;
-        let text = extract_text(&seo_json);
+        let (_url_id, title, meta, h1, headings_h2, headings_h3, extractable, seo_json) =
+            row_result;
+        let text = extract_text_from_fields(
+            &title,
+            &meta,
+            &h1,
+            &headings_h2,
+            &headings_h3,
+            &extractable,
+            &seo_json,
+        );
         if text.is_empty() {
             continue;
         }
@@ -285,5 +392,22 @@ mod tests {
             .keywords
             .iter()
             .any(|entry| entry.phrase == "alpha beta" && entry.count == 1));
+    }
+
+    #[test]
+    fn extract_text_uses_normalized_columns_without_json() {
+        let text = extract_text_from_fields(
+            &Some("Column Title".to_string()),
+            &Some("Column meta copy".to_string()),
+            &Some("Column H1".to_string()),
+            &Some(r#"["Column H2", "Second H2"]"#.to_string()),
+            &Some("Column H3".to_string()),
+            &Some("Column body text for keyword analysis".to_string()),
+            &None,
+        );
+
+        assert!(text.contains("Column Title"));
+        assert!(text.contains("Second H2"));
+        assert!(text.contains("Column body text"));
     }
 }
