@@ -24,6 +24,7 @@ pub struct KeywordFrequency {
 pub struct KeywordAnalysisResult {
     pub keywords: Vec<KeywordFrequency>,
     pub total_words: i64,
+    pub total_phrases: i64,
 }
 
 // ─── Stop Words ────────────────────────────────────────────────────
@@ -158,8 +159,7 @@ pub fn analyze_keywords(
         )
         .map_err(|e| e.to_string())?;
 
-    // ngram -> count of occurrences across all pages
-    let mut ngram_counts: HashMap<String, i64> = HashMap::new();
+    let mut texts = Vec::new();
 
     let rows = stmt
         .query_map(rusqlite::params![crawl_id], |row| {
@@ -173,25 +173,34 @@ pub fn analyze_keywords(
         if text.is_empty() {
             continue;
         }
+        texts.push(text);
+    }
 
-        let tokens = tokenize(&text);
+    Ok(analyze_keyword_texts(&texts, gram_size))
+}
 
-        // Build n-grams and count them
-        let ngrams = build_ngrams(&tokens, gram_size);
-        for ng in ngrams {
+fn analyze_keyword_texts(texts: &[String], gram_size: usize) -> KeywordAnalysisResult {
+    // ngram -> count of occurrences across all pages
+    let mut ngram_counts: HashMap<String, i64> = HashMap::new();
+    let mut total_words: i64 = 0;
+
+    for text in texts {
+        let tokens = tokenize(text);
+        total_words += tokens.len() as i64;
+
+        for ng in build_ngrams(&tokens, gram_size) {
             *ngram_counts.entry(ng).or_insert(0) += 1;
         }
     }
 
-    // Calculate total words (sum of all token counts across all pages)
-    let total_words: i64 = ngram_counts.values().sum();
+    let total_phrases: i64 = ngram_counts.values().sum();
 
     // Build result sorted by count desc, then alphabetically
     let mut keywords: Vec<KeywordFrequency> = ngram_counts
         .into_iter()
         .map(|(phrase, count)| {
-            let frequency = if total_words > 0 {
-                (count as f64) / (total_words as f64)
+            let frequency = if total_phrases > 0 {
+                (count as f64) / (total_phrases as f64)
             } else {
                 0.0
             };
@@ -209,10 +218,11 @@ pub fn analyze_keywords(
     // Limit to top 250 results (matching TypeScript behavior)
     keywords.truncate(250);
 
-    Ok(KeywordAnalysisResult {
+    KeywordAnalysisResult {
         keywords,
         total_words,
-    })
+        total_phrases,
+    }
 }
 
 #[cfg(test)]
@@ -261,5 +271,19 @@ mod tests {
         assert!(text.contains("Legacy Fixture"));
         assert!(text.contains("Legacy Heading"));
         assert!(text.contains("legacy extractable body"));
+    }
+
+    #[test]
+    fn keyword_analysis_reports_words_separately_from_phrases() {
+        let texts = vec!["alpha beta gamma alpha".to_string()];
+
+        let result = analyze_keyword_texts(&texts, 2);
+
+        assert_eq!(result.total_words, 4);
+        assert_eq!(result.total_phrases, 3);
+        assert!(result
+            .keywords
+            .iter()
+            .any(|entry| entry.phrase == "alpha beta" && entry.count == 1));
     }
 }

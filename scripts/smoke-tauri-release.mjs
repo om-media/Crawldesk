@@ -70,7 +70,8 @@ async function startFixtureServer() {
       res.end(fixtureHtml(
         'Smoke Fixture Home',
         `<h1>Smoke Fixture</h1>
-         <p>This local fixture verifies the packaged crawl pipeline.</p>
+         <p>Adventure planning content cluster topic verifies the packaged crawl pipeline.</p>
+         <p>Adventure planning content cluster topic repeats for keyword analysis.</p>
          <a href="/about">About</a>
          <a href="/missing">Missing page</a>
          <img src="/hero.jpg">`,
@@ -80,12 +81,12 @@ async function startFixtureServer() {
     }
     if (url.pathname === '/about') {
       res.writeHead(200, { 'content-type': 'text/html' })
-      res.end(fixtureHtml('Smoke Fixture About', '<h1>About Fixture</h1><p>About page body text.</p><a href="/">Home</a>'))
+      res.end(fixtureHtml('Smoke Fixture About', '<h1>About Fixture</h1><p>Adventure planning content cluster topic supports grouped crawl analysis.</p><p>Adventure planning content cluster topic repeats on the about page.</p><a href="/">Home</a>'))
       return
     }
     if (url.pathname === '/sitemap-only') {
       res.writeHead(200, { 'content-type': 'text/html' })
-      res.end(fixtureHtml('Sitemap Only', '<h1>Sitemap Only</h1><p>This URL is discovered from sitemap.xml.</p>'))
+      res.end(fixtureHtml('Sitemap Only', '<h1>Sitemap Only</h1><p>Adventure planning content cluster topic appears from sitemap discovery.</p><p>Adventure planning content cluster topic repeats on sitemap content.</p>'))
       return
     }
     if (url.pathname === '/hero.jpg') {
@@ -218,6 +219,10 @@ async function runSmoke() {
       const issueRows = await window.crawldesk.issues.list({ crawlId: crawl.id, page: 0, pageSize: 100 })
       const links = await window.crawldesk.links.list({ crawlId: crawl.id, page: 0, pageSize: 50 })
       const definitions = await window.crawldesk.issues.definitions()
+      const keywordUnigrams = await window.crawldesk.keywords.analyze(crawl.id, 'unigrams')
+      const keywordBigrams = await window.crawldesk.keywords.analyze(crawl.id, 'bigrams')
+      const keywordTrigrams = await window.crawldesk.keywords.analyze(crawl.id, 'trigrams')
+      const clusters = await window.crawldesk.clusters.find(crawl.id)
       const extractionRule = await window.crawldesk.extractions.create({
         crawlId: crawl.id,
         name: 'Smoke title',
@@ -307,6 +312,10 @@ async function runSmoke() {
         linkTotal: links.total ?? links.items?.length ?? 0,
         definitionCount: definitions.length,
         definitionIds: definitions.map((definition) => definition.id),
+        keywordUnigrams,
+        keywordBigrams,
+        keywordTrigrams,
+        clusters,
         extractionRuleUpdated,
         extractionRulesBeforeDelete,
         extractionRulesAfterDelete,
@@ -332,6 +341,10 @@ async function runSmoke() {
     record('release crawl stores links', result.linkTotal > 0, `${result.linkTotal} links`)
     record('release issue registry command works', result.definitionCount > 20, `${result.definitionCount} definitions`)
     record('release issue registry includes thin content', result.definitionIds.includes('thin_content'), result.definitionIds.join(', '))
+    record('release keyword analysis returns unigrams', result.keywordUnigrams?.totalWords > 0 && result.keywordUnigrams?.totalPhrases > 0 && result.keywordUnigrams?.keywords?.some((item) => item.phrase === 'adventure' && item.count >= 3), JSON.stringify(result.keywordUnigrams))
+    record('release keyword analysis returns bigrams', result.keywordBigrams?.totalWords > result.keywordBigrams?.totalPhrases && result.keywordBigrams?.keywords?.some((item) => item.phrase === 'adventure planning' && item.count >= 3), JSON.stringify(result.keywordBigrams))
+    record('release keyword analysis returns trigrams', result.keywordTrigrams?.totalWords > result.keywordTrigrams?.totalPhrases && result.keywordTrigrams?.keywords?.some((item) => item.phrase === 'adventure planning content' && item.count >= 3), JSON.stringify(result.keywordTrigrams))
+    record('release content clustering returns grouped pages', Array.isArray(result.clusters) && result.clusters.some((cluster) => Number(cluster.size) >= 2 && cluster.keywords?.includes('adventure')), JSON.stringify(result.clusters))
     record('release extraction rules CRUD works', result.extractionRuleUpdated?.name === 'Smoke meta description' && result.extractionRuleUpdated?.active === 0 && result.extractionRulesBeforeDelete.length === 1 && result.extractionRulesAfterDelete.length === 0, JSON.stringify({ updated: result.extractionRuleUpdated, before: result.extractionRulesBeforeDelete, after: result.extractionRulesAfterDelete }))
     record('release custom extraction results are applied during crawl', result.activeExtractionRule?.name === 'Smoke H1' && result.secondExtractionRules.length >= 1 && result.secondExtractionResults.some((item) => item.name === 'Smoke H1' && Array.isArray(item.values) && item.values.some((value) => value.includes('Smoke Fixture'))), JSON.stringify({ rules: result.secondExtractionRules, results: result.secondExtractionResults }))
     record('release crawl schedules CRUD works', result.scheduleUpdated?.enabled === 0 && result.scheduleUpdated?.next_run_at == null && result.schedulesBeforeDelete.length === 1 && result.schedulesAfterDelete.length === 0, JSON.stringify({ updated: result.scheduleUpdated, before: result.schedulesBeforeDelete, after: result.schedulesAfterDelete }))

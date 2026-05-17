@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useResolvedCrawl } from '../hooks/use-resolved-crawl'
+import ErrorBanner from '../components/ErrorBanner'
 
 
 interface ClusterMember { url: string; score: number }
@@ -31,15 +32,19 @@ export default function ClustersScreen() {
   const [clusters, setClusters] = useState<ContentCluster[]>([])
   const [loading, setLoading] = useState(false)
   const [expandedCluster, setExpandedCluster] = useState<number | null>(null)
+  const [loadError, setLoadError] = useState<string | null>(null)
 
   async function analyze() {
     if (!activeCrawlId) return
     setLoading(true)
+    setLoadError(null)
     try {
       const result = await window.crawldesk.clusters.find(activeCrawlId)
       setClusters((Array.isArray(result) ? result : []).map(normalizeCluster))
     } catch (e: any) {
       console.error('[Clusters] Failed to cluster:', e.message)
+      setClusters([])
+      setLoadError(e?.message || 'Failed to analyze content clusters for this crawl.')
     } finally {
       setLoading(false)
     }
@@ -59,6 +64,8 @@ export default function ClustersScreen() {
       <h1 className="text-[30px] leading-none tracking-tight font-bold text-primary-text mb-2">Content Clusters</h1>
       <p className="text-sm text-primary-muted mb-6">TF-IDF based semantic similarity clustering. Pages grouped by shared topical keywords — potential cannibalization candidates flagged within each cluster.</p>
 
+      {loadError && <ErrorBanner message={loadError} onRetry={analyze} />}
+
       {loading && (
         <div className="flex items-center justify-center py-16">
           <div className="animate-spin h-8 w-8 border-2 border-teal-accent border-t-transparent rounded-full mr-3"></div>
@@ -69,6 +76,7 @@ export default function ClustersScreen() {
       {!loading && clusters.length === 0 && (
         <div className="card py-10 text-center">
           <p className="text-primary-text">No clusters found — all pages appear to cover distinct topics.</p>
+          <p className="text-sm text-primary-muted mt-2">Only HTML pages with extracted text are included.</p>
         </div>
       )}
 
