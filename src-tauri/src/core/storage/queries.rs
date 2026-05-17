@@ -255,10 +255,19 @@ pub fn delete_project_cascade(conn: &mut Connection, project_id: i64) -> Result<
         params![project_id],
     )?;
     tx.execute(
+        "DELETE FROM extraction_rules
+         WHERE crawl_id IN (SELECT id FROM crawls WHERE project_id = ?1)",
+        params![project_id],
+    )?;
+    tx.execute(
         "DELETE FROM crawl_diffs
          WHERE project_id = ?1
             OR crawl_a_id IN (SELECT id FROM crawls WHERE project_id = ?1)
             OR crawl_b_id IN (SELECT id FROM crawls WHERE project_id = ?1)",
+        params![project_id],
+    )?;
+    tx.execute(
+        "DELETE FROM crawl_schedules WHERE project_id = ?1",
         params![project_id],
     )?;
     tx.execute(
@@ -1695,6 +1704,8 @@ mod regression_tests {
             CREATE TABLE sitemaps (id INTEGER PRIMARY KEY, project_id INTEGER NOT NULL);
             CREATE TABLE crawl_diffs (id INTEGER PRIMARY KEY, project_id INTEGER NOT NULL, crawl_a_id INTEGER, crawl_b_id INTEGER);
             CREATE TABLE psi_results (id INTEGER PRIMARY KEY, url_id INTEGER);
+            CREATE TABLE extraction_rules (id INTEGER PRIMARY KEY, crawl_id INTEGER NOT NULL);
+            CREATE TABLE crawl_schedules (id INTEGER PRIMARY KEY, project_id INTEGER NOT NULL);
 
             INSERT INTO projects VALUES (1, 'Delete Me', 'https://example.com/');
             INSERT INTO crawls VALUES (10, 1);
@@ -1706,6 +1717,8 @@ mod regression_tests {
             INSERT INTO sitemaps VALUES (60, 1);
             INSERT INTO crawl_diffs VALUES (70, 1, 10, 10);
             INSERT INTO psi_results VALUES (80, 20);
+            INSERT INTO extraction_rules VALUES (90, 10);
+            INSERT INTO crawl_schedules VALUES (91, 1);
             ",
         )
         .unwrap();
@@ -1723,6 +1736,8 @@ mod regression_tests {
             "sitemaps",
             "crawl_diffs",
             "psi_results",
+            "extraction_rules",
+            "crawl_schedules",
         ] {
             let count: i64 = conn
                 .query_row(&format!("SELECT COUNT(*) FROM {}", table), [], |row| {

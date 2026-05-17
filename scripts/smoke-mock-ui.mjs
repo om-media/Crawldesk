@@ -162,6 +162,18 @@ async function runSmoke() {
     const projectCount = await page.evaluate(() => window.crawldesk.projects.list().then((projects) => projects.length))
     record('mock projects load', projectCount >= 2, `${projectCount} projects`)
 
+    const deleteProjectWorks = await page.evaluate(async () => {
+      const before = await window.crawldesk.projects.list()
+      const project = await window.crawldesk.projects.create({
+        name: 'Smoke Delete Project',
+        rootUrl: 'https://delete-smoke.example/',
+      })
+      await window.crawldesk.projects.delete(project.id)
+      const after = await window.crawldesk.projects.list()
+      return before.length === after.length && !after.some((item) => String(item.id) === String(project.id))
+    })
+    record('project delete bridge removes project', deleteProjectWorks)
+
     await clickText(page, 'Avanterra Park', '.card')
     await page.waitForFunction(() => {
       const input = document.querySelector('.url-field input')
