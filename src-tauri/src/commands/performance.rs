@@ -20,6 +20,7 @@ pub struct PerformanceRow {
     pub ttfb_ms: Option<f64>,
     pub speed_index: Option<f64>,
     pub size_bytes: Option<i64>,
+    pub carbon_footprint_grams: Option<f64>,
     pub fetched_at: Option<String>,
 }
 
@@ -34,6 +35,8 @@ pub struct PerformanceSummary {
     pub avg_cls: Option<f64>,
     pub avg_ttfb_ms: Option<f64>,
     pub avg_size_bytes: Option<i64>,
+    pub avg_carbon_grams: Option<f64>,
+    pub total_carbon_grams: f64,
     pub total_urls_with_psi: i64,
     pub slow_pages: i64,
     pub large_pages: i64,
@@ -44,7 +47,7 @@ pub fn list_performance_by_crawl(crawl_id: i64) -> Result<Vec<PerformanceRow>, S
     let conn = db::get_connection().map_err(|e| e.to_string())?;
     let mut stmt = conn
         .prepare(
-            "SELECT id, url, response_time_ms, size_bytes, fetched_at
+            "SELECT id, url, response_time_ms, size_bytes, carbon_footprint_grams, fetched_at
              FROM urls
              WHERE crawl_id = ?1
                AND (response_time_ms IS NOT NULL OR size_bytes IS NOT NULL)
@@ -59,8 +62,16 @@ pub fn list_performance_by_crawl(crawl_id: i64) -> Result<Vec<PerformanceRow>, S
             let url: String = row.get("url")?;
             let response_time_ms: Option<f64> = row.get("response_time_ms")?;
             let size_bytes: Option<i64> = row.get("size_bytes")?;
+            let carbon_footprint_grams: Option<f64> = row.get("carbon_footprint_grams")?;
             let fetched_at: Option<String> = row.get("fetched_at")?;
-            Ok(performance_row(id, url, response_time_ms, size_bytes, fetched_at))
+            Ok(performance_row(
+                id,
+                url,
+                response_time_ms,
+                size_bytes,
+                carbon_footprint_grams,
+                fetched_at,
+            ))
         })
         .map_err(|e| format!("Failed to query performance rows: {}", e))?;
 
@@ -73,6 +84,12 @@ pub fn summarize_performance(crawl_id: i64) -> Result<PerformanceSummary, String
     let total_urls_with_psi = rows.len() as i64;
     let avg_ttfb_ms = average_f64(rows.iter().filter_map(|row| row.ttfb_ms));
     let avg_size_bytes = average_i64(rows.iter().filter_map(|row| row.size_bytes));
+    let avg_carbon_grams = average_carbon(rows.iter().filter_map(|row| row.carbon_footprint_grams));
+    let total_carbon_grams = round_4(
+        rows.iter()
+            .filter_map(|row| row.carbon_footprint_grams)
+            .sum::<f64>(),
+    );
     let avg_performance = average_i64(rows.iter().filter_map(|row| row.performance_score));
     let slow_pages = rows
         .iter()
@@ -92,6 +109,8 @@ pub fn summarize_performance(crawl_id: i64) -> Result<PerformanceSummary, String
         avg_cls: None,
         avg_ttfb_ms,
         avg_size_bytes,
+        avg_carbon_grams,
+        total_carbon_grams,
         total_urls_with_psi,
         slow_pages,
         large_pages,
@@ -103,9 +122,11 @@ fn performance_row(
     url: String,
     response_time_ms: Option<f64>,
     size_bytes: Option<i64>,
+    stored_carbon_grams: Option<f64>,
     fetched_at: Option<String>,
 ) -> PerformanceRow {
     let performance_score = response_time_ms.map(score_response_time);
+    let carbon_footprint_grams = stored_carbon_grams.or_else(|| estimate_carbon_grams(size_bytes));
     PerformanceRow {
         id: id.to_string(),
         url,
@@ -121,6 +142,7 @@ fn performance_row(
         ttfb_ms: response_time_ms,
         speed_index: response_time_ms,
         size_bytes,
+        carbon_footprint_grams,
         fetched_at,
     }
 }
@@ -149,8 +171,39 @@ fn average_f64(values: impl Iterator<Item = f64>) -> Option<f64> {
     if count == 0.0 {
         None
     } else {
-        Some(((total / count) * 100.0).round() / 100.0)
+        Some(round_2(total / count))
     }
+}
+
+fn average_carbon(values: impl Iterator<Item = f64>) -> Option<f64> {
+    let mut count = 0.0;
+    let mut total = 0.0;
+    for value in values {
+        count += 1.0;
+        total += value;
+    }
+    if count == 0.0 {
+        None
+    } else {
+        Some(round_4(total / count))
+    }
+}
+
+fn estimate_carbon_grams(size_bytes: Option<i64>) -> Option<f64> {
+    let bytes = size_bytes?;
+    if bytes <= 0 {
+        return None;
+    }
+    // Practical first-pass estimate: 0.8g CO2e per transferred MB.
+    Some(round_4((bytes as f64 / 1_000_000.0) * 0.8))
+}
+
+fn round_2(value: f64) -> f64 {
+    (value * 100.0).round() / 100.0
+}
+
+fn round_4(value: f64) -> f64 {
+    (value * 10_000.0).round() / 10_000.0
 }
 
 fn average_i64(values: impl Iterator<Item = i64>) -> Option<i64> {
@@ -185,6 +238,7 @@ mod tests {
             "https://example.com/".to_string(),
             Some(450.0),
             Some(25_000),
+            None,
             Some("2026-05-17T08:00:00Z".to_string()),
         );
 
@@ -193,5 +247,20 @@ mod tests {
         assert_eq!(row.performance_score, Some(90));
         assert_eq!(row.ttfb_ms, Some(450.0));
         assert_eq!(row.size_bytes, Some(25_000));
+        assert_eq!(row.carbon_footprint_grams, Some(0.02));
+    }
+
+    #[test]
+    fn stored_carbon_overrides_estimate() {
+        let row = performance_row(
+            8,
+            "https://example.com/report".to_string(),
+            Some(100.0),
+            Some(1_000_000),
+            Some(2.5),
+            None,
+        );
+
+        assert_eq!(row.carbon_footprint_grams, Some(2.5));
     }
 }

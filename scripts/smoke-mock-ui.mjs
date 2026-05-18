@@ -261,6 +261,8 @@ async function runSmoke() {
     await clickText(page, 'Performance', 'button')
     await page.waitForFunction(() => document.body.textContent?.includes('URLs Analyzed'))
     record('performance screen is reachable', await bodyIncludes(page, 'URLs Analyzed'))
+    await page.waitForFunction(() => document.body.textContent?.includes('Est. CO2'))
+    record('performance screen shows carbon estimate', await bodyIncludes(page, 'Est. CO2'))
 
     await clickText(page, 'Extractions', 'button')
     await page.waitForFunction(() => document.body.textContent?.includes('Custom Extractions'))

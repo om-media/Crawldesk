@@ -8,6 +8,8 @@ interface PsiRow {
   best_practices_score: number | null; seo_score: number | null
   lcp_ms: number | null; fid_ms: number | null; cls: number | null
   fcp_ms: number | null; ttfb_ms: number | null; speed_index: number | null
+  size_bytes?: number | null; sizeBytes?: number | null
+  carbon_footprint_grams?: number | null; carbonFootprintGrams?: number | null
   fetched_at: string
 }
 
@@ -15,6 +17,7 @@ interface PsiSummary {
   avgPerformance: number | null; avgAccessibility: number | null
   avgBestPractices: number | null; avgSeo: number | null
   avgLcpMs: number | null; avgCls: number | null; avgTtfbMs?: number | null; avgSizeBytes?: number | null
+  avgCarbonGrams?: number | null; totalCarbonGrams?: number | null
   totalUrlsWithPsi: number
 }
 
@@ -76,11 +79,13 @@ export default function PerformanceScreen() {
             { label: 'Performance', value: summary.avgPerformance },
             { label: 'Accessibility', value: summary.avgAccessibility },
             { label: 'Avg TTFB', value: summary.avgTtfbMs != null ? Math.round(summary.avgTtfbMs) : null },
-            { label: 'SEO Score', value: summary.avgSeo },
+            { label: 'Est. CO2', value: summary.totalCarbonGrams ?? null },
           ].map(c => (
             <div key={c.label} className="kpi-card">
               <p className="text-xs text-primary-muted uppercase">{c.label}</p>
-              <p className={`text-2xl font-bold ${typeof c.value === 'number' && c.label === 'Avg TTFB' ? cwvStatus(c.value, 500, 1000) : scoreColor(c.value ?? 0)}`}>{c.value != null ? (c.label === 'Avg TTFB' ? `${c.value}ms` : c.value) : '—'}</p>
+              <p className={`text-2xl font-bold ${c.label === 'Avg TTFB' && typeof c.value === 'number' ? cwvStatus(c.value, 500, 1000) : c.label === 'Est. CO2' ? 'text-teal-accent' : scoreColor(c.value ?? 0)}`}>
+                {c.value != null ? (c.label === 'Avg TTFB' ? `${c.value}ms` : c.label === 'Est. CO2' ? formatCarbon(c.value) : c.value) : '—'}
+              </p>
             </div>
           ))}
         </div>
@@ -148,7 +153,7 @@ export default function PerformanceScreen() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-lumen/50">
-                {['URL', 'Perf', 'TTFB', 'Size', 'Fetched'].map(h => (
+                {['URL', 'Perf', 'TTFB', 'Size', 'CO2', 'Fetched'].map(h => (
                   <th key={h} className="text-left px-4 py-2.5 text-xs font-semibold text-primary-muted uppercase">{h}</th>
                 ))}
               </tr>
@@ -160,6 +165,7 @@ export default function PerformanceScreen() {
                   <td className={`px-4 py-2 font-bold ${scoreColor(r.performance_score ?? 0)}`}>{r.performance_score != null ? r.performance_score : '—'}</td>
                   <td className={`px-4 py-2 ${cwvStatus(r.ttfb_ms, 500, 1000)}`}>{r.ttfb_ms != null ? `${Math.round(r.ttfb_ms)}ms` : '—'}</td>
                   <td className="px-4 py-2 text-primary-muted">{formatBytes((r as any).size_bytes ?? (r as any).sizeBytes)}</td>
+                  <td className="px-4 py-2 text-primary-muted">{formatCarbon(r.carbon_footprint_grams ?? r.carbonFootprintGrams)}</td>
                   <td className="px-4 py-2 text-primary-muted">{r.fetched_at ? new Date(r.fetched_at).toLocaleString('en-US') : '—'}</td>
                 </tr>
               ))}
@@ -184,6 +190,10 @@ function normalizePerformanceRow(row: any): PsiRow {
     fcp_ms: row.fcp_ms ?? row.fcpMs ?? null,
     ttfb_ms: row.ttfb_ms ?? row.ttfbMs ?? null,
     speed_index: row.speed_index ?? row.speedIndex ?? null,
+    size_bytes: row.size_bytes ?? row.sizeBytes ?? null,
+    sizeBytes: row.sizeBytes ?? row.size_bytes ?? null,
+    carbon_footprint_grams: row.carbon_footprint_grams ?? row.carbonFootprintGrams ?? null,
+    carbonFootprintGrams: row.carbonFootprintGrams ?? row.carbon_footprint_grams ?? null,
     fetched_at: row.fetched_at ?? row.fetchedAt ?? '',
   }
 }
@@ -194,4 +204,12 @@ function formatBytes(value: unknown) {
   if (bytes >= 1_000_000) return `${(bytes / 1_000_000).toFixed(1)} MB`
   if (bytes >= 1_000) return `${Math.round(bytes / 1_000)} KB`
   return `${bytes} B`
+}
+
+function formatCarbon(value: unknown) {
+  const grams = Number(value ?? 0)
+  if (!grams) return '—'
+  if (grams >= 1000) return `${(grams / 1000).toFixed(2)} kg`
+  if (grams < 0.01) return '<0.01 g'
+  return `${grams.toFixed(2)} g`
 }
