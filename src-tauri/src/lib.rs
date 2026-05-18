@@ -22,7 +22,10 @@ pub fn run() {
         .manage(CrawlManager::new())
         .setup(|app| {
             // Initialize database on first launch
-            let db_path = app.path().app_data_dir()?.join("crawldesk.sqlite");
+            let data_dir = std::env::var_os("CRAWLDESK_APP_DATA_DIR")
+                .map(std::path::PathBuf::from)
+                .unwrap_or(app.path().app_data_dir()?);
+            let db_path = data_dir.join("crawldesk.sqlite");
             info!("Database path: {:?}", db_path);
 
             // Create parent directory if needed

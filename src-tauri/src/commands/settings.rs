@@ -9,8 +9,26 @@ use tracing::{info, warn};
 
 const SETTINGS_FILENAME: &str = "settings.json";
 
+fn resolve_data_dir(app: &AppHandle) -> Result<PathBuf, String> {
+    std::env::var_os("CRAWLDESK_APP_DATA_DIR")
+        .map(PathBuf::from)
+        .map(Ok)
+        .unwrap_or_else(|| {
+            app.path()
+                .app_data_dir()
+                .map_err(|e| format!("Failed to get app data dir: {}", e))
+        })
+}
+
 /// Get the settings file path from the app data directory.
 fn get_settings_path(app: &AppHandle) -> Result<PathBuf, String> {
+    if let Some(data_dir) = std::env::var_os("CRAWLDESK_APP_DATA_DIR") {
+        let settings_dir = PathBuf::from(data_dir);
+        fs::create_dir_all(&settings_dir)
+            .map_err(|e| format!("Failed to create settings dir: {}", e))?;
+        return Ok(settings_dir.join(SETTINGS_FILENAME));
+    }
+
     let settings_dir = app
         .path()
         .app_data_dir()
@@ -55,13 +73,15 @@ fn save_settings_to_file(path: &PathBuf, config: &AppConfig) -> Result<(), Strin
 #[tauri::command]
 pub fn get_settings(app: AppHandle) -> Result<AppConfig, String> {
     let settings_path = get_settings_path(&app)?;
-    let config = load_settings_from_file(&settings_path);
+    let mut config = load_settings_from_file(&settings_path);
+    config.data_dir = resolve_data_dir(&app)?;
     Ok(config)
 }
 
 #[tauri::command]
-pub fn update_settings(app: AppHandle, settings: AppConfig) -> Result<AppConfig, String> {
+pub fn update_settings(app: AppHandle, mut settings: AppConfig) -> Result<AppConfig, String> {
     let settings_path = get_settings_path(&app)?;
+    settings.data_dir = resolve_data_dir(&app)?;
 
     // Persist to file
     save_settings_to_file(&settings_path, &settings)?;

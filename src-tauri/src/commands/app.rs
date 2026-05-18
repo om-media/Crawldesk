@@ -1,6 +1,7 @@
 //! App commands — system utilities (version, paths, shell access).
 
 use std::env;
+use std::path::PathBuf;
 use tauri::{AppHandle, Manager};
 use tauri_plugin_shell::ShellExt;
 
@@ -12,11 +13,14 @@ pub fn get_version() -> String {
 #[tauri::command]
 pub fn get_data_path(app: AppHandle) -> Result<String, String> {
     // Get app data directory for storing the SQLite database
-    let data_dir = app
-        .path()
-        .app_data_dir()
-        .map_err(|e| format!("Failed to get app data dir: {}", e))?
-        .join("crawldesk");
+    let data_dir = env::var_os("CRAWLDESK_APP_DATA_DIR")
+        .map(PathBuf::from)
+        .map(Ok)
+        .unwrap_or_else(|| {
+            app.path()
+                .app_data_dir()
+                .map_err(|e| format!("Failed to get app data dir: {}", e))
+        })?;
 
     // Create directory if it doesn't exist
     std::fs::create_dir_all(&data_dir)

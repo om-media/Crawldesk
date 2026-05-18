@@ -124,7 +124,7 @@ export default function SettingsScreen() {
       <div className="card mb-4" style={{ borderRadius: '12px' }}>
         <h2 className="font-semibold text-primary-text mb-3">Data Storage</h2>
         <p className="text-sm text-primary-muted mb-2">All crawl data is stored locally in SQLite.</p>
-        <code className="block bg-midnight border border-lumen rounded-lg p-3 text-xs break-all text-teal-accent">{dataPath}/crawldesk.sqlite</code>
+        <code className="block bg-midnight border border-lumen rounded-lg p-3 text-xs break-all text-teal-accent">{dataPath}\crawldesk.sqlite</code>
       </div>
 
       {/* Crawl Defaults */}

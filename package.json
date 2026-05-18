@@ -5,7 +5,7 @@
   "description": "Local-first desktop SEO crawler with enterprise-grade analysis",
   "scripts": {
     "build:renderer": "vite build",
-    "build:tauri": "cd src-tauri && cargo build --release",
+    "build:tauri": "tauri build --no-bundle",
     "build": "npm run build:renderer",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",

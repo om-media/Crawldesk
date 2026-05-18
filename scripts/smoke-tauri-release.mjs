@@ -1,6 +1,7 @@
 import { spawn, spawnSync } from 'node:child_process'
 import { existsSync, mkdirSync, rmSync } from 'node:fs'
 import http from 'node:http'
+import { tmpdir } from 'node:os'
 import path from 'node:path'
 import process from 'node:process'
 import puppeteer from 'puppeteer-core'
@@ -10,6 +11,7 @@ const exePath = process.env.CRAWLDESK_EXE || path.join(repoRoot, 'src-tauri', 't
 const debugPort = Number(process.env.CRAWLDESK_WEBVIEW_DEBUG_PORT || 9333)
 const tempRoot = process.env.CRAWLDESK_SMOKE_TMP || path.join(repoRoot, '.tmp')
 const appData = path.join(tempRoot, 'tauri-release-smoke-appdata')
+const webViewData = path.join(tmpdir(), `crawldesk-release-smoke-webview-${process.pid}`)
 const checks = []
 
 function record(name, passed, detail = '') {
@@ -153,6 +155,8 @@ async function runSmoke() {
   mkdirSync(tempRoot, { recursive: true })
   rmSync(appData, { recursive: true, force: true })
   mkdirSync(appData, { recursive: true })
+  rmSync(webViewData, { recursive: true, force: true })
+  mkdirSync(webViewData, { recursive: true })
 
   const fixture = await startFixtureServer()
   const fixtureBase = `http://127.0.0.1:${fixture.address().port}/`
@@ -164,8 +168,8 @@ async function runSmoke() {
       cwd: repoRoot,
       env: {
         ...process.env,
-        APPDATA: appData,
-        LOCALAPPDATA: path.join(appData, 'Local'),
+        CRAWLDESK_APP_DATA_DIR: appData,
+        WEBVIEW2_USER_DATA_FOLDER: webViewData,
         WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `--remote-debugging-port=${debugPort}`,
       },
       stdio: ['ignore', 'pipe', 'pipe'],
@@ -390,6 +394,12 @@ async function runSmoke() {
   } finally {
     if (browser) await browser.disconnect()
     if (app?.pid) spawnSync('taskkill', ['/pid', String(app.pid), '/t', '/f'], { stdio: 'ignore' })
+    await wait(500)
+    try {
+      rmSync(webViewData, { recursive: true, force: true })
+    } catch {
+      // WebView2 can release its profile a moment after the process tree exits.
+    }
     await new Promise((resolve) => fixture.close(resolve))
   }
 }
