@@ -91,6 +91,7 @@ async function clickText(page, text, selector = 'button,a,[role="button"],.card'
       return !disabled && rect.width > 0 && rect.height > 0 && label.includes(needle)
     })
     if (!match) return null
+    match.scrollIntoView({ block: 'center', inline: 'center' })
     const rect = match.getBoundingClientRect()
     return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }
   }, { text, selector })
@@ -210,6 +211,16 @@ async function runSmoke() {
     await page.waitForFunction(() => document.body.textContent?.includes('Exported'))
     record('issues export action works in mock mode', await bodyIncludes(page, 'Exported'))
 
+    await clickText(page, 'Client Errors', 'button')
+    await page.waitForFunction(() => document.body.textContent?.includes('Client Errors'))
+    await page.waitForFunction(() => document.body.textContent?.includes('404'))
+    record('client errors screen shows 4xx rows', await bodyIncludes(page, '404'))
+
+    await clickText(page, 'Content Audit', 'button')
+    await page.waitForFunction(() => document.body.textContent?.includes('Pages Analyzed'))
+    await page.waitForFunction(() => document.body.textContent?.includes('Zip Line Experience'))
+    record('content audit screen shows readability data', await bodyIncludes(page, 'Zip Line Experience'))
+
     await clickText(page, 'Links', 'button')
     await page.waitForFunction(() => document.body.textContent?.includes('Broken Links'))
     const linkRowsAll = await visibleRows(page)
@@ -258,6 +269,18 @@ async function runSmoke() {
     await clickText(page, 'Schedules', 'button')
     await page.waitForFunction(() => document.body.textContent?.includes('Crawl Scheduling'))
     record('schedules screen is reachable', await bodyIncludes(page, 'New Schedule'))
+
+    await clickText(page, 'Exports', 'button')
+    await page.waitForFunction(() => document.body.textContent?.includes('Export all crawled URLs'))
+    await clickText(page, 'All URLs CSV', 'button')
+    await page.waitForFunction(() => document.body.textContent?.includes('Exported 247 URLs'))
+    record('exports screen can export URLs', await bodyIncludes(page, 'Exported 247 URLs'))
+
+    await clickText(page, 'Settings', 'button')
+    await page.waitForFunction(() => document.body.textContent?.includes('Crawl Defaults'))
+    await clickText(page, 'Save Settings', 'button')
+    await page.waitForFunction(() => document.body.textContent?.includes('Settings saved'))
+    record('settings screen loads and saves', await bodyIncludes(page, 'Settings saved'))
 
     record('no uncaught browser errors', pageErrors.length === 0, pageErrors.join('; '))
 

@@ -229,6 +229,16 @@ async function runSmoke() {
       const contentAudit = await window.crawldesk.content.audit(crawl.id, 25)
       const performanceRows = await window.crawldesk.psi.listByCrawl(crawl.id)
       const performanceSummary = await window.crawldesk.psi.summarize(crawl.id)
+      const settingsBefore = await window.crawldesk.settings.get()
+      const settingsUpdated = await window.crawldesk.settings.update({
+        ...settingsBefore,
+        defaultConcurrency: 4,
+        defaultDelayMs: 25,
+      })
+      await window.crawldesk.settings.update(settingsBefore)
+      const urlExport = await window.crawldesk.exports.exportUrls({ crawlId: crawl.id })
+      const issueExport = await window.crawldesk.exports.exportIssues({ crawlId: crawl.id })
+      const linkExport = await window.crawldesk.exports.exportLinks({ crawlId: crawl.id })
       const extractionRule = await window.crawldesk.extractions.create({
         crawlId: crawl.id,
         name: 'Smoke title',
@@ -326,6 +336,10 @@ async function runSmoke() {
         contentAudit,
         performanceRows,
         performanceSummary,
+        settingsUpdated,
+        urlExport,
+        issueExport,
+        linkExport,
         extractionRuleUpdated,
         extractionRulesBeforeDelete,
         extractionRulesAfterDelete,
@@ -358,6 +372,13 @@ async function runSmoke() {
     record('release content clustering returns grouped pages', Array.isArray(result.clusters) && result.clusters.some((cluster) => Number(cluster.size) >= 2 && cluster.keywords?.includes('adventure')), JSON.stringify(result.clusters))
     record('release content audit returns readability metrics', result.contentAudit?.totalPages >= 3 && result.contentAudit?.pages?.some((page) => page.fleschReadingEase !== undefined && page.readingLevel), JSON.stringify(result.contentAudit))
     record('release performance summary uses crawl timings', result.performanceSummary?.totalUrlsWithPsi >= 3 && result.performanceRows?.some((row) => row.ttfbMs != null || row.ttfb_ms != null), JSON.stringify({ summary: result.performanceSummary, rows: result.performanceRows }))
+    record('release settings bridge loads and saves', Number(result.settingsUpdated?.defaultConcurrency ?? result.settingsUpdated?.default_concurrency) === 4 && Number(result.settingsUpdated?.defaultDelayMs ?? result.settingsUpdated?.default_delay_ms) === 25, JSON.stringify(result.settingsUpdated))
+    record('release URL CSV export works', result.urlExport?.rowCount >= 3 && result.urlExport?.fileSize > 0, JSON.stringify(result.urlExport))
+    record('release issue CSV export works', result.issueExport?.rowCount > 0 && result.issueExport?.fileSize > 0, JSON.stringify(result.issueExport))
+    record('release link CSV export works', result.linkExport?.rowCount > 0 && result.linkExport?.fileSize > 0, JSON.stringify(result.linkExport))
+    for (const exportResult of [result.urlExport, result.issueExport, result.linkExport]) {
+      if (exportResult?.filePath) rmSync(exportResult.filePath, { force: true })
+    }
     record('release extraction rules CRUD works', result.extractionRuleUpdated?.name === 'Smoke meta description' && result.extractionRuleUpdated?.active === 0 && result.extractionRulesBeforeDelete.length === 1 && result.extractionRulesAfterDelete.length === 0, JSON.stringify({ updated: result.extractionRuleUpdated, before: result.extractionRulesBeforeDelete, after: result.extractionRulesAfterDelete }))
     record('release custom extraction results are applied during crawl', result.activeExtractionRule?.name === 'Smoke H1' && result.secondExtractionRules.length >= 1 && result.secondExtractionResults.some((item) => item.name === 'Smoke H1' && Array.isArray(item.values) && item.values.some((value) => value.includes('Smoke Fixture'))), JSON.stringify({ rules: result.secondExtractionRules, results: result.secondExtractionResults }))
     record('release crawl schedules CRUD works', result.scheduleUpdated?.enabled === 0 && result.scheduleUpdated?.next_run_at == null && result.schedulesBeforeDelete.length === 1 && result.schedulesAfterDelete.length === 0, JSON.stringify({ updated: result.scheduleUpdated, before: result.schedulesBeforeDelete, after: result.schedulesAfterDelete }))

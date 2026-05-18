@@ -21,6 +21,18 @@ let nextCrawlId = 2
 let nextExtractionRuleId = 1
 let nextScheduleId = 1
 
+let MOCK_SETTINGS = {
+  dataDir: '/tmp/crawldesk-mock',
+  dbFilename: 'crawldesk.sqlite',
+  maxConcurrentCrawls: 3,
+  defaultUserAgent: 'CrawlDesk SEO Crawler',
+  defaultConcurrency: 5,
+  defaultDelayMs: 500,
+  defaultMaxUrls: 1000,
+  defaultMaxDepth: 10,
+  defaultTimeoutSeconds: 30,
+}
+
 const MOCK_PROJECTS = [
   { id: '1', name: 'Avanterra Park', root_url: 'https://avanterrapark.com', created_at: '2025-05-10T10:00:00Z', updated_at: '2025-05-13T08:30:00Z', lastCrawlDate: '2025-05-13T08:30:00Z', lastCrawlUrlCount: 247, lastCrawlIssueCount: 12 },
   { id: '2', name: 'Silent Jam Zone', root_url: 'https://silentjamzone.com', created_at: '2025-05-11T14:00:00Z', updated_at: '2025-05-12T09:00:00Z', lastCrawlDate: null, lastCrawlUrlCount: null, lastCrawlIssueCount: null },
@@ -452,6 +464,17 @@ export function setupMockCrawldesk() {
       getDataPath: async () => '/tmp/crawldesk-mock',
       openExternalUrl: async () => { console.log('[Mock] Open external URL') },
       openPath: async () => { throw new Error('Open path is not implemented in mock mode') },
+    },
+    settings: {
+      get: async () => {
+        await delay()
+        return { ...MOCK_SETTINGS }
+      },
+      update: async (settings: any) => {
+        await delay()
+        MOCK_SETTINGS = { ...MOCK_SETTINGS, ...settings }
+        return { ...MOCK_SETTINGS }
+      },
     },
     keywords: {
       analyze: async (_crawlId: string, gramType: string) => {
