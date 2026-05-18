@@ -183,6 +183,26 @@ async function runSmoke() {
     await page.waitForFunction(() => Array.from(document.querySelectorAll('button')).some((button) => button.textContent?.includes('Clear')))
     record('project selection populates toolbar URL', true)
 
+    await clickText(page, 'Crawl Setup', 'button')
+    await page.waitForFunction(() => document.body.textContent?.includes('Target Website'))
+    await clickText(page, 'Start Crawl', 'form button')
+    await page.waitForFunction(() => document.body.textContent?.includes('Live Crawl'))
+    await page.waitForFunction(() => document.body.textContent?.includes('Running') || document.body.textContent?.includes('Waiting for first results'))
+    const liveCrawlState = await page.evaluate(() => {
+      const text = document.body.textContent || ''
+      const cards = Array.from(document.querySelectorAll('.kpi-card')).map((card) => card.textContent?.replace(/\s+/g, ' ').trim() || '')
+      return {
+        hasRunning: text.includes('Running'),
+        hasWaiting: text.includes('Waiting for first results'),
+        cards,
+      }
+    })
+    record(
+      'crawl setup starts live crawl UI',
+      liveCrawlState.hasRunning && liveCrawlState.cards.some((card) => card.includes('Queued') && /[1-9]/.test(card)),
+      JSON.stringify(liveCrawlState),
+    )
+
     await page.waitForFunction(() => Array.from(document.querySelectorAll('button')).some((button) => button.textContent?.includes('All URLs') && !button.disabled))
     await clickText(page, 'All URLs', 'button')
     await page.waitForFunction(() => document.body.textContent?.includes('Results ('))

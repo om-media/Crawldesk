@@ -1,11 +1,14 @@
 import { useState, useEffect } from 'react'
 import { useProjectStore } from '../stores/project-store'
+import { useCrawlStore } from '../stores/crawl-store'
 import { DEFAULT_CRAWL_SETTINGS } from '@shared/types/crawl'
 
 interface Props { onComplete: () => void }
 
 export default function CrawlSetup({ onComplete }: Props) {
   const { selectedProjectId, setActiveCrawlId, projects } = useProjectStore()
+  const resetCrawlProgress = useCrawlStore(s => s.reset)
+  const updateProgress = useCrawlStore(s => s.updateProgress)
   const project = projects.find(p => p.id === selectedProjectId)
   const [settings, setSettings] = useState({
     startUrl: '',
@@ -47,11 +50,22 @@ export default function CrawlSetup({ onComplete }: Props) {
 
     setCreating(true)
     try {
+      resetCrawlProgress()
       const includePats = settings.includePatterns.split('\n').filter(Boolean).map(s => s.trim())
       const excludePats = settings.excludePatterns.split('\n').filter(Boolean).map(s => s.trim())
       const payload = { ...settings, startUrl: settings.startUrl, includePatterns: includePats, excludePatterns: excludePats }
-     const crawl = await window.crawldesk.crawls.create(selectedProjectId, payload)
+      const crawl = await window.crawldesk.crawls.create(selectedProjectId, payload)
       setActiveCrawlId(crawl.id)
+      updateProgress({
+        crawlId: crawl.id,
+        status: 'running',
+        totalDiscovered: 1,
+        totalQueued: 1,
+        totalCompleted: 0,
+        totalFailed: 0,
+        totalBlocked: 0,
+        elapsedTimeSeconds: 0,
+      })
       onComplete()
     } catch (err: any) {
       console.error('[UI] Failed to start crawl:', err, err.stack)
