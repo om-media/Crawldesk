@@ -499,7 +499,11 @@ function setupCrawldesk() {
       delete: (id: string | number) => invoke('delete_crawl_schedule', { id: toId(id) }),
     },
     diff: {
-      get: () => unavailable('Single crawl diff'),
+      get: async (projectId: string | number, diffId: string) => {
+        const rows = await invoke<Array<any>>('list_crawl_diffs', { projectId: toId(projectId) })
+        const match = (rows || []).map(normalizeCrawlDiff).find(diff => diff.id === diffId)
+        return match ?? null
+      },
       listByProject: async (projectId: string | number) => {
         const rows = await invoke<Array<any>>('list_crawl_diffs', { projectId: toId(projectId) })
         return (rows || []).map(normalizeCrawlDiff)

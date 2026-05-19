@@ -654,7 +654,10 @@ export function setupMockCrawldesk() {
       },
     },
     diff: {
-      get: async () => null,
+      get: async (projectId: string | number, diffId: string) => {
+        await delay()
+        return MOCK_DIFFS.find(diff => String(diff.project_id) === String(projectId) && diff.id === diffId) ?? null
+      },
       listByProject: async (projectId: string | number) => {
         await delay()
         return MOCK_DIFFS.filter(diff => String(diff.project_id) === String(projectId))
