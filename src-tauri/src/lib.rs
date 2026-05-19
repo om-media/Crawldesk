@@ -97,6 +97,7 @@ pub fn run() {
             commands::schedule::update_crawl_schedule,
             commands::schedule::delete_crawl_schedule,
             commands::schedule::run_due_crawl_schedules,
+            commands::schedule::run_crawl_schedule_now,
             // Diff commands
             commands::diff::list_crawl_diffs,
             commands::diff::get_crawl_diff_detail,

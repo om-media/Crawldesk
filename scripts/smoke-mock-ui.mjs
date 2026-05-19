@@ -517,6 +517,17 @@ async function runSmoke() {
       }
     })
     record('schedules screen creates a schedule', scheduleState.hasSchedule, JSON.stringify(scheduleState))
+    await clickText(page, 'Run now', 'button')
+    await page.waitForFunction(() => document.body.textContent?.includes('Started scheduled crawl #'))
+    const manualScheduleRunState = await page.evaluate(async () => {
+      const rows = await window.crawldesk.schedules.list('1')
+      const crawls = await window.crawldesk.crawls.listByProject('1')
+      return {
+        hasLastRun: rows.some((row) => row.start_url === 'https://avanterrapark.com/smoke-schedule' && row.last_run_at),
+        crawlCount: crawls.length,
+      }
+    })
+    record('schedules screen can run a schedule now', manualScheduleRunState.hasLastRun && manualScheduleRunState.crawlCount >= 3, JSON.stringify(manualScheduleRunState))
 
     await clickText(page, 'Exports', 'button')
     await page.waitForFunction(() => document.body.textContent?.includes('Export all crawled URLs'))

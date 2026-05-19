@@ -284,6 +284,8 @@ async function runSmoke() {
         crawlSettingsJson: JSON.stringify({ maxUrls: 10, maxDepth: 1 }),
         cronExpression: '0 2 * * *',
       })
+      const manualScheduleRun = await window.crawldesk.schedules.runNow(schedule.id)
+      const latestManualScheduleRun = await waitForCrawl(manualScheduleRun.crawlId)
       const scheduleUpdated = await window.crawldesk.schedules.update(schedule.id, { enabled: false })
       const schedulesBeforeDelete = await window.crawldesk.schedules.list(project.id)
       await window.crawldesk.schedules.delete(schedule.id)
@@ -389,6 +391,8 @@ async function runSmoke() {
         activeExtractionRule,
         secondExtractionRules,
         secondExtractionResults,
+        manualScheduleRun,
+        latestManualScheduleRun,
         scheduleUpdated,
         schedulesBeforeDelete,
         schedulesAfterDelete,
@@ -426,6 +430,7 @@ async function runSmoke() {
     }
     record('release extraction rules CRUD works', result.extractionRuleUpdated?.name === 'Smoke meta description' && result.extractionRuleUpdated?.active === 0 && result.extractionRulesBeforeDelete.length === 1 && result.extractionRulesAfterDelete.length === 0, JSON.stringify({ updated: result.extractionRuleUpdated, before: result.extractionRulesBeforeDelete, after: result.extractionRulesAfterDelete }))
     record('release custom extraction results are applied during crawl', result.activeExtractionRule?.name === 'Smoke H1' && result.secondExtractionRules.length >= 1 && result.secondExtractionResults.some((item) => item.name === 'Smoke H1' && Array.isArray(item.values) && item.values.some((value) => value.includes('Smoke Fixture'))), JSON.stringify({ rules: result.secondExtractionRules, results: result.secondExtractionResults }))
+    record('release crawl schedule can run now', result.manualScheduleRun?.crawlId && result.latestManualScheduleRun?.status === 'completed', JSON.stringify({ run: result.manualScheduleRun, status: result.latestManualScheduleRun?.status }))
     record('release crawl schedules CRUD works', result.scheduleUpdated?.enabled === 0 && result.scheduleUpdated?.next_run_at == null && result.schedulesBeforeDelete.length === 1 && result.schedulesAfterDelete.length === 0, JSON.stringify({ updated: result.scheduleUpdated, before: result.schedulesBeforeDelete, after: result.schedulesAfterDelete }))
     record('release crawl diff command compares completed crawls', result.secondStatus === 'completed' && result.diffRows.length >= 1 && result.diffRows.some((item) => String(item.crawl_b_id) === String(result.secondCrawlId)), JSON.stringify({ secondStatus: result.secondStatus, diffs: result.diffRows }))
     record('release crawl diff detail command returns sections', Boolean(result.diffDetail?.summary?.id) && Array.isArray(result.diffDetail?.newUrls) && Array.isArray(result.diffDetail?.changedUrls) && Array.isArray(result.diffDetail?.newBrokenLinks), JSON.stringify(result.diffDetail))

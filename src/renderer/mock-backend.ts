@@ -14,6 +14,37 @@ function delay(ms: number = MOCK_DELAY): Promise<void> {
   return new Promise(r => setTimeout(r, ms))
 }
 
+function nextMockScheduleRunAt() {
+  return new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+}
+
+function createMockCrawlFromSchedule(schedule: any) {
+  const now = new Date().toISOString()
+  const crawl: Record<string, unknown> & { completed_at: string | null } = {
+    id: String(nextCrawlId++),
+    project_id: String(schedule.project_id),
+    status: 'running',
+    start_url: schedule.start_url,
+    settings_json: schedule.crawl_settings_json || '{}',
+    started_at: now,
+    completed_at: null,
+    error_message: null,
+    url_count: 0,
+    issue_count: 0,
+    link_count: 0,
+    created_at: now,
+  }
+  MOCK_CRAWLS.push(crawl)
+  setTimeout(() => {
+    crawl.status = 'completed'
+    crawl.url_count = 247
+    crawl.issue_count = 12
+    crawl.link_count = 1834
+    crawl.completed_at = new Date().toISOString()
+  }, 2000)
+  return crawl
+}
+
 // ── Mock Data ───────────────────────────────────────────────────
 
 let nextProjectId = 3
@@ -699,7 +730,6 @@ export function setupMockCrawldesk() {
       create: async (input: any) => {
         await delay()
         const now = new Date().toISOString()
-        const nextRun = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
         const schedule = {
           id: String(nextScheduleId++),
           project_id: String(input.projectId),
@@ -708,7 +738,7 @@ export function setupMockCrawldesk() {
           cron_expression: input.cronExpression,
           enabled: 1,
           last_run_at: null,
-          next_run_at: nextRun,
+          next_run_at: nextMockScheduleRunAt(),
           created_at: now,
           updated_at: now,
         }
@@ -722,7 +752,7 @@ export function setupMockCrawldesk() {
         if (patch.cronExpression !== undefined) schedule.cron_expression = patch.cronExpression
         if (patch.enabled !== undefined) {
           schedule.enabled = patch.enabled ? 1 : 0
-          schedule.next_run_at = patch.enabled ? new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() : null
+          schedule.next_run_at = patch.enabled ? nextMockScheduleRunAt() : null
         }
         schedule.updated_at = new Date().toISOString()
         return schedule
@@ -740,10 +770,22 @@ export function setupMockCrawldesk() {
           .filter(schedule => schedule.enabled && schedule.next_run_at && new Date(schedule.next_run_at) <= now)
           .map(schedule => {
             schedule.last_run_at = now.toISOString()
-            schedule.next_run_at = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString()
+            schedule.next_run_at = nextMockScheduleRunAt()
             schedule.updated_at = now.toISOString()
-            return { scheduleId: schedule.id, crawlId: String(nextCrawlId++) }
+            const crawl = createMockCrawlFromSchedule(schedule)
+            return { scheduleId: schedule.id, crawlId: crawl.id }
           })
+      },
+      runNow: async (id: string | number) => {
+        await delay()
+        const schedule = MOCK_SCHEDULES.find(schedule => String(schedule.id) === String(id))
+        if (!schedule) throw new Error('Crawl schedule not found')
+        const now = new Date().toISOString()
+        const crawl = createMockCrawlFromSchedule(schedule)
+        schedule.last_run_at = now
+        schedule.next_run_at = schedule.enabled ? nextMockScheduleRunAt() : null
+        schedule.updated_at = now
+        return { scheduleId: schedule.id, crawlId: crawl.id }
       },
     },
     diff: {

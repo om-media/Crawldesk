@@ -74,7 +74,9 @@ export default function SchedulesScreen() {
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState({ startUrl: '', cronExpression: '' })
   const [saving, setSaving] = useState(false)
+  const [runningScheduleId, setRunningScheduleId] = useState<string | null>(null)
   const [error, setError] = useState('')
+  const [notice, setNotice] = useState('')
 
   // Human-readable cron descriptions
   const cronPresets = [
@@ -120,6 +122,7 @@ export default function SchedulesScreen() {
   async function createSchedule(e: React.FormEvent) {
     e.preventDefault()
     setError('')
+    setNotice('')
     if (!selectedProjectId) { setError('Select a project before creating a schedule.'); return }
     if (!form.startUrl.trim()) { setError('Start URL is required.'); return }
     if (!form.cronExpression.trim()) { setError('Cron expression is required.'); return }
@@ -134,6 +137,7 @@ export default function SchedulesScreen() {
       })
       setForm({ startUrl: '', cronExpression: '' })
       setShowForm(false)
+      setNotice('Schedule created.')
       await loadSchedules()
     } catch (err: any) {
       console.error('[Schedules] Create failed:', err.message)
@@ -145,6 +149,7 @@ export default function SchedulesScreen() {
 
   async function toggleEnabled(id: string, enabled: boolean) {
     setError('')
+    setNotice('')
     try {
       await window.crawldesk.schedules.update(id, { enabled })
       await loadSchedules()
@@ -156,12 +161,30 @@ export default function SchedulesScreen() {
 
   async function deleteSchedule(id: string) {
     setError('')
+    setNotice('')
     try {
       await window.crawldesk.schedules.delete(id)
+      setNotice('Schedule deleted.')
       await loadSchedules()
     } catch (err: any) {
       console.error('[Schedules] Delete failed:', err.message)
       setError(err?.message || 'Failed to delete schedule')
+    }
+  }
+
+  async function runScheduleNow(id: string) {
+    setError('')
+    setNotice('')
+    setRunningScheduleId(id)
+    try {
+      const run = await window.crawldesk.schedules.runNow(id)
+      setNotice(`Started scheduled crawl #${run.crawlId || run.crawl_id}.`)
+      await loadSchedules()
+    } catch (err: any) {
+      console.error('[Schedules] Manual run failed:', err.message)
+      setError(err?.message || 'Failed to start scheduled crawl')
+    } finally {
+      setRunningScheduleId(null)
     }
   }
 
@@ -170,6 +193,7 @@ export default function SchedulesScreen() {
       <h1 className="text-[30px] leading-none tracking-tight font-bold text-primary-text mb-2">Crawl Scheduling</h1>
       <p className="text-sm text-primary-muted mb-6">Set up recurring crawls with cron expressions. Compare results across runs to track SEO changes over time.</p>
       {error && <ErrorBanner message={error} onRetry={error.startsWith('Failed') ? loadSchedules : undefined} />}
+      {notice && <div className="mb-4 text-sm text-emerald bg-emerald/10 border border-emerald/30 rounded px-3 py-2">{notice}</div>}
 
       {/* New Schedule Form */}
       {!showForm ? (
@@ -227,6 +251,9 @@ export default function SchedulesScreen() {
             </p>
           </div>
           <div className="flex items-center gap-2 shrink-0">
+            <button onClick={() => runScheduleNow(s.id)} disabled={runningScheduleId === s.id} className="btn-primary !py-1.5 !px-3 text-xs">
+              {runningScheduleId === s.id ? 'Starting...' : 'Run now'}
+            </button>
             <button onClick={() => toggleEnabled(s.id, !s.enabled)} className={`btn-secondary !py-1.5 !px-3 text-xs ${s.enabled ? '' : '!opacity-60'}`}>
               {s.enabled ? 'Disable' : 'Enable'}
             </button>

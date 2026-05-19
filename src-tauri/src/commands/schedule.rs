@@ -89,6 +89,15 @@ pub async fn run_due_crawl_schedules(
     run_due_schedules_once(app, (*state).clone(), Utc::now()).await
 }
 
+#[tauri::command]
+pub async fn run_crawl_schedule_now(
+    app: AppHandle,
+    id: i64,
+    state: State<'_, CrawlManager>,
+) -> Result<DueScheduleRun, String> {
+    run_schedule_now(app, id, (*state).clone(), Utc::now()).await
+}
+
 pub fn spawn_schedule_runner(app: AppHandle, crawl_manager: CrawlManager) {
     tauri::async_runtime::spawn(async move {
         loop {
@@ -142,6 +151,35 @@ pub async fn run_due_schedules_once(
     Ok(runs)
 }
 
+async fn run_schedule_now(
+    app: AppHandle,
+    schedule_id: i64,
+    crawl_manager: CrawlManager,
+    now: DateTime<Utc>,
+) -> Result<DueScheduleRun, String> {
+    let conn = db::get_connection().map_err(|e| e.to_string())?;
+    let schedule = get_schedule(&conn, schedule_id)?
+        .ok_or_else(|| "Crawl schedule not found".to_string())?;
+    let settings = settings_for_schedule(&schedule)?;
+    drop(conn);
+
+    let crawl_id = crate::commands::crawl::start_crawl_with_manager(
+        app,
+        schedule.project_id,
+        settings,
+        crawl_manager,
+    )
+    .await?;
+
+    let conn = db::get_connection().map_err(|e| e.to_string())?;
+    mark_schedule_started(&conn, &schedule, now)?;
+
+    Ok(DueScheduleRun {
+        schedule_id: schedule.id,
+        crawl_id,
+    })
+}
+
 fn list_schedules(conn: &Connection, project_id: i64) -> rusqlite::Result<Vec<CrawlSchedule>> {
     let mut stmt = conn.prepare(
         "SELECT id, project_id, start_url, crawl_settings_json, cron_expression, enabled,
@@ -190,6 +228,28 @@ fn claim_due_schedules(
     }
 
     Ok(due_schedules)
+}
+
+fn mark_schedule_started(
+    conn: &Connection,
+    schedule: &CrawlSchedule,
+    now: DateTime<Utc>,
+) -> Result<(), String> {
+    let next_run_at = if schedule.enabled == 1 {
+        next_run_for_cron(&schedule.cron_expression, now).map(|dt| dt.to_rfc3339())
+    } else {
+        None
+    };
+
+    conn.execute(
+        "UPDATE crawl_schedules
+         SET last_run_at = ?1, next_run_at = ?2, updated_at = datetime('now')
+         WHERE id = ?3",
+        params![now.to_rfc3339(), next_run_at, schedule.id],
+    )
+    .map_err(|e| e.to_string())?;
+
+    Ok(())
 }
 
 fn settings_for_schedule(schedule: &CrawlSchedule) -> Result<CrawlSettings, String> {
@@ -551,6 +611,66 @@ mod tests {
         );
         assert_eq!(settings.max_urls, CrawlSettings::default().max_urls);
         assert_eq!(settings.user_agent, CrawlSettings::default().user_agent);
+    }
+
+    #[test]
+    fn mark_schedule_started_updates_last_run_and_preserves_enabled_next_run() {
+        let conn = setup_conn();
+        let now = Utc.with_ymd_and_hms(2026, 5, 16, 1, 30, 0).unwrap();
+        let created = create_schedule(
+            &conn,
+            CreateCrawlScheduleInput {
+                project_id: 1,
+                start_url: "https://example.com/manual".to_string(),
+                crawl_settings_json: None,
+                cron_expression: "0 2 * * *".to_string(),
+            },
+        )
+        .expect("create schedule");
+
+        mark_schedule_started(&conn, &created, now).expect("mark schedule started");
+
+        let updated = get_schedule(&conn, created.id)
+            .expect("load schedule")
+            .expect("schedule exists");
+        assert_eq!(updated.last_run_at, Some(now.to_rfc3339()));
+        assert_eq!(
+            updated.next_run_at,
+            Some("2026-05-16T02:00:00+00:00".to_string())
+        );
+    }
+
+    #[test]
+    fn mark_schedule_started_keeps_disabled_schedule_without_next_run() {
+        let conn = setup_conn();
+        let now = Utc.with_ymd_and_hms(2026, 5, 16, 1, 30, 0).unwrap();
+        let created = create_schedule(
+            &conn,
+            CreateCrawlScheduleInput {
+                project_id: 1,
+                start_url: "https://example.com/manual".to_string(),
+                crawl_settings_json: None,
+                cron_expression: "0 2 * * *".to_string(),
+            },
+        )
+        .expect("create schedule");
+        let disabled = update_schedule(
+            &conn,
+            created.id,
+            UpdateCrawlScheduleInput {
+                enabled: Some(false),
+                cron_expression: None,
+            },
+        )
+        .expect("disable schedule");
+
+        mark_schedule_started(&conn, &disabled, now).expect("mark disabled schedule started");
+
+        let updated = get_schedule(&conn, created.id)
+            .expect("load schedule")
+            .expect("schedule exists");
+        assert_eq!(updated.last_run_at, Some(now.to_rfc3339()));
+        assert_eq!(updated.next_run_at, None);
     }
 
     #[test]
