@@ -45,6 +45,8 @@ export default function PerformanceScreen() {
   const [summary, setSummary] = useState<PsiSummary | null>(null)
   const [loading, setLoading] = useState(false)
   const [filterText, setFilterText] = useState('')
+  const [filterMode, setFilterMode] = useState<'all' | 'slow' | 'large'>('all')
+  const [sortMode, setSortMode] = useState<'slowest' | 'largest' | 'worstScore' | 'url'>('slowest')
   const [error, setError] = useState('')
 
   useEffect(() => { loadData() }, [activeCrawlId])
@@ -69,7 +71,14 @@ export default function PerformanceScreen() {
     finally { setLoading(false) }
   }
 
-  const filtered = results.filter(r => !filterText || r.url.toLowerCase().includes(filterText.toLowerCase()))
+  const filtered = results
+    .filter(r => !filterText || r.url.toLowerCase().includes(filterText.toLowerCase()))
+    .filter(r => {
+      if (filterMode === 'slow') return Number(r.ttfb_ms ?? 0) > 1000
+      if (filterMode === 'large') return Number(r.size_bytes ?? r.sizeBytes ?? 0) > 1_000_000
+      return true
+    })
+    .sort((a, b) => sortPerformanceRows(a, b, sortMode))
 
   if (!activeCrawlId) return (
     <div className="card py-16 text-center">
@@ -163,7 +172,7 @@ export default function PerformanceScreen() {
       </div>
 
       {/* Filter */}
-      <div className="mb-4">
+      <div className="mb-4 flex flex-col xl:flex-row xl:items-end gap-3">
         <input
           type="text"
           placeholder="Filter by URL..."
@@ -171,7 +180,33 @@ export default function PerformanceScreen() {
           onChange={e => setFilterText(e.target.value)}
           className="input-field !w-full max-w-sm"
         />
+        <div className="flex flex-wrap gap-2">
+          {[
+            { key: 'all', label: 'All Pages' },
+            { key: 'slow', label: 'Slow Pages' },
+            { key: 'large', label: 'Large Pages' },
+          ].map(option => (
+            <button
+              key={option.key}
+              type="button"
+              onClick={() => setFilterMode(option.key as typeof filterMode)}
+              className={`btn-secondary !py-2 !px-3 text-xs ${filterMode === option.key ? 'border-teal-accent text-teal-accent' : ''}`}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+        <div>
+          <label className="block text-xs text-primary-muted uppercase tracking-wider mb-1">Sort</label>
+          <select value={sortMode} onChange={e => setSortMode(e.target.value as typeof sortMode)} className="input-field !py-2 !text-sm">
+            <option value="slowest">Slowest first</option>
+            <option value="largest">Largest first</option>
+            <option value="worstScore">Worst score first</option>
+            <option value="url">URL A-Z</option>
+          </select>
+        </div>
       </div>
+      <p className="text-xs text-primary-muted mb-3">Showing {filtered.length} of {results.length} performance rows.</p>
 
       {loading ? (
         <p className="text-primary-muted">Loading performance data...</p>
@@ -225,6 +260,19 @@ function normalizePerformanceRow(row: any): PsiRow {
     carbonFootprintGrams: row.carbonFootprintGrams ?? row.carbon_footprint_grams ?? null,
     fetched_at: row.fetched_at ?? row.fetchedAt ?? '',
   }
+}
+
+function sortPerformanceRows(a: PsiRow, b: PsiRow, sortMode: 'slowest' | 'largest' | 'worstScore' | 'url') {
+  if (sortMode === 'largest') {
+    return Number(b.size_bytes ?? b.sizeBytes ?? 0) - Number(a.size_bytes ?? a.sizeBytes ?? 0)
+  }
+  if (sortMode === 'worstScore') {
+    return Number(a.performance_score ?? 101) - Number(b.performance_score ?? 101)
+  }
+  if (sortMode === 'url') {
+    return a.url.localeCompare(b.url)
+  }
+  return Number(b.ttfb_ms ?? 0) - Number(a.ttfb_ms ?? 0)
 }
 
 function formatBytes(value: unknown) {

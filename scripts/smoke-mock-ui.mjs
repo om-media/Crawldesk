@@ -469,6 +469,13 @@ async function runSmoke() {
       return text.includes('https://avanterrapark.com/gallery') && !text.includes('https://avanterrapark.com/activities/zip-line')
     })
     record('performance filter narrows rows by URL', await bodyIncludes(page, 'https://avanterrapark.com/gallery'))
+    await fillByPlaceholder(page, 'Filter by URL', '')
+    await clickText(page, 'Large Pages', 'button')
+    await page.waitForFunction(() => {
+      const text = document.body.textContent || ''
+      return text.includes('Showing 1 of') && text.includes('https://avanterrapark.com/gallery') && !text.includes('https://avanterrapark.com/activities/zip-line')
+    })
+    record('performance large page filter isolates heavy rows', await bodyIncludes(page, 'Showing 1 of') && await bodyIncludes(page, 'https://avanterrapark.com/gallery'))
 
     await clickText(page, 'Extractions', 'button')
     await page.waitForFunction(() => document.body.textContent?.includes('Custom Extractions'))
