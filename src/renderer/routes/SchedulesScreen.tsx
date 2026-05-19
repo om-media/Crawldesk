@@ -20,6 +20,7 @@ export default function SchedulesScreen() {
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState({ startUrl: '', cronExpression: '' })
   const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
 
   // Human-readable cron descriptions
   const cronPresets = [
@@ -51,8 +52,10 @@ export default function SchedulesScreen() {
     try {
       const list = await window.crawldesk.schedules.list(selectedProjectId)
       setSchedules(list || [])
+      setError('')
     } catch (e: any) {
       console.error('[Schedules] Failed to load:', e.message)
+      setError(e?.message || 'Failed to load schedules')
     } finally {
       setLoading(false)
     }
@@ -62,7 +65,11 @@ export default function SchedulesScreen() {
 
   async function createSchedule(e: React.FormEvent) {
     e.preventDefault()
-    if (!selectedProjectId || !form.startUrl || !form.cronExpression) return
+    setError('')
+    if (!selectedProjectId) { setError('Select a project before creating a schedule.'); return }
+    if (!form.startUrl.trim()) { setError('Start URL is required.'); return }
+    if (!form.cronExpression.trim()) { setError('Cron expression is required.'); return }
+    try { new URL(form.startUrl) } catch { setError('Start URL must be a valid URL.'); return }
     setSaving(true)
     try {
       await window.crawldesk.schedules.create({
@@ -73,32 +80,46 @@ export default function SchedulesScreen() {
       })
       setForm({ startUrl: '', cronExpression: '' })
       setShowForm(false)
-      loadSchedules()
+      await loadSchedules()
     } catch (err: any) {
       console.error('[Schedules] Create failed:', err.message)
+      setError(err?.message || 'Failed to create schedule')
     } finally {
       setSaving(false)
     }
   }
 
   async function toggleEnabled(id: string, enabled: boolean) {
-    await window.crawldesk.schedules.update(id, { enabled })
-    loadSchedules()
+    setError('')
+    try {
+      await window.crawldesk.schedules.update(id, { enabled })
+      await loadSchedules()
+    } catch (err: any) {
+      console.error('[Schedules] Update failed:', err.message)
+      setError(err?.message || 'Failed to update schedule')
+    }
   }
 
   async function deleteSchedule(id: string) {
-    await window.crawldesk.schedules.delete(id)
-    loadSchedules()
+    setError('')
+    try {
+      await window.crawldesk.schedules.delete(id)
+      await loadSchedules()
+    } catch (err: any) {
+      console.error('[Schedules] Delete failed:', err.message)
+      setError(err?.message || 'Failed to delete schedule')
+    }
   }
 
   return (
     <div>
       <h1 className="text-[30px] leading-none tracking-tight font-bold text-primary-text mb-2">Crawl Scheduling</h1>
       <p className="text-sm text-primary-muted mb-6">Set up recurring crawls with cron expressions. Compare results across runs to track SEO changes over time.</p>
+      {error && <div className="bg-[#3b171b] border border-red-900 rounded-lg p-3 text-sm text-red-400 mb-4">{error}</div>}
 
       {/* New Schedule Form */}
       {!showForm ? (
-        <button onClick={() => setShowForm(true)} className="btn-secondary !py-2 !px-4 text-sm mb-4">+ New Schedule</button>
+        <button onClick={() => { setError(''); setShowForm(true) }} className="btn-secondary !py-2 !px-4 text-sm mb-4">+ New Schedule</button>
       ) : (
         <form onSubmit={createSchedule} className="card p-4 mb-4 flex gap-3 items-end" style={{ borderRadius: '12px' }}>
           <div className="flex-1">

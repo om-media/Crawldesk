@@ -25,7 +25,11 @@ export default function ExtractionsScreen() {
     try {
       const rows = await window.crawldesk.extractions.list(activeCrawlId)
       setRules(rows || [])
-    } catch (e) { console.error('[Extractions] Load failed:', e); setRules([]) }
+    } catch (e: any) {
+      console.error('[Extractions] Load failed:', e)
+      setError(e?.message || 'Failed to load extraction rules')
+      setRules([])
+    }
   }
 
   function startAdd() {
@@ -37,6 +41,11 @@ export default function ExtractionsScreen() {
     setEditing(rule.id); setError('')
     setFormName(rule.name); setFormSelector(rule.selector); setFormType(rule.rule_type)
     setFormAttribute(rule.attribute || '')
+  }
+
+  function clearForm() {
+    setEditing(null); setError('')
+    setFormName(''); setFormSelector(''); setFormType('css'); setFormAttribute('')
   }
 
   function cancelEdit() { setEditing(null); setError('') }
@@ -54,18 +63,20 @@ export default function ExtractionsScreen() {
         await window.crawldesk.extractions.create({ crawlId: activeCrawlId, name: formName, selector: formSelector, ruleType: formType, attribute: formAttribute, active: true })
       }
       await loadRules()
-      cancelEdit()
+      clearForm()
     } catch (err: any) { console.error('[Extractions] Save failed:', err); setError(err?.message || 'Failed to save rule') }
   }
 
   async function toggleActive(id: string, newActive: number) {
+    setError('')
     try { await window.crawldesk.extractions.update(id, { active: newActive ? 1 : 0 }); await loadRules() }
-    catch (e) { console.error('[Extractions] Toggle failed:', e) }
+    catch (e: any) { console.error('[Extractions] Toggle failed:', e); setError(e?.message || 'Failed to update rule') }
   }
 
   async function deleteRule(id: string) {
+    setError('')
     try { await window.crawldesk.extractions.delete(id); await loadRules() }
-    catch (e) { console.error('[Extractions] Delete failed:', e) }
+    catch (e: any) { console.error('[Extractions] Delete failed:', e); setError(e?.message || 'Failed to delete rule') }
   }
 
   if (!activeCrawlId) return (

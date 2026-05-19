@@ -393,11 +393,43 @@ async function runSmoke() {
 
     await clickText(page, 'Extractions', 'button')
     await page.waitForFunction(() => document.body.textContent?.includes('Custom Extractions'))
-    record('extractions screen is reachable', await bodyIncludes(page, 'New Extraction Rule'))
+    await fillByLabel(page, 'Rule Name', 'Smoke Meta Description')
+    await fillByLabel(page, 'Selector / Pattern', 'meta[name="description"]')
+    await fillByLabel(page, 'Attribute', 'content')
+    await clickText(page, 'Add Rule', 'form button')
+    await page.waitForFunction(() => document.body.textContent?.includes('Smoke Meta Description'))
+    const extractionState = await page.evaluate(async () => {
+      const crawls = await window.crawldesk.crawls.listByProject('1')
+      const crawl = crawls[crawls.length - 1]
+      const rows = await window.crawldesk.extractions.list(crawl.id)
+      const nameInput = Array.from(document.querySelectorAll('label')).find((label) => label.textContent?.includes('Rule Name'))?.parentElement?.querySelector('input')
+      return {
+        count: rows.length,
+        hasRule: rows.some((row) => row.name === 'Smoke Meta Description' && row.selector === 'meta[name="description"]' && row.attribute === 'content'),
+        nameCleared: nameInput instanceof HTMLInputElement && nameInput.value === '',
+      }
+    })
+    record('extractions screen creates a rule and clears the form', extractionState.hasRule && extractionState.nameCleared, JSON.stringify(extractionState))
 
     await clickText(page, 'Schedules', 'button')
     await page.waitForFunction(() => document.body.textContent?.includes('Crawl Scheduling'))
-    record('schedules screen is reachable', await bodyIncludes(page, 'New Schedule'))
+    await clickText(page, 'New Schedule', 'button')
+    await fillByLabel(page, 'Start URL', 'not-a-url')
+    await fillByLabel(page, 'Cron Expression', '0 2 * * *')
+    await clickText(page, 'Save', 'form button')
+    await page.waitForFunction(() => document.body.textContent?.includes('Start URL must be a valid URL'))
+    record('schedules screen validates URL before save', await bodyIncludes(page, 'Start URL must be a valid URL'))
+    await fillByLabel(page, 'Start URL', 'https://avanterrapark.com/smoke-schedule')
+    await clickText(page, 'Save', 'form button')
+    await page.waitForFunction(() => document.body.textContent?.includes('https://avanterrapark.com/smoke-schedule'))
+    const scheduleState = await page.evaluate(async () => {
+      const rows = await window.crawldesk.schedules.list('1')
+      return {
+        count: rows.length,
+        hasSchedule: rows.some((row) => row.start_url === 'https://avanterrapark.com/smoke-schedule' && row.cron_expression === '0 2 * * *'),
+      }
+    })
+    record('schedules screen creates a schedule', scheduleState.hasSchedule, JSON.stringify(scheduleState))
 
     await clickText(page, 'Exports', 'button')
     await page.waitForFunction(() => document.body.textContent?.includes('Export all crawled URLs'))
