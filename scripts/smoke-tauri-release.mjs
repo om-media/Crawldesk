@@ -56,6 +56,7 @@ async function startFixtureServer() {
   <url><loc>${origin}/</loc></url>
   <url><loc>${origin}/about</loc></url>
   <url><loc>${origin}/sitemap-only</loc></url>
+  <url><loc>${origin}/tag/noise</loc></url>
   <url><loc>${origin}/hero.jpg</loc></url>
   <url><loc>${origin}/missing</loc></url>
 </urlset>`)
@@ -77,6 +78,7 @@ async function startFixtureServer() {
          <a href="/about">About</a>
          <a href="/about">Learn more</a>
          <a href="/sitemap-only">Learn more</a>
+         <a href="/tag/noise">Tag Archive</a>
          <a href="/missing">Missing page</a>
          <img src="/hero.jpg">`,
         `<script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"Smoke Fixture Home"}</script>`
@@ -91,6 +93,11 @@ async function startFixtureServer() {
     if (url.pathname === '/sitemap-only') {
       res.writeHead(200, { 'content-type': 'text/html' })
       res.end(fixtureHtml('Sitemap Only', '<h1>Sitemap Only</h1><p>Adventure planning content cluster topic appears from sitemap discovery.</p><p>Adventure planning content cluster topic repeats on sitemap content.</p><a href="/">Learn more</a>'))
+      return
+    }
+    if (url.pathname === '/tag/noise') {
+      res.writeHead(200, { 'content-type': 'text/html' })
+      res.end(fixtureHtml('Tag Archive', '<h1>Tag Archive</h1><p>This archive page should be removable with wildcard crawl exclusions.</p><a href="/">Home</a>'))
       return
     }
     if (url.pathname === '/hero.jpg') {
@@ -285,6 +292,13 @@ async function runSmoke() {
       const secondExtractionRules = await window.crawldesk.extractions.list(secondCrawl.id)
       const secondUrls = await window.crawldesk.urls.list({ projectId: project.id, crawlId: secondCrawl.id, page: 0, pageSize: 50 })
       const diffRows = await window.crawldesk.diff.listByProject(project.id)
+      const excludedCrawl = await window.crawldesk.crawls.create(project.id, {
+        ...crawlSettings,
+        excludePatterns: ['*/tag/*'],
+      })
+      const latestExcluded = await waitForCrawl(excludedCrawl.id)
+      await new Promise((resolve) => setTimeout(resolve, 1000))
+      const excludedUrls = await window.crawldesk.urls.list({ projectId: project.id, crawlId: excludedCrawl.id, page: 0, pageSize: 50 })
 
       function parseJson(value) {
         if (typeof value !== 'string') return value
@@ -322,6 +336,8 @@ async function runSmoke() {
         status: latest?.status || null,
         secondCrawlId: secondCrawl.id,
         secondStatus: latestSecond?.status || null,
+        excludedStatus: latestExcluded?.status || null,
+        excludedUrls: (excludedUrls.items || []).map((item) => item.url),
         urlTotal: urls.total ?? urls.items?.length ?? 0,
         crawlOnlyUrlTotal: urlsByCrawlOnly.total ?? urlsByCrawlOnly.items?.length ?? 0,
         urls: (urls.items || []).map((item) => ({ url: item.url, status: item.status_code ?? item.statusCode })),
@@ -373,7 +389,7 @@ async function runSmoke() {
     record('release keyword analysis returns unigrams', result.keywordUnigrams?.totalWords > 0 && result.keywordUnigrams?.totalPhrases > 0 && result.keywordUnigrams?.keywords?.some((item) => item.phrase === 'adventure' && item.count >= 3), JSON.stringify(result.keywordUnigrams))
     record('release keyword analysis returns bigrams', result.keywordBigrams?.totalWords > result.keywordBigrams?.totalPhrases && result.keywordBigrams?.keywords?.some((item) => item.phrase === 'adventure planning' && item.count >= 3), JSON.stringify(result.keywordBigrams))
     record('release keyword analysis returns trigrams', result.keywordTrigrams?.totalWords > result.keywordTrigrams?.totalPhrases && result.keywordTrigrams?.keywords?.some((item) => item.phrase === 'adventure planning content' && item.count >= 3), JSON.stringify(result.keywordTrigrams))
-    record('release content clustering returns grouped pages', Array.isArray(result.clusters) && result.clusters.some((cluster) => Number(cluster.size) >= 2 && cluster.keywords?.includes('adventure')), JSON.stringify(result.clusters))
+    record('release content clustering returns grouped pages', Array.isArray(result.clusters) && result.clusters.some((cluster) => Number(cluster.size) >= 2 && cluster.urls?.some((url) => url.endsWith('/about'))), JSON.stringify(result.clusters))
     record('release content audit returns readability metrics', result.contentAudit?.totalPages >= 3 && result.contentAudit?.pages?.some((page) => page.fleschReadingEase !== undefined && page.readingLevel), JSON.stringify(result.contentAudit))
     record('release performance summary uses crawl timings', result.performanceSummary?.totalUrlsWithPsi >= 3 && result.performanceRows?.some((row) => row.ttfbMs != null || row.ttfb_ms != null), JSON.stringify({ summary: result.performanceSummary, rows: result.performanceRows }))
     record('release performance summary estimates carbon', Number(result.performanceSummary?.totalCarbonGrams) > 0 && result.performanceRows?.some((row) => Number(row.carbonFootprintGrams ?? row.carbon_footprint_grams) > 0), JSON.stringify({ summary: result.performanceSummary, rows: result.performanceRows }))
@@ -388,6 +404,7 @@ async function runSmoke() {
     record('release custom extraction results are applied during crawl', result.activeExtractionRule?.name === 'Smoke H1' && result.secondExtractionRules.length >= 1 && result.secondExtractionResults.some((item) => item.name === 'Smoke H1' && Array.isArray(item.values) && item.values.some((value) => value.includes('Smoke Fixture'))), JSON.stringify({ rules: result.secondExtractionRules, results: result.secondExtractionResults }))
     record('release crawl schedules CRUD works', result.scheduleUpdated?.enabled === 0 && result.scheduleUpdated?.next_run_at == null && result.schedulesBeforeDelete.length === 1 && result.schedulesAfterDelete.length === 0, JSON.stringify({ updated: result.scheduleUpdated, before: result.schedulesBeforeDelete, after: result.schedulesAfterDelete }))
     record('release crawl diff command compares completed crawls', result.secondStatus === 'completed' && result.diffRows.length >= 1 && result.diffRows.some((item) => String(item.crawl_b_id) === String(result.secondCrawlId)), JSON.stringify({ secondStatus: result.secondStatus, diffs: result.diffRows }))
+    record('release crawl exclude patterns filter URLs', result.excludedStatus === 'completed' && !result.excludedUrls.some((url) => url.includes('/tag/')), JSON.stringify({ status: result.excludedStatus, urls: result.excludedUrls }))
     record('release project delete cascades', result.projectDeleted, `projectId=${result.projectId}`)
 
     const failed = checks.filter((check) => !check.passed)

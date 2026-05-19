@@ -34,6 +34,11 @@ pub struct CrawlEngineConfig {
     pub respect_sitemaps: bool,
     pub custom_headers: Option<Vec<(String, String)>>,
     pub custom_extraction_rules: Vec<CustomExtractionRule>,
+    pub include_patterns: Vec<String>,
+    pub exclude_patterns: Vec<String>,
+    pub allowed_hostnames: Vec<String>,
+    pub blocked_hostnames: Vec<String>,
+    pub max_url_length: i32,
 }
 
 /// Result of crawling a single URL.
@@ -92,7 +97,7 @@ impl Clone for CrawlEngine {
         Self {
             config: self.config.clone(),
             frontier: Arc::clone(&self.frontier),
-            scope: ScopeService::new(&self.config.root_url),
+            scope: Self::build_scope(&self.config),
             robots: Arc::clone(&self.robots),
             callback: None, // callbacks are not cloned
             stats: Arc::clone(&self.stats),
@@ -214,13 +219,13 @@ fn result_to_page_data(result: &CrawlResult, project_id: i64, crawl_id: i64) -> 
 
 impl CrawlEngine {
     pub fn new(config: CrawlEngineConfig) -> Self {
-        let root_url = config.root_url.clone();
         let max_urls = config.max_urls;
         let max_depth = config.max_depth;
+        let scope = Self::build_scope(&config);
         Self {
             config,
             frontier: Arc::new(Mutex::new(UrlFrontier::new(max_urls, max_depth))),
-            scope: ScopeService::new(&root_url),
+            scope,
             robots: Arc::new(Mutex::new(RobotsService::new())),
             callback: None,
             stats: Arc::new(Mutex::new(CrawlStats::default())),
@@ -229,6 +234,23 @@ impl CrawlEngine {
             project_id: 0,
             crawl_id: 0,
         }
+    }
+
+    fn build_scope(config: &CrawlEngineConfig) -> ScopeService {
+        let mut scope = ScopeService::new(&config.root_url);
+        for hostname in &config.allowed_hostnames {
+            scope.add_allowed_hostname(hostname);
+        }
+        for hostname in &config.blocked_hostnames {
+            scope.add_blocked_hostname(hostname);
+        }
+        for pattern in &config.include_patterns {
+            scope.add_include_pattern(pattern);
+        }
+        for pattern in &config.exclude_patterns {
+            scope.add_exclude_pattern(pattern);
+        }
+        scope
     }
 
     /// Set the writer handle for persisting crawl data to SQLite.
@@ -256,7 +278,7 @@ impl CrawlEngine {
         let mut added = 0;
         for url in urls {
             if let Some(normalized) = normalize_url(&url) {
-                if self.scope.is_in_scope(&normalized) {
+                if self.is_crawlable_url(&normalized) {
                     if frontier.enqueue(normalized, depth) {
                         added += 1;
                     }
@@ -265,6 +287,17 @@ impl CrawlEngine {
         }
         info!("Seeded {} URLs (depth {})", added, depth);
         added
+    }
+
+    fn is_crawlable_url(&self, url: &str) -> bool {
+        if self.config.max_url_length > 0 && url.len() > self.config.max_url_length as usize {
+            debug!(
+                "URL exceeds max length ({}): {}",
+                self.config.max_url_length, url
+            );
+            return false;
+        }
+        self.scope.is_in_scope(url)
     }
 
     /// Run the crawl — main loop.
@@ -405,7 +438,7 @@ impl CrawlEngine {
                 if link.link_type == LinkType::HtmlA && !link.is_no_follow {
                     let normalized = normalize_url(&link.href);
                     if let Some(ref norm_url) = normalized {
-                        if self.scope.is_in_scope(norm_url) {
+                        if self.is_crawlable_url(norm_url) {
                             self.frontier
                                 .lock()
                                 .await

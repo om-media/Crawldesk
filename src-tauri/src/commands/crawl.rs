@@ -121,6 +121,11 @@ pub async fn start_crawl(
         respect_sitemaps: settings.respect_sitemaps,
         custom_headers: None,
         custom_extraction_rules,
+        include_patterns: settings.include_patterns.clone(),
+        exclude_patterns: settings.exclude_patterns.clone(),
+        allowed_hostnames: settings.allowed_hostnames.clone(),
+        blocked_hostnames: settings.blocked_hostnames.clone(),
+        max_url_length: settings.max_url_length,
     };
 
     // Start the SQLite writer task — runs on a dedicated thread per PRD §9.3
