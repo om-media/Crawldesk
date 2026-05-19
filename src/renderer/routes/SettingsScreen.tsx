@@ -48,6 +48,7 @@ export default function SettingsScreen() {
   const [loadError, setLoadError] = useState<string | null>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [saveSuccess, setSaveSuccess] = useState(false)
+  const [pathMessage, setPathMessage] = useState<string | null>(null)
 
   useEffect(() => { loadInfo(); loadSettings() }, [])
 
@@ -94,6 +95,18 @@ export default function SettingsScreen() {
     setSaveSuccess(false)
   }
 
+  async function openDataFolder() {
+    const target = settings.dataDir || dataPath
+    if (!target) return
+    setPathMessage(null)
+    try {
+      await window.crawldesk.app.openPath(target)
+      setPathMessage('Data folder opened.')
+    } catch (e: any) {
+      setPathMessage(e?.message || 'Failed to open data folder.')
+    }
+  }
+
   const databasePath = settings.dataDir || dataPath
     ? `${settings.dataDir || dataPath}\\${settings.dbFilename || 'crawldesk.sqlite'}`
     : settings.dbFilename || 'crawldesk.sqlite'
@@ -129,6 +142,12 @@ export default function SettingsScreen() {
         <h2 className="font-semibold text-primary-text mb-3">Data Storage</h2>
         <p className="text-sm text-primary-muted mb-2">All crawl data is stored locally in SQLite.</p>
         <code className="block bg-midnight border border-lumen rounded-lg p-3 text-xs break-all text-teal-accent">{databasePath}</code>
+        <div className="mt-3 flex flex-wrap items-center gap-3">
+          <button type="button" onClick={openDataFolder} className="btn-secondary text-sm" disabled={!(settings.dataDir || dataPath)}>
+            Open data folder
+          </button>
+          {pathMessage && <span className="text-sm text-primary-muted">{pathMessage}</span>}
+        </div>
       </div>
 
       {/* Crawl Defaults */}

@@ -463,7 +463,7 @@ export function setupMockCrawldesk() {
       getVersion: async () => '0.1.0-mock',
       getDataPath: async () => '/tmp/crawldesk-mock',
       openExternalUrl: async () => { console.log('[Mock] Open external URL') },
-      openPath: async () => { throw new Error('Open path is not implemented in mock mode') },
+      openPath: async () => { console.log('[Mock] Open path') },
     },
     settings: {
       get: async () => {

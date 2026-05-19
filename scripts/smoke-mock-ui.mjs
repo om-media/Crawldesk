@@ -534,6 +534,9 @@ async function runSmoke() {
 
     await clickText(page, 'Settings', 'button')
     await page.waitForFunction(() => document.body.textContent?.includes('Crawl Defaults'))
+    await clickText(page, 'Open data folder', 'button')
+    await page.waitForFunction(() => document.body.textContent?.includes('Data folder opened.'))
+    record('settings screen opens data folder action', await bodyIncludes(page, 'Data folder opened.'))
     await clickText(page, 'Save Settings', 'button')
     await page.waitForFunction(() => document.body.textContent?.includes('Settings saved'))
     record('settings screen loads and saves', await bodyIncludes(page, 'Settings saved'))

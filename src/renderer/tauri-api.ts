@@ -417,7 +417,7 @@ function setupCrawldesk() {
       getVersion: () => invoke('get_version'),
       getDataPath: () => invoke('get_data_path'),
       openExternalUrl: (url: string) => invoke('open_external_url', { url }),
-      openPath: () => unavailable('Open path'),
+      openPath: (path: string) => invoke('open_path', { path }),
     },
     settings: {
       get: () => invoke('get_settings'),

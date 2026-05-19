@@ -36,3 +36,11 @@ pub fn open_external_url(app: AppHandle, url: String) -> Result<(), String> {
         .map_err(|e| format!("Failed to open URL: {}", e))?;
     Ok(())
 }
+
+#[tauri::command]
+pub fn open_path(app: AppHandle, path: String) -> Result<(), String> {
+    app.shell()
+        .open(&path, None)
+        .map_err(|e| format!("Failed to open path: {}", e))?;
+    Ok(())
+}
