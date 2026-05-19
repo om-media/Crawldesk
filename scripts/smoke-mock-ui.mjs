@@ -465,6 +465,20 @@ async function runSmoke() {
     await clickText(page, 'All URLs CSV', 'button')
     await page.waitForFunction(() => document.body.textContent?.includes('Exported 247 URLs'))
     record('exports screen can export URLs', await bodyIncludes(page, 'Exported 247 URLs'))
+    await clickText(page, 'Issues CSV', 'button')
+    await page.waitForFunction(() => document.body.textContent?.includes('Exported 12 issues'))
+    record('exports screen can export issues', await bodyIncludes(page, 'Exported 12 issues'))
+    await clickText(page, 'Links CSV', 'button')
+    await page.waitForFunction(() => document.body.textContent?.includes('Exported 1834 links'))
+    const exportStatus = await page.evaluate(() => {
+      const text = document.body.textContent || ''
+      return {
+        urls: text.includes('Exported 247 URLs'),
+        issues: text.includes('Exported 12 issues'),
+        links: text.includes('Exported 1834 links'),
+      }
+    })
+    record('exports screen preserves independent export statuses', exportStatus.urls && exportStatus.issues && exportStatus.links, JSON.stringify(exportStatus))
 
     await clickText(page, 'Settings', 'button')
     await page.waitForFunction(() => document.body.textContent?.includes('Crawl Defaults'))
