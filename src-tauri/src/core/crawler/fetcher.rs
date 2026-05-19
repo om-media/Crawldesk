@@ -2,6 +2,7 @@
 
 use super::normalizer::resolve_url;
 use crate::core::crawler::models::FetchResult;
+use reqwest::header::{HeaderName, HeaderValue, ACCEPT_LANGUAGE};
 use reqwest::Client;
 use std::collections::HashMap;
 use std::time::Duration;
@@ -131,7 +132,25 @@ impl Fetcher {
             ));
         }
 
-        let response = self.client.get(url).send().await?;
+        let mut request = self
+            .client
+            .get(url)
+            .header(ACCEPT_LANGUAGE, self.config.accept_language.as_str());
+        if let Some(custom_headers) = &self.config.custom_headers {
+            for (name, value) in custom_headers {
+                match (
+                    HeaderName::from_bytes(name.as_bytes()),
+                    HeaderValue::from_str(value),
+                ) {
+                    (Ok(name), Ok(value)) => {
+                        request = request.header(name, value);
+                    }
+                    _ => warn!("Skipping invalid custom request header: {}", name),
+                }
+            }
+        }
+
+        let response = request.send().await?;
         let status = response.status();
 
         // Handle redirect

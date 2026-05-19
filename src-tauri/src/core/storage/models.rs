@@ -329,7 +329,7 @@ pub struct CrawlSettings {
     pub max_url_length: i32,
     pub disable_private_ip_access: bool,
     pub enable_js_rendering: bool,
-    pub custom_headers: Option<String>, // JSON object
+    pub custom_headers: Option<serde_json::Value>, // JSON object, array, or encoded string
     pub start_url: Option<String>,      // Optional override for the starting URL
 }
 

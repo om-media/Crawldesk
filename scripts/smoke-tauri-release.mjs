@@ -100,6 +100,16 @@ async function startFixtureServer() {
       res.end(fixtureHtml('Tag Archive', '<h1>Tag Archive</h1><p>This archive page should be removable with wildcard crawl exclusions.</p><a href="/">Home</a>'))
       return
     }
+    if (url.pathname === '/private') {
+      if (req.headers['x-crawldesk-smoke'] !== 'open') {
+        res.writeHead(403, { 'content-type': 'text/html' })
+        res.end(fixtureHtml('Private Fixture', '<h1>Forbidden</h1><p>Missing smoke header.</p>'))
+        return
+      }
+      res.writeHead(200, { 'content-type': 'text/html' })
+      res.end(fixtureHtml('Private Fixture', '<h1>Private Fixture</h1><p>Custom request headers unlocked this page.</p>'))
+      return
+    }
     if (url.pathname === '/hero.jpg') {
       const jpg = Buffer.from('/9j/4AAQSkZJRgABAQAAAQABAAD/2w==', 'base64')
       res.writeHead(200, { 'content-type': 'image/jpeg', 'content-length': String(jpg.length) })
@@ -299,6 +309,16 @@ async function runSmoke() {
       const latestExcluded = await waitForCrawl(excludedCrawl.id)
       await new Promise((resolve) => setTimeout(resolve, 1000))
       const excludedUrls = await window.crawldesk.urls.list({ projectId: project.id, crawlId: excludedCrawl.id, page: 0, pageSize: 50 })
+      const headerCrawl = await window.crawldesk.crawls.create(project.id, {
+        ...crawlSettings,
+        startUrl: `${fixtureBase}private`,
+        maxUrls: 1,
+        respectSitemaps: false,
+        customHeaders: { 'x-crawldesk-smoke': 'open' },
+      })
+      const latestHeader = await waitForCrawl(headerCrawl.id)
+      await new Promise((resolve) => setTimeout(resolve, 1000))
+      const headerUrls = await window.crawldesk.urls.list({ projectId: project.id, crawlId: headerCrawl.id, page: 0, pageSize: 10 })
 
       function parseJson(value) {
         if (typeof value !== 'string') return value
@@ -338,6 +358,8 @@ async function runSmoke() {
         secondStatus: latestSecond?.status || null,
         excludedStatus: latestExcluded?.status || null,
         excludedUrls: (excludedUrls.items || []).map((item) => item.url),
+        headerStatus: latestHeader?.status || null,
+        headerUrls: (headerUrls.items || []).map((item) => ({ url: item.url, status: item.status_code ?? item.statusCode })),
         urlTotal: urls.total ?? urls.items?.length ?? 0,
         crawlOnlyUrlTotal: urlsByCrawlOnly.total ?? urlsByCrawlOnly.items?.length ?? 0,
         urls: (urls.items || []).map((item) => ({ url: item.url, status: item.status_code ?? item.statusCode })),
@@ -405,6 +427,7 @@ async function runSmoke() {
     record('release crawl schedules CRUD works', result.scheduleUpdated?.enabled === 0 && result.scheduleUpdated?.next_run_at == null && result.schedulesBeforeDelete.length === 1 && result.schedulesAfterDelete.length === 0, JSON.stringify({ updated: result.scheduleUpdated, before: result.schedulesBeforeDelete, after: result.schedulesAfterDelete }))
     record('release crawl diff command compares completed crawls', result.secondStatus === 'completed' && result.diffRows.length >= 1 && result.diffRows.some((item) => String(item.crawl_b_id) === String(result.secondCrawlId)), JSON.stringify({ secondStatus: result.secondStatus, diffs: result.diffRows }))
     record('release crawl exclude patterns filter URLs', result.excludedStatus === 'completed' && !result.excludedUrls.some((url) => url.includes('/tag/')), JSON.stringify({ status: result.excludedStatus, urls: result.excludedUrls }))
+    record('release crawl custom headers are sent', result.headerStatus === 'completed' && result.headerUrls.some((item) => item.url.endsWith('/private') && item.status === 200), JSON.stringify({ status: result.headerStatus, urls: result.headerUrls }))
     record('release project delete cascades', result.projectDeleted, `projectId=${result.projectId}`)
 
     const failed = checks.filter((check) => !check.passed)

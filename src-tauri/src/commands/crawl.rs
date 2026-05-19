@@ -11,8 +11,68 @@ use crate::core::storage::db;
 use crate::core::storage::models::CrawlSettings;
 use crate::core::storage::writer;
 use serde_json::json;
+use serde_json::Value;
 use tauri::{AppHandle, Emitter, State};
 use tracing::{info, warn};
+
+fn parse_custom_headers(value: Option<&Value>) -> Result<Option<Vec<(String, String)>>, String> {
+    let Some(value) = value else {
+        return Ok(None);
+    };
+
+    match value {
+        Value::Null => Ok(None),
+        Value::String(raw) => {
+            if raw.trim().is_empty() {
+                return Ok(None);
+            }
+            let parsed: Value = serde_json::from_str(raw)
+                .map_err(|e| format!("Invalid customHeaders JSON: {}", e))?;
+            parse_custom_headers(Some(&parsed))
+        }
+        Value::Object(map) => {
+            let headers = map
+                .iter()
+                .filter_map(|(name, value)| {
+                    value
+                        .as_str()
+                        .map(|header_value| (name.trim().to_string(), header_value.to_string()))
+                })
+                .filter(|(name, _)| !name.is_empty())
+                .collect::<Vec<_>>();
+            Ok((!headers.is_empty()).then_some(headers))
+        }
+        Value::Array(items) => {
+            let mut headers = Vec::new();
+            for item in items {
+                match item {
+                    Value::Array(pair) if pair.len() == 2 => {
+                        if let (Some(name), Some(value)) = (pair[0].as_str(), pair[1].as_str()) {
+                            if !name.trim().is_empty() {
+                                headers.push((name.trim().to_string(), value.to_string()));
+                            }
+                        }
+                    }
+                    Value::Object(map) => {
+                        let name = map
+                            .get("name")
+                            .or_else(|| map.get("key"))
+                            .and_then(Value::as_str);
+                        let value = map.get("value").and_then(Value::as_str);
+                        if let (Some(name), Some(value)) = (name, value) {
+                            if !name.trim().is_empty() {
+                                headers.push((name.trim().to_string(), value.to_string()));
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            Ok((!headers.is_empty()).then_some(headers))
+        }
+        _ => Err("customHeaders must be an object, array, encoded JSON string, or null".to_string()),
+    }
+}
 
 /// Start a new crawl for a project.
 #[tauri::command]
@@ -100,6 +160,7 @@ pub async fn start_crawl(
     );
 
     // Build engine config
+    let custom_headers = parse_custom_headers(settings.custom_headers.as_ref())?;
     let fetcher_config = FetcherConfig {
         user_agent: settings.user_agent.clone(),
         timeout_seconds: settings.timeout_seconds as u64,
@@ -107,7 +168,7 @@ pub async fn start_crawl(
         follow_redirects: settings.follow_redirects,
         max_redirects: settings.max_redirects as usize,
         accept_language: settings.accept_language.clone(),
-        custom_headers: None,
+        custom_headers: custom_headers.clone(),
     };
 
     let engine_config = CrawlEngineConfig {
@@ -119,7 +180,7 @@ pub async fn start_crawl(
         fetcher_config,
         respect_robots_txt: settings.respect_robots_txt,
         respect_sitemaps: settings.respect_sitemaps,
-        custom_headers: None,
+        custom_headers,
         custom_extraction_rules,
         include_patterns: settings.include_patterns.clone(),
         exclude_patterns: settings.exclude_patterns.clone(),
@@ -453,4 +514,45 @@ pub fn clear_crawl(crawl_id: i64) -> Result<(), String> {
 pub fn list_crawls(project_id: i64) -> Result<Vec<crate::core::storage::models::Crawl>, String> {
     let conn = db::get_connection()?;
     crate::core::storage::queries::list_crawls(&conn, project_id).map_err(|e| e.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn parses_custom_headers_from_object() {
+        let value = json!({
+            "x-crawldesk-smoke": "open",
+            "x-empty": 12,
+        });
+        let headers = parse_custom_headers(Some(&value)).unwrap().unwrap();
+        assert_eq!(headers, vec![("x-crawldesk-smoke".to_string(), "open".to_string())]);
+    }
+
+    #[test]
+    fn parses_custom_headers_from_array_items() {
+        let value = json!([
+            { "name": "x-one", "value": "1" },
+            ["x-two", "2"],
+            { "key": "x-three", "value": "3" }
+        ]);
+        let headers = parse_custom_headers(Some(&value)).unwrap().unwrap();
+        assert_eq!(
+            headers,
+            vec![
+                ("x-one".to_string(), "1".to_string()),
+                ("x-two".to_string(), "2".to_string()),
+                ("x-three".to_string(), "3".to_string()),
+            ]
+        );
+    }
+
+    #[test]
+    fn parses_custom_headers_from_encoded_json_string() {
+        let value = json!("{\"x-token\":\"abc\"}");
+        let headers = parse_custom_headers(Some(&value)).unwrap().unwrap();
+        assert_eq!(headers, vec![("x-token".to_string(), "abc".to_string())]);
+    }
 }
