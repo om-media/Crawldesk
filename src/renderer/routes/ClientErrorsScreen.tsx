@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useResolvedCrawl } from '../hooks/use-resolved-crawl'
+import ErrorBanner from '../components/ErrorBanner'
 import type { UrlRecord } from '@shared/types/url'
 
 
@@ -27,6 +28,7 @@ export default function ClientErrorsScreen() {
   const pageSize = 50
   const [loading, setLoading] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [exportMessage, setExportMessage] = useState<string | null>(null)
   const [statusFilter, setStatusFilter] = useState<StatusCodeFilter>('')
   const [sortByPriority, setSortByPriority] = useState(true)
   const [selectedUrl, setSelectedUrl] = useState<UrlRecord | null>(null)
@@ -59,10 +61,16 @@ export default function ClientErrorsScreen() {
 
   async function exportCurrentView() {
     if (!activeCrawlId) return
+    setExportMessage(null)
     let f: Record<string, unknown> = { statusCategory: '4xx' }
     if (statusFilter && statusFilter !== 'other') f.statusCode = Number(statusFilter)
     if (statusFilter === 'other') f.excludedStatusCodes = [403, 404, 410]
-    await window.crawldesk.exports.exportUrls({ crawlId: activeCrawlId, filtered: true, filters: f })
+    try {
+      const result = await window.crawldesk.exports.exportUrls({ crawlId: activeCrawlId, filtered: true, filters: f })
+      setExportMessage(`Exported ${Number(result?.rowCount ?? 0).toLocaleString('en-US')} client error URLs.`)
+    } catch (e: any) {
+      setExportMessage(e?.message || 'Failed to export client errors.')
+    }
   }
 
   function priorityLabel(inlinks?: number | null): { label: string; className: string } {
@@ -88,10 +96,10 @@ export default function ClientErrorsScreen() {
       <h1 className="text-[30px] font-bold text-primary-text tracking-tight mb-2">Client Errors</h1>
       <p className="text-sm text-primary-muted mb-6">Pages returning 4xx status codes — sorted by priority based on inlink count.</p>
 
-      {loadError && (
-        <div className="mb-4 rounded-xl p-3 bg-[#3b171b] border border-red-900 text-red-400 text-sm flex items-center justify-between">
-          <span>{loadError}</span>
-          <button onClick={loadUrls} className="btn-secondary !py-1.5 !px-3 text-xs ml-4">Retry</button>
+      {loadError && <ErrorBanner message={loadError} onRetry={loadUrls} />}
+      {exportMessage && (
+        <div className="mb-4 rounded-lg border border-lumen bg-panel-dark px-3 py-2 text-sm text-primary-muted">
+          {exportMessage}
         </div>
       )}
 
@@ -102,7 +110,7 @@ export default function ClientErrorsScreen() {
             {tab.label}
           </button>
         ))}
-        <label className="ml-auto flex items-center gap-2 text-sm text-primary-muted cursor-pointer select-none">
+        <label className="sm:ml-auto flex items-center gap-2 text-sm text-primary-muted cursor-pointer select-none">
           <input type="checkbox" checked={sortByPriority} onChange={e => setSortByPriority(e.target.checked)} className="accent-teal-accent" />
           Sort by priority
         </label>

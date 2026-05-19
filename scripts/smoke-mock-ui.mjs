@@ -377,11 +377,20 @@ async function runSmoke() {
     await page.waitForFunction(() => document.body.textContent?.includes('Client Errors'))
     await page.waitForFunction(() => document.body.textContent?.includes('404'))
     record('client errors screen shows 4xx rows', await bodyIncludes(page, '404'))
+    await clickText(page, 'Export CSV', 'button')
+    await page.waitForFunction(() => document.body.textContent?.includes('client error URLs'))
+    record('client errors export shows completion', await bodyIncludes(page, 'client error URLs'))
 
     await clickText(page, 'Content Audit', 'button')
     await page.waitForFunction(() => document.body.textContent?.includes('Pages Analyzed'))
     await page.waitForFunction(() => document.body.textContent?.includes('Zip Line Experience'))
     record('content audit screen shows readability data', await bodyIncludes(page, 'Zip Line Experience'))
+    await fillByPlaceholder(page, 'Filter content pages', 'corporate')
+    await page.waitForFunction(() => {
+      const text = document.body.textContent || ''
+      return text.includes('Corporate Team Building') && text.includes('Showing 1 of') && !text.includes('Zip Line Experience')
+    })
+    record('content audit filter narrows rows', await bodyIncludes(page, 'Corporate Team Building'))
 
     await clickText(page, 'Links', 'button')
     await page.waitForFunction(() => document.body.textContent?.includes('Broken Links'))

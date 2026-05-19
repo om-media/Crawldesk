@@ -43,6 +43,7 @@ export default function ContentAuditScreen() {
   const [audit, setAudit] = useState<ContentAuditResult | null>(null)
   const [loading, setLoading] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [filterText, setFilterText] = useState('')
 
   useEffect(() => { loadAudit() }, [activeCrawlId])
 
@@ -70,10 +71,23 @@ export default function ContentAuditScreen() {
   )
 
   const pages = audit?.pages || []
+  const filteredPages = pages.filter(page => {
+    const query = filterText.trim().toLowerCase()
+    if (!query) return true
+    return [page.url, page.title || '', page.readingLevel].join(' ').toLowerCase().includes(query)
+  })
 
   return (
     <div>
-      <h1 className="mb-6 text-[30px] font-bold leading-none tracking-tight text-primary-text">Content Audit</h1>
+      <div className="mb-6 flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-[30px] font-bold leading-none tracking-tight text-primary-text">Content Audit</h1>
+          <p className="mt-2 text-sm text-primary-muted">Readability, thin content, and page copy quality for crawled HTML pages.</p>
+        </div>
+        <button type="button" onClick={loadAudit} className="btn-secondary text-sm" disabled={loading}>
+          {loading ? 'Refreshing...' : 'Refresh'}
+        </button>
+      </div>
 
       {loadError && <ErrorBanner message={loadError} onRetry={loadAudit} />}
 
@@ -104,6 +118,25 @@ export default function ContentAuditScreen() {
           <p className="mt-2 text-sm text-primary-muted">Only successful HTML pages with extracted text are included.</p>
         </div>
       ) : (
+        <>
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <input
+            type="text"
+            placeholder="Filter content pages..."
+            value={filterText}
+            onChange={event => setFilterText(event.target.value)}
+            className="input-field !w-full max-w-sm"
+          />
+          <span className="text-xs text-primary-muted">
+            Showing {filteredPages.length.toLocaleString('en-US')} of {pages.length.toLocaleString('en-US')} pages
+          </span>
+        </div>
+        {filteredPages.length === 0 ? (
+          <div className="rounded-lg border border-lumen bg-panel-dark py-10 text-center">
+            <p className="text-primary-text">No content pages match this filter.</p>
+            <p className="mt-2 text-sm text-primary-muted">Search by URL, title, or reading level.</p>
+          </div>
+      ) : (
         <table className="w-full overflow-hidden rounded-lg border border-lumen bg-panel-dark text-left text-sm">
           <thead>
             <tr className="border-b border-lumen">
@@ -116,7 +149,7 @@ export default function ContentAuditScreen() {
             </tr>
           </thead>
           <tbody>
-            {pages.map(page => (
+            {filteredPages.map(page => (
               <tr key={page.urlId} className="border-b border-lumen hover:bg-[#0c1820]">
                 <td className="px-4 py-2">
                   <div className="max-w-[720px] truncate text-primary-text">{page.title || page.url}</div>
@@ -131,6 +164,8 @@ export default function ContentAuditScreen() {
             ))}
           </tbody>
         </table>
+      )}
+      </>
       )}
     </div>
   )
