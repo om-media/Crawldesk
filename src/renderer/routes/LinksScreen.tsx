@@ -11,6 +11,7 @@ export default function LinksScreen() {
   const [filterInternal, setFilterInternal] = useState<boolean | null>(null)
   const [page, setPage] = useState(0)
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [exportMessage, setExportMessage] = useState('')
   const [loading, setLoading] = useState(true)
   const pageSize = 50
 
@@ -44,6 +45,25 @@ export default function LinksScreen() {
   }
 
   async function retry() { setLoadError(null); loadLinks() }
+
+  function applyInternalFilter(value: boolean | null) {
+    setFilterInternal(value)
+    setPage(0)
+  }
+
+  async function exportVisibleLinks() {
+    if (!activeCrawlId) return
+    setExportMessage('Exporting links...')
+    try {
+      const result = await window.crawldesk.exports.exportLinks({
+        crawlId: activeCrawlId,
+        filters: filterInternal !== null ? { isInternal: filterInternal } : {},
+      })
+      setExportMessage(`Exported ${result.rowCount} links to ${result.filePath}`)
+    } catch (err: any) {
+      setExportMessage(err?.message || 'Failed to export links')
+    }
+  }
 
   if (!activeCrawlId) return (
     <div className="rounded-xl border border-lumen bg-panel-dark p-6 shadow-lg py-16 text-center">
@@ -100,11 +120,22 @@ export default function LinksScreen() {
           </div>
           {/* Filters + Export */}
           <div className="flex items-center gap-3 mb-4">
-            <button onClick={() => setFilterInternal(null)} className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${filterInternal === null ? 'bg-teal-accent text-white' : 'text-primary-muted hover:text-primary-text'}`}>All</button>
-            <button onClick={() => setFilterInternal(true)} className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${filterInternal === true ? 'bg-teal-accent text-white' : 'text-primary-muted hover:text-primary-text'}`}>Internal</button>
-            <button onClick={() => setFilterInternal(false)} className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${filterInternal === false ? 'bg-teal-accent text-white' : 'text-primary-muted hover:text-primary-text'}`}>External</button>
-            <button onClick={async () => { if (activeCrawlId) await window.crawldesk.exports.exportLinks({ crawlId: activeCrawlId }) }} className="btn-primary ml-auto">Export CSV</button>
+            <button onClick={() => applyInternalFilter(null)} className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${filterInternal === null ? 'bg-teal-accent text-white' : 'text-primary-muted hover:text-primary-text'}`}>All</button>
+            <button onClick={() => applyInternalFilter(true)} className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${filterInternal === true ? 'bg-teal-accent text-white' : 'text-primary-muted hover:text-primary-text'}`}>Internal</button>
+            <button onClick={() => applyInternalFilter(false)} className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${filterInternal === false ? 'bg-teal-accent text-white' : 'text-primary-muted hover:text-primary-text'}`}>External</button>
+            <button onClick={exportVisibleLinks} className="btn-primary ml-auto">Export CSV</button>
           </div>
+          {exportMessage && (
+            <div className={`mb-4 rounded-lg border p-3 text-sm ${
+              exportMessage.startsWith('Exported')
+                ? 'bg-emerald/10 border-emerald/30 text-emerald'
+                : exportMessage.startsWith('Exporting')
+                  ? 'bg-midnight/40 border-lumen text-primary-muted'
+                  : 'bg-red-500/10 border-red-900 text-red-400'
+            }`}>
+              {exportMessage}
+            </div>
+          )}
           {anchorSummary.length > 0 && (
             <div className="mb-6 border border-lumen rounded-lg bg-panel-dark overflow-hidden">
               <div className="px-4 py-3 border-b border-lumen">

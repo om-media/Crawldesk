@@ -371,9 +371,13 @@ async function runSmoke() {
     await page.waitForFunction(() => document.body.textContent?.includes('Broken Links'))
     const linkRowsAll = await visibleRows(page)
     record('links screen shows link data', linkRowsAll > 0, `${linkRowsAll} visible rows`)
+    await page.waitForFunction(() => document.body.textContent?.includes('Top Anchor Text') && document.body.textContent?.includes('click here'))
+    record('links screen shows anchor text summary', await bodyIncludes(page, 'Top Anchor Text') && await bodyIncludes(page, 'click here'))
 
     await clickText(page, 'Internal', 'button')
     await page.waitForFunction(() => document.body.textContent?.includes('Internal Links'))
+    const internalPageLabel = await page.evaluate(() => document.body.textContent?.includes('Page 1 of'))
+    record('links internal filter resets to first page', internalPageLabel)
     const internalCellsOk = await page.evaluate(() => {
       const rows = Array.from(document.querySelectorAll('tbody tr')).filter((row) => {
         const firstCell = row.querySelector('td')
@@ -385,6 +389,9 @@ async function runSmoke() {
       })
     })
     record('internal link filter applies', internalCellsOk)
+    await clickText(page, 'Export CSV', 'button')
+    await page.waitForFunction(() => document.body.textContent?.includes('Exported 1834 links'))
+    record('links screen export shows completion', await bodyIncludes(page, 'Exported 1834 links'))
 
     await clickText(page, 'Keywords', 'button')
     await page.waitForFunction(() => document.body.textContent?.includes('Total Words Analyzed'))
