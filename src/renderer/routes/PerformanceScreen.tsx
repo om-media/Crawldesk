@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
-import { useProjectStore } from '../stores/project-store'
+import ErrorBanner from '../components/ErrorBanner'
+import { useResolvedCrawl } from '../hooks/use-resolved-crawl'
 
 
 interface PsiRow {
@@ -39,7 +40,7 @@ function cwvStatus(value: number | null, thresholdGood: number, thresholdPoor: n
 }
 
 export default function PerformanceScreen() {
-  const { activeCrawlId } = useProjectStore()
+  const { activeCrawlId, resolvingCrawl, resolveError } = useResolvedCrawl()
   const [results, setResults] = useState<PsiRow[]>([])
   const [summary, setSummary] = useState<PsiSummary | null>(null)
   const [loading, setLoading] = useState(false)
@@ -72,19 +73,27 @@ export default function PerformanceScreen() {
 
   if (!activeCrawlId) return (
     <div className="card py-16 text-center">
-      <p className="text-lg font-semibold text-primary-muted">No performance data yet.</p>
-      <p className="text-sm text-primary-muted mt-2">Run a crawl first to collect response timing and page size metrics.</p>
+      <p className="text-lg font-semibold text-primary-muted">{resolvingCrawl ? 'Loading latest crawl...' : 'No performance data yet.'}</p>
+      <p className="text-sm text-primary-muted mt-2">{resolveError || (resolvingCrawl ? 'Finding the most recent crawl with performance data.' : 'Run a crawl first to collect response timing and page size metrics.')}</p>
     </div>
   )
 
   return (
     <div>
-      <h1 className="text-[30px] leading-none tracking-tight font-bold text-primary-text mb-6">Performance</h1>
-      {error && <div className="bg-[#3b171b] border border-red-900 rounded-lg p-3 text-sm text-red-400 mb-4">{error}</div>}
+      <div className="mb-6 flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-[30px] leading-none tracking-tight font-bold text-primary-text">Performance</h1>
+          <p className="mt-2 text-sm text-primary-muted">Response timing, payload size, and estimated page weight impact for crawled URLs.</p>
+        </div>
+        <button type="button" onClick={loadData} className="btn-secondary text-sm" disabled={loading}>
+          {loading ? 'Refreshing...' : 'Refresh'}
+        </button>
+      </div>
+      {error && <ErrorBanner message={error} onRetry={loadData} />}
 
       {/* Summary cards */}
       {summary && summary.totalUrlsWithPsi > 0 && (
-        <div className="grid grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
           {[
             { label: 'Performance', value: summary.avgPerformance },
             { label: 'Accessibility', value: summary.avgAccessibility },
@@ -103,7 +112,7 @@ export default function PerformanceScreen() {
 
       {/* CWV averages */}
       {summary && summary.totalUrlsWithPsi > 0 && (
-        <div className="grid grid-cols-3 gap-4 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
           <div className="card p-4 flex items-center gap-3">
             <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-teal-accent/15 text-teal-accent text-sm font-bold">L</span>
             <div>
@@ -134,7 +143,7 @@ export default function PerformanceScreen() {
 
       {/* Stats row */}
       <div className="kpi-card mb-6">
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="flex items-center gap-3">
             <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-teal-accent/15 text-teal-accent">P</span>
             <div>
@@ -160,7 +169,7 @@ export default function PerformanceScreen() {
           placeholder="Filter by URL..."
           value={filterText}
           onChange={e => setFilterText(e.target.value)}
-          className="w-full max-w-sm px-3 py-2 rounded-lg bg-sidebar border border-lumen text-sm text-primary-text focus:outline-none focus:border-teal-accent"
+          className="input-field !w-full max-w-sm"
         />
       </div>
 

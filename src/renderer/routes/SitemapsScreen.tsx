@@ -34,6 +34,7 @@ export default function SitemapsScreen() {
   const [loading, setLoading] = useState(false)
   const [affectedLoading, setAffectedLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [affectedError, setAffectedError] = useState<string | null>(null)
 
   useEffect(() => {
     loadOverview()
@@ -68,6 +69,7 @@ export default function SitemapsScreen() {
   async function loadAffectedUrls(issueType: SitemapIssueType) {
     if (!activeCrawlId) return
     setAffectedLoading(true)
+    setAffectedError(null)
     try {
       const result = await window.crawldesk.issues.list({
         crawlId: activeCrawlId,
@@ -81,6 +83,7 @@ export default function SitemapsScreen() {
       console.error('[Sitemaps] Failed to load affected URLs:', e)
       setAffectedUrls([])
       setAffectedTotal(0)
+      setAffectedError('Failed to load affected sitemap URLs.')
     } finally {
       setAffectedLoading(false)
     }
@@ -120,19 +123,27 @@ export default function SitemapsScreen() {
             Compare discovered sitemap URLs with what the crawl actually reached and indexed.
           </p>
         </div>
-        <button type="button" onClick={loadOverview} className="btn-secondary text-sm" disabled={loading}>
+        <button
+          type="button"
+          onClick={() => {
+            loadOverview()
+            loadAffectedUrls(selectedType)
+          }}
+          className="btn-secondary text-sm"
+          disabled={loading || affectedLoading}
+        >
           {loading ? 'Refreshing...' : 'Refresh'}
         </button>
       </div>
 
-      <div className="grid grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
         <MetricCard label="Crawled URLs" value={urlSummary?.totalUrls ?? 0} />
         <MetricCard label="Indexable URLs" value={urlSummary?.indexableUrls ?? 0} />
         <MetricCard label="Non-indexable URLs" value={urlSummary?.nonIndexableUrls ?? 0} />
         <MetricCard label="Sitemap Issues" value={totalSitemapIssues} tone={totalSitemapIssues > 0 ? 'warning' : 'good'} />
       </div>
 
-      <div className="grid grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
         {SITEMAP_ISSUE_TYPES.map((type) => (
           <button
             key={type}
@@ -157,7 +168,11 @@ export default function SitemapsScreen() {
           {affectedLoading && <div className="animate-spin h-4 w-4 border border-teal-accent border-t-transparent rounded-full" />}
         </div>
 
-        {affectedUrls.length === 0 && !affectedLoading ? (
+        {affectedError ? (
+          <div className="p-4">
+            <ErrorBanner message={affectedError} onRetry={() => loadAffectedUrls(selectedType)} />
+          </div>
+        ) : affectedUrls.length === 0 && !affectedLoading ? (
           <div className="py-12 text-center">
             <p className="text-sm font-semibold text-primary-text">No sitemap discrepancies found for this group.</p>
             <p className="mt-2 text-sm text-primary-muted">
