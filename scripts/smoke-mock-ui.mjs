@@ -550,6 +550,21 @@ async function runSmoke() {
       }
     })
     record('schedules screen edits an existing schedule with crawl settings', scheduleEditState.edited, JSON.stringify(scheduleEditState))
+    await clickText(page, 'Duplicate', 'button')
+    await page.waitForFunction(() => document.body.textContent?.includes('Schedule duplicated.'))
+    const scheduleDuplicateState = await page.evaluate(async () => {
+      const rows = await window.crawldesk.schedules.list('1')
+      const duplicates = rows.filter((row) => row.start_url === 'https://avanterrapark.com/smoke-schedule-edited' && row.cron_expression === '0 */6 * * *')
+      return {
+        count: rows.length,
+        duplicates: duplicates.length,
+        copiedSettings: duplicates.every((row) => {
+          const settings = JSON.parse(row.crawl_settings_json || '{}')
+          return settings.maxUrls === 8 && settings.maxDepth === 1 && settings.concurrency === 2
+        }),
+      }
+    })
+    record('schedules screen duplicates a tuned schedule', scheduleDuplicateState.duplicates === 2 && scheduleDuplicateState.copiedSettings, JSON.stringify(scheduleDuplicateState))
     await clickText(page, 'Run now', 'button')
     await page.waitForFunction(() => document.body.textContent?.includes('Started scheduled crawl #'))
     const manualScheduleRunState = await page.evaluate(async () => {

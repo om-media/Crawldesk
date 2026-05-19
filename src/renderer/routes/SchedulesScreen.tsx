@@ -94,6 +94,7 @@ export default function SchedulesScreen() {
   const [editForm, setEditForm] = useState<ScheduleForm>(defaultScheduleForm)
   const [saving, setSaving] = useState(false)
   const [updatingScheduleId, setUpdatingScheduleId] = useState<string | null>(null)
+  const [duplicatingScheduleId, setDuplicatingScheduleId] = useState<string | null>(null)
   const [runningScheduleId, setRunningScheduleId] = useState<string | null>(null)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
@@ -207,6 +208,28 @@ export default function SchedulesScreen() {
       setError(err?.message || 'Failed to update schedule')
     } finally {
       setUpdatingScheduleId(null)
+    }
+  }
+
+  async function duplicateSchedule(schedule: Schedule) {
+    setError('')
+    setNotice('')
+    if (!selectedProjectId) { setError('Select a project before duplicating a schedule.'); return }
+    setDuplicatingScheduleId(schedule.id)
+    try {
+      await window.crawldesk.schedules.create({
+        projectId: selectedProjectId,
+        startUrl: schedule.start_url,
+        crawlSettingsJson: schedule.crawl_settings_json || '{}',
+        cronExpression: schedule.cron_expression,
+      })
+      setNotice('Schedule duplicated.')
+      await loadSchedules()
+    } catch (err: any) {
+      console.error('[Schedules] Duplicate failed:', err.message)
+      setError(err?.message || 'Failed to duplicate schedule')
+    } finally {
+      setDuplicatingScheduleId(null)
     }
   }
 
@@ -350,6 +373,9 @@ export default function SchedulesScreen() {
                   {runningScheduleId === s.id ? 'Starting...' : 'Run now'}
                 </button>
                 <button onClick={() => startEditing(s)} className="btn-secondary !py-1.5 !px-3 text-xs">Edit</button>
+                <button onClick={() => duplicateSchedule(s)} disabled={duplicatingScheduleId === s.id} className="btn-secondary !py-1.5 !px-3 text-xs">
+                  {duplicatingScheduleId === s.id ? 'Copying...' : 'Duplicate'}
+                </button>
                 <button onClick={() => toggleEnabled(s.id, !s.enabled)} className={`btn-secondary !py-1.5 !px-3 text-xs ${s.enabled ? '' : '!opacity-60'}`}>
                   {s.enabled ? 'Disable' : 'Enable'}
                 </button>
