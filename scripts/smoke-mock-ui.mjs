@@ -99,6 +99,28 @@ async function clickText(page, text, selector = 'button,a,[role="button"],.card'
   await page.mouse.click(box.x, box.y)
 }
 
+async function fillByLabel(page, labelText, value, selector = 'input,textarea') {
+  const filled = await page.evaluate(({ labelText, value, selector }) => {
+    const needle = labelText.toLowerCase()
+    const label = Array.from(document.querySelectorAll('label')).find((element) => {
+      const text = element.textContent?.replace(/\s+/g, ' ').trim().toLowerCase() || ''
+      return text.includes(needle)
+    })
+    const input = label?.parentElement?.querySelector(selector)
+    if (!(input instanceof HTMLInputElement || input instanceof HTMLTextAreaElement)) return false
+
+    const prototype = input instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype
+    const valueSetter = Object.getOwnPropertyDescriptor(prototype, 'value')?.set
+    valueSetter?.call(input, value)
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+    input.dispatchEvent(new Event('change', { bubbles: true }))
+    input.blur()
+    return true
+  }, { labelText, value, selector })
+
+  if (!filled) throw new Error(`Could not fill field labelled: ${labelText}`)
+}
+
 async function bodyIncludes(page, text) {
   return page.evaluate((expected) => document.body.textContent?.includes(expected) ?? false, text)
 }
@@ -186,9 +208,39 @@ async function runSmoke() {
 
     await clickText(page, 'Crawl Setup', 'button')
     await page.waitForFunction(() => document.body.textContent?.includes('Target Website'))
+    await fillByLabel(page, 'Exclude Patterns', '*/tag/*\n*.pdf$')
+    await fillByLabel(page, 'Allowed Hostnames', 'blog.avanterrapark.com')
+    await fillByLabel(page, 'Blocked Hostnames', 'staging.avanterrapark.com')
+    await fillByLabel(page, 'Max URL Length', '2048', 'input')
+    await fillByLabel(page, 'Custom Request Headers', 'X-CrawlDesk-Smoke: open\nX-Preview-Token: abc123')
     await clickText(page, 'Start Crawl', 'form button')
     await page.waitForFunction(() => document.body.textContent?.includes('Live Crawl'))
     await page.waitForFunction(() => document.body.textContent?.includes('Running') || document.body.textContent?.includes('Waiting for first results'))
+    const submittedCrawlSettings = await page.evaluate(async () => {
+      const crawls = await window.crawldesk.crawls.listByProject('1')
+      const crawl = crawls[crawls.length - 1]
+      return JSON.parse(crawl?.settings_json || '{}')
+    })
+    record(
+      'crawl setup submits host scope controls',
+      submittedCrawlSettings.excludePatterns?.includes('*/tag/*') &&
+        submittedCrawlSettings.excludePatterns?.includes('*.pdf$') &&
+        submittedCrawlSettings.allowedHostnames?.includes('blog.avanterrapark.com') &&
+        submittedCrawlSettings.blockedHostnames?.includes('staging.avanterrapark.com') &&
+        submittedCrawlSettings.maxUrlLength === 2048,
+      JSON.stringify({
+        excludePatterns: submittedCrawlSettings.excludePatterns,
+        allowedHostnames: submittedCrawlSettings.allowedHostnames,
+        blockedHostnames: submittedCrawlSettings.blockedHostnames,
+        maxUrlLength: submittedCrawlSettings.maxUrlLength,
+      }),
+    )
+    record(
+      'crawl setup submits custom request headers',
+      submittedCrawlSettings.customHeaders?.['X-CrawlDesk-Smoke'] === 'open' &&
+        submittedCrawlSettings.customHeaders?.['X-Preview-Token'] === 'abc123',
+      JSON.stringify(submittedCrawlSettings.customHeaders),
+    )
     const liveCrawlState = await page.evaluate(() => {
       const text = document.body.textContent || ''
       const cards = Array.from(document.querySelectorAll('.kpi-card')).map((card) => card.textContent?.replace(/\s+/g, ' ').trim() || '')

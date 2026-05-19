@@ -24,12 +24,17 @@ export interface CrawlSettingsInput {
   concurrency: number
   requestTimeoutMs: number
   respectRobotsTxt: boolean
+  respectSitemaps: boolean
   crawlSubdomains: boolean
   checkExternalLinks: boolean
   crawlExternalLinks: boolean
   userAgent: string
   includePatterns: string[]
   excludePatterns: string[]
+  allowedHostnames: string[]
+  blockedHostnames: string[]
+  maxUrlLength: number
+  customHeaders: Record<string, string> | Array<{ name: string; value: string }> | null
 }
 
 export interface CrawlProgress {
@@ -52,14 +57,16 @@ export interface CrawlSummary {
   durationSeconds: number
 }
 
-export const DEFAULT_CRAWL_SETTINGS: Omit<CrawlSettingsInput, 'includePatterns' | 'excludePatterns'> = {
+export const DEFAULT_CRAWL_SETTINGS: Omit<CrawlSettingsInput, 'includePatterns' | 'excludePatterns' | 'allowedHostnames' | 'blockedHostnames' | 'customHeaders'> = {
   maxUrls: 10000,
   maxDepth: 10,
   concurrency: 10,
   requestTimeoutMs: 15000,
   respectRobotsTxt: true,
+  respectSitemaps: true,
   crawlSubdomains: false,
   checkExternalLinks: true,
   crawlExternalLinks: false,
-  userAgent: 'CrawlDeskBot/0.1 (+https://example.com/bot)'
+  userAgent: 'CrawlDeskBot/0.1 (+https://example.com/bot)',
+  maxUrlLength: 2048,
 } as const

@@ -5,6 +5,36 @@ import { DEFAULT_CRAWL_SETTINGS } from '@shared/types/crawl'
 
 interface Props { onComplete: () => void }
 
+function lines(value: string) {
+  return value.split(/\r?\n/).map(line => line.trim()).filter(Boolean)
+}
+
+function parseCustomHeaders(value: string) {
+  const trimmed = value.trim()
+  if (!trimmed) return null
+
+  if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+    return JSON.parse(trimmed)
+  }
+
+  const headers: Record<string, string> = {}
+  for (const line of lines(value)) {
+    const separator = line.indexOf(':')
+    if (separator <= 0) {
+      throw new Error(`Invalid custom header line: ${line}`)
+    }
+
+    const name = line.slice(0, separator).trim()
+    const headerValue = line.slice(separator + 1).trim()
+    if (!name || !headerValue) {
+      throw new Error(`Invalid custom header line: ${line}`)
+    }
+    headers[name] = headerValue
+  }
+
+  return Object.keys(headers).length > 0 ? headers : null
+}
+
 export default function CrawlSetup({ onComplete }: Props) {
   const { selectedProjectId, setActiveCrawlId, projects } = useProjectStore()
   const resetCrawlProgress = useCrawlStore(s => s.reset)
@@ -24,6 +54,10 @@ export default function CrawlSetup({ onComplete }: Props) {
     userAgent: DEFAULT_CRAWL_SETTINGS.userAgent,
     includePatterns: '',
     excludePatterns: '',
+    allowedHostnames: '',
+    blockedHostnames: '',
+    maxUrlLength: DEFAULT_CRAWL_SETTINGS.maxUrlLength,
+    customHeaders: '',
   })
 
   // Pre-fill start URL from project's root_url
@@ -47,13 +81,29 @@ export default function CrawlSetup({ onComplete }: Props) {
     try { new URL(settings.startUrl) } catch { setError('Invalid start URL'); return }
     if (settings.concurrency > 20) { setError('Concurrency cannot exceed 20 in this version.'); return }
     if (settings.maxUrls < 1 || settings.maxUrls > 500000) { setError('Max URLs must be between 1 and 500,000.'); return }
+    if (settings.maxUrlLength < 256 || settings.maxUrlLength > 8192) {
+      setError('Max URL length must be between 256 and 8,192.')
+      return
+    }
 
     setCreating(true)
     try {
       resetCrawlProgress()
-      const includePats = settings.includePatterns.split('\n').filter(Boolean).map(s => s.trim())
-      const excludePats = settings.excludePatterns.split('\n').filter(Boolean).map(s => s.trim())
-      const payload = { ...settings, startUrl: settings.startUrl, includePatterns: includePats, excludePatterns: excludePats }
+      const includePats = lines(settings.includePatterns)
+      const excludePats = lines(settings.excludePatterns)
+      const allowedHostnames = lines(settings.allowedHostnames)
+      const blockedHostnames = lines(settings.blockedHostnames)
+      const customHeaders = parseCustomHeaders(settings.customHeaders)
+      const payload = {
+        ...settings,
+        startUrl: settings.startUrl,
+        includePatterns: includePats,
+        excludePatterns: excludePats,
+        allowedHostnames,
+        blockedHostnames,
+        maxUrlLength: settings.maxUrlLength,
+        customHeaders,
+      }
       const crawl = await window.crawldesk.crawls.create(selectedProjectId, payload)
       setActiveCrawlId(crawl.id)
       updateProgress({
@@ -75,7 +125,6 @@ export default function CrawlSetup({ onComplete }: Props) {
     }
   }
 
-  const toggle = (key: string) => () => setSettings(s => ({ ...s, [key]: !s[key as keyof typeof s] }))
   const input = (key: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
     setSettings(s => ({ ...s, [key]: e.target.value }))
 
@@ -101,6 +150,7 @@ export default function CrawlSetup({ onComplete }: Props) {
           <div className="kpi-card"><label className="block text-xs font-medium text-primary-muted uppercase tracking-wider mb-1">Max Depth</label><input type="number" value={settings.maxDepth} onChange={numInput('maxDepth')} min={0} max={20} className="!text-lg font-semibold input-field text-primary-text" /></div>
           <div className="kpi-card"><label className="block text-xs font-medium text-primary-muted uppercase tracking-wider mb-1">Concurrency (max 20)</label><input type="number" value={settings.concurrency} onChange={numInput('concurrency')} min={1} max={20} className="!text-lg font-semibold input-field text-primary-text" /></div>
           <div className="kpi-card"><label className="block text-xs font-medium text-primary-muted uppercase tracking-wider mb-1">Timeout (ms)</label><input type="number" value={settings.requestTimeoutMs} onChange={numInput('requestTimeoutMs')} min={1000} max={60000} step={1000} className="!text-lg font-semibold input-field text-primary-text" /></div>
+          <div className="kpi-card"><label className="block text-xs font-medium text-primary-muted uppercase tracking-wider mb-1">Max URL Length</label><input type="number" value={settings.maxUrlLength} onChange={numInput('maxUrlLength')} min={256} max={8192} step={128} className="!text-lg font-semibold input-field text-primary-text" /></div>
         </div>
 
         {/* Toggles */}
@@ -132,6 +182,18 @@ export default function CrawlSetup({ onComplete }: Props) {
         <div className="grid grid-cols-2 gap-4">
           <div><label className="block text-xs font-medium text-primary-muted uppercase tracking-wider mb-1">Include Patterns (one per line)</label><textarea rows={3} value={settings.includePatterns} onChange={input('includePatterns')} placeholder="/blog/*" className="input-field" /></div>
           <div><label className="block text-xs font-medium text-primary-muted uppercase tracking-wider mb-1">Exclude Patterns (one per line)</label><textarea rows={3} value={settings.excludePatterns} onChange={input('excludePatterns')} placeholder="*/tag/*" className="input-field" /></div>
+        </div>
+
+        {/* Host Scope */}
+        <div className="grid grid-cols-2 gap-4">
+          <div><label className="block text-xs font-medium text-primary-muted uppercase tracking-wider mb-1">Allowed Hostnames</label><textarea rows={3} value={settings.allowedHostnames} onChange={input('allowedHostnames')} placeholder="blog.example.com" className="input-field" /></div>
+          <div><label className="block text-xs font-medium text-primary-muted uppercase tracking-wider mb-1">Blocked Hostnames</label><textarea rows={3} value={settings.blockedHostnames} onChange={input('blockedHostnames')} placeholder="staging.example.com" className="input-field" /></div>
+        </div>
+
+        {/* Headers */}
+        <div className="kpi-card">
+          <label className="block text-xs font-medium text-primary-muted uppercase tracking-wider mb-1">Custom Request Headers</label>
+          <textarea rows={4} value={settings.customHeaders} onChange={input('customHeaders')} placeholder={'X-Preview-Token: abc123\nX-CrawlDesk-Smoke: open'} className="input-field font-mono text-sm" />
         </div>
 
         <button type="submit" disabled={creating} className="btn-primary w-full py-3 text-base">{creating ? 'Starting...' : 'Start Crawl'}</button>
