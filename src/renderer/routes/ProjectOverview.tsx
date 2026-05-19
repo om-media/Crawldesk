@@ -29,6 +29,7 @@ export default function ProjectOverview({ crawlId, onNavigate }: Props) {
   const [recentUrls, setRecentUrls] = useState<any[]>([])
   const [depthDist, setDepthDist] = useState<Record<number, number>>({})
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [sectionErrors, setSectionErrors] = useState<string[]>([])
   const selectedCrawlId = crawlId ?? selectBestCrawlId(crawls as any[])
   const activeCrawl = crawls.find(c => c.id === selectedCrawlId && (c.status === 'running' || c.status === 'paused'))
   const lastCrawl = crawls.find(c => c.id === selectedCrawlId) ?? crawls[0]
@@ -41,19 +42,24 @@ export default function ProjectOverview({ crawlId, onNavigate }: Props) {
   async function loadCrawls() {
     if (!selectedProjectId) return
     setLoadError(null)
+    setSectionErrors([])
     try {
       const list = await window.crawldesk.crawls.listByProject(selectedProjectId)
       setCrawls(list || [])
       if (list?.length > 0) {
         const displayCrawlId = selectBestCrawlId(list as any[]) ?? list[0].id
         let s: any = null
-        try { s = await window.crawldesk.urls.summarize(displayCrawlId); setSummary(s) } catch (e) { console.error('[Overview] Failed to load URL summary:', e) }
-        try { setIssueSummary((await window.crawldesk.issues.summarize(displayCrawlId)) || []) } catch (e) { console.error('[Overview] Failed to load issue summary:', e) }
+        const warn = (message: string, error: unknown) => {
+          console.error(`[Overview] ${message}:`, error)
+          setSectionErrors(current => current.includes(message) ? current : [...current, message])
+        }
+        try { s = await window.crawldesk.urls.summarize(displayCrawlId); setSummary(s) } catch (e) { warn('Failed to load URL summary', e) }
+        try { setIssueSummary((await window.crawldesk.issues.summarize(displayCrawlId)) || []) } catch (e) { warn('Failed to load issue summary', e) }
         // Fetch recent URLs for the table
         try {
           const urlsResult = await window.crawldesk.urls.list({ projectId: selectedProjectId, crawlId: displayCrawlId, page: 0, pageSize: 8 })
           setRecentUrls(urlsResult.items || [])
-        } catch (e) { console.error('[Overview] Failed to load recent URLs:', e) }
+        } catch (e) { warn('Failed to load recent URLs', e) }
         // Build depth distribution from summary or URL data
         try {
           const depthData: Record<number, number> = {}
@@ -64,7 +70,7 @@ export default function ProjectOverview({ crawlId, onNavigate }: Props) {
             ;(allForChart.items || []).forEach((u: any) => { depthData[u.depth] = (depthData[u.depth] || 0) + 1 })
           }
           setDepthDist(depthData)
-        } catch (e) { console.error('[Overview] Failed to build depth distribution:', e) }
+        } catch (e) { warn('Failed to build depth distribution', e) }
       }
     } catch (e: any) {
       setLoadError(e?.message || 'Failed to load project data')
@@ -109,6 +115,19 @@ export default function ProjectOverview({ crawlId, onNavigate }: Props) {
 
   return (
     <div className="space-y-5">
+      {loadError && (
+        <div className="bg-[#3b171b] border border-red-900 rounded-lg p-3 text-sm text-red-400">
+          <div className="flex items-center justify-between gap-3">
+            <span>{loadError}</span>
+            <button onClick={retryLoad} className="text-xs font-semibold underline">Retry</button>
+          </div>
+        </div>
+      )}
+      {sectionErrors.length > 0 && (
+        <div className="bg-amber/10 border border-amber/30 rounded-lg p-3 text-sm text-amber">
+          Some overview panels could not load: {sectionErrors.join(', ')}.
+        </div>
+      )}
       {/* Page header */}
       <div className="flex items-start justify-between">
         <div>

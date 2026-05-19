@@ -224,6 +224,22 @@ async function runSmoke() {
     })
     await page.waitForFunction(() => Array.from(document.querySelectorAll('button')).some((button) => button.textContent?.includes('Clear')))
     record('project selection populates toolbar URL', true)
+    await page.waitForFunction(() => document.body.textContent?.includes('Technical health and crawl intelligence'))
+    await page.waitForFunction(() => document.body.textContent?.includes('Recent Crawled URLs') && document.body.textContent?.includes('Page 1 - Avanterra Park'))
+    const overviewState = await page.evaluate(() => {
+      const text = document.body.textContent || ''
+      return {
+        hasTotalUrls: text.includes('Total URLs') && text.includes('247'),
+        hasIndexablePages: text.includes('Indexable Pages'),
+        hasRecentUrls: text.includes('Recent Crawled URLs') && text.includes('https://avanterrapark.com/'),
+        hasTopIssues: text.includes('Top Issues'),
+      }
+    })
+    record(
+      'overview screen shows crawl summary and recent URLs',
+      overviewState.hasTotalUrls && overviewState.hasIndexablePages && overviewState.hasRecentUrls && overviewState.hasTopIssues,
+      JSON.stringify(overviewState),
+    )
 
     await clickText(page, 'Crawl Setup', 'button')
     await page.waitForFunction(() => document.body.textContent?.includes('Target Website'))
