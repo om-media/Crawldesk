@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useProjectStore } from '../stores/project-store'
 import { useCrawlStore } from '../stores/crawl-store'
+import ErrorBanner from '../components/ErrorBanner'
 import type { Route } from '@shared/types/route'
 
 interface Props { onNavigate?: (route: Route) => void }
@@ -14,6 +15,8 @@ export default function ProjectsScreen({ onNavigate }: Props) {
   const [url, setUrl] = useState('')
   const [urlError, setUrlError] = useState('')
   const [loading, setLoading] = useState(true)
+  const [projectSearch, setProjectSearch] = useState('')
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [pendingDelete, setPendingDelete] = useState<any | null>(null)
   const [deleteError, setDeleteError] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
@@ -21,9 +24,11 @@ export default function ProjectsScreen({ onNavigate }: Props) {
   useEffect(() => { loadProjects() }, [])
 
   async function loadProjects() {
+    setLoadError(null)
     try {
       if (!window.crawldesk) {
         console.error('[ProjectsScreen] window.crawldesk is not available!')
+        setLoadError('CrawlDesk bridge is not available.')
         setProjects([])
         return
       }
@@ -31,6 +36,7 @@ export default function ProjectsScreen({ onNavigate }: Props) {
       setProjects(list || [])
     } catch (err) {
       console.error('[ProjectsScreen] Failed to load projects:', err)
+      setLoadError(err instanceof Error ? err.message : 'Failed to load projects.')
     } finally { setLoading(false) }
   }
 
@@ -78,12 +84,20 @@ export default function ProjectsScreen({ onNavigate }: Props) {
 
   if (loading) return <div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-2 border-teal-accent border-t-transparent rounded-full"></div></div>
 
+  const filteredProjects = projects.filter(project => {
+    const query = projectSearch.trim().toLowerCase()
+    if (!query) return true
+    return [project.name, project.root_url].join(' ').toLowerCase().includes(query)
+  })
+
   return (
     <div>
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
         <h1 className="text-[30px] font-bold text-primary-text tracking-tight leading-none">Projects</h1>
         <button onClick={() => setShowModal(true)} className="btn-primary">+ New Project</button>
       </div>
+
+      {loadError && <ErrorBanner message={loadError} onRetry={loadProjects} />}
 
       {projects.length === 0 ? (
         <div className="card text-center py-20" style={{ borderRadius: '14px' }}>
@@ -92,8 +106,26 @@ export default function ProjectsScreen({ onNavigate }: Props) {
           <button onClick={() => setShowModal(true)} className="btn-primary mt-6 px-6 py-3">Create First Project</button>
         </div>
       ) : (
+        <>
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <input
+            type="text"
+            value={projectSearch}
+            onChange={event => setProjectSearch(event.target.value)}
+            placeholder="Filter projects..."
+            className="input-field !w-full max-w-sm"
+          />
+          <span className="text-xs text-primary-muted">
+            Showing {filteredProjects.length.toLocaleString('en-US')} of {projects.length.toLocaleString('en-US')}
+          </span>
+        </div>
+        {filteredProjects.length === 0 ? (
+          <div className="card text-center py-12">
+            <p className="text-primary-text">No projects match this filter.</p>
+          </div>
+        ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {projects.map(p => (
+          {filteredProjects.map(p => (
             <div key={p.id} className={`card hover:border-teal-accent/50 transition-all cursor-pointer ${selectedProjectId === p.id ? '!border-teal-accent !bg-teal-bg/30' : ''}`} onClick={() => openProject(p.id)}>
               <div className="flex items-start justify-between mb-3">
                 <h3 className="font-semibold text-primary-text">{p.name}</h3>
@@ -110,6 +142,8 @@ export default function ProjectsScreen({ onNavigate }: Props) {
             </div>
           ))}
         </div>
+        )}
+        </>
       )}
 
       {/* New Project Modal */}

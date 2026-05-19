@@ -217,6 +217,13 @@ async function runSmoke() {
     })
     record('project delete bridge removes project', deleteProjectWorks)
 
+    await fillByPlaceholder(page, 'Filter projects', 'avanterra')
+    await page.waitForFunction(() => {
+      const text = document.body.textContent || ''
+      return text.includes('Avanterra Park') && text.includes('Showing 1 of')
+    })
+    record('project filter narrows project list', await bodyIncludes(page, 'Showing 1 of'))
+
     await clickText(page, 'Avanterra Park', '.card')
     await page.waitForFunction(() => {
       const input = document.querySelector('.url-field input')

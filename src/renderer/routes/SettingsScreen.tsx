@@ -94,6 +94,10 @@ export default function SettingsScreen() {
     setSaveSuccess(false)
   }
 
+  const databasePath = settings.dataDir || dataPath
+    ? `${settings.dataDir || dataPath}\\${settings.dbFilename || 'crawldesk.sqlite'}`
+    : settings.dbFilename || 'crawldesk.sqlite'
+
   if (loading) {
     return (
       <div className="max-w-2xl">
@@ -106,7 +110,7 @@ export default function SettingsScreen() {
   }
 
   return (
-    <div className="max-w-2xl">
+    <div className="max-w-3xl">
       <h1 className="text-[30px] leading-none tracking-tight font-bold text-primary-text mb-6">Settings</h1>
 
       {loadError && <ErrorBanner message={loadError} onRetry={loadSettings} />}
@@ -124,7 +128,7 @@ export default function SettingsScreen() {
       <div className="card mb-4" style={{ borderRadius: '12px' }}>
         <h2 className="font-semibold text-primary-text mb-3">Data Storage</h2>
         <p className="text-sm text-primary-muted mb-2">All crawl data is stored locally in SQLite.</p>
-        <code className="block bg-midnight border border-lumen rounded-lg p-3 text-xs break-all text-teal-accent">{dataPath}\crawldesk.sqlite</code>
+        <code className="block bg-midnight border border-lumen rounded-lg p-3 text-xs break-all text-teal-accent">{databasePath}</code>
       </div>
 
       {/* Crawl Defaults */}
@@ -133,7 +137,7 @@ export default function SettingsScreen() {
 
         {saveError && <ErrorBanner message={saveError} />}
 
-        <div className="grid grid-cols-2 gap-4 text-sm">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
           <div>
             <label className="block text-xs text-primary-muted uppercase tracking-wider font-semibold mb-1">Default Concurrency</label>
             <input
@@ -200,7 +204,7 @@ export default function SettingsScreen() {
           />
         </div>
 
-        <div className="mt-4 flex items-center gap-3">
+        <div className="mt-4 flex flex-wrap items-center gap-3">
           <button
             onClick={handleSave}
             disabled={saving}
