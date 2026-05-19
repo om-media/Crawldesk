@@ -90,6 +90,7 @@ function formatMs(value?: number | null) {
 
 const PAGE_SIZE = 100
 const DEBOUNCE_MS = 300
+const TABLE_GRID_COLUMNS = 'minmax(260px, 1.6fr) 80px 110px minmax(180px, 1fr) 80px 60px 70px'
 
 const COLUMNS: { key: keyof UrlRecord | string; label: string; sortable: boolean; width: string }[] = [
   { key: 'url', label: 'URL', sortable: true, width: 'minmax(200px, 1fr)' },
@@ -128,7 +129,7 @@ export default function ResultsScreen() {
   const [visibleRange, setVisibleRange] = useState({ start: 0, end: 20 })
   const ROW_HEIGHT = 36
   const tableViewportHeight = urls.length > 0
-    ? Math.min(Math.max(urls.length * ROW_HEIGHT, ROW_HEIGHT * 6), ROW_HEIGHT * 14)
+    ? Math.min(Math.max(urls.length * ROW_HEIGHT, ROW_HEIGHT * 10), ROW_HEIGHT * 20)
     : ROW_HEIGHT * 6
 
   // Total pages
@@ -308,14 +309,16 @@ export default function ResultsScreen() {
       </div>
 
       {/* Table */}
-      <div className="overflow-hidden border border-lumen rounded-lg bg-panel-dark flex flex-col">
+      <div className="min-w-0 overflow-hidden border border-lumen rounded-lg bg-panel-dark flex flex-col">
         {/* Header */}
-        <div className="flex items-center bg-midnight border-b border-row shrink-0" style={{ height: ROW_HEIGHT }}>
+        <div
+          className="grid items-center bg-midnight border-b border-row shrink-0"
+          style={{ height: ROW_HEIGHT, gridTemplateColumns: TABLE_GRID_COLUMNS }}
+        >
           {COLUMNS.map(col => (
             <div
               key={col.key}
-              className={`px-4 py-2 text-xs font-medium text-primary-muted select-none ${col.sortable ? 'cursor-pointer hover:bg-[#112a38]' : ''}`}
-              style={{ width: col.width, minWidth: col.width, maxWidth: col.width === 'minmax(200px, 1fr)' ? undefined : col.width, flex: col.width.includes('minmax') ? 1 : undefined }}
+              className={`min-w-0 truncate px-4 py-2 text-xs font-medium text-primary-muted select-none ${col.sortable ? 'cursor-pointer hover:bg-[#112a38]' : ''}`}
               onClick={col.sortable ? () => toggleSort(col.key) : undefined}
             >
               {col.label}
@@ -329,7 +332,8 @@ export default function ResultsScreen() {
         {/* Virtual-scrolled body */}
         <div
           ref={tableBodyRef}
-          className="overflow-y-auto overflow-x-auto relative"
+          data-results-table-body
+          className="relative overflow-y-auto overflow-x-hidden"
           style={{ contain: 'strict', height: tableViewportHeight }}
         >
           {loading && urls.length === 0 ? (
@@ -345,28 +349,28 @@ export default function ResultsScreen() {
                   <button
                     type="button"
                     key={u.id}
-                    className="absolute left-0 right-0 flex items-center border-b border-row hover:bg-[#0f1f2a] focus:bg-[#0f1f2a] focus:outline-none focus-visible:ring-1 focus-visible:ring-teal-accent cursor-pointer transition-colors text-left"
-                    style={{ top, height: ROW_HEIGHT }}
+                    className="absolute left-0 right-0 grid min-w-0 items-center border-b border-row hover:bg-[#0f1f2a] focus:bg-[#0f1f2a] focus:outline-none focus-visible:ring-1 focus-visible:ring-teal-accent cursor-pointer transition-colors text-left"
+                    style={{ top, height: ROW_HEIGHT, gridTemplateColumns: TABLE_GRID_COLUMNS }}
                     onClick={() => setSelectedUrl(u)}
                     aria-label={`Open URL details for ${u.url}`}
                   >
-                    <div className="px-4 truncate text-primary-text text-sm" style={{ flex: 1, minWidth: 200 }}>
+                    <div className="min-w-0 px-4 truncate text-primary-text text-sm">
                       {u.url}
                     </div>
-                    <div className="px-4 text-sm" style={{ width: 80, minWidth: 80 }}>{statusBadge(u.status_code)}</div>
-                    <div className="px-4 text-sm" style={{ width: 110, minWidth: 110 }}>
+                    <div className="min-w-0 px-4 text-sm">{statusBadge(u.status_code)}</div>
+                    <div className="min-w-0 px-4 text-sm">
                       <span className={`pill ${u.indexability === 'indexable' ? 'pill-success' : u.indexability === 'non_indexable' ? 'pill-error' : ''}`}>
                         {u.indexability || 'unknown'}
                       </span>
                     </div>
-                    <div className="px-4 truncate text-primary-muted text-sm" style={{ width: 200, minWidth: 120, flex: 1 }}>
+                    <div className="min-w-0 px-4 truncate text-primary-muted text-sm">
                       {u.title || '-'}
                     </div>
-                    <div className="px-4 text-primary-text text-sm" style={{ width: 80, minWidth: 80, textAlign: 'right' }}>
+                    <div className="min-w-0 px-4 text-primary-text text-sm text-right">
                       {u.word_count != null ? Number(u.word_count).toLocaleString() : '-'}
                     </div>
-                    <div className="px-4 text-primary-text text-sm" style={{ width: 60, minWidth: 60, textAlign: 'right' }}>{u.depth}</div>
-                    <div className="px-4 text-primary-muted text-sm" style={{ width: 70, minWidth: 70, textAlign: 'right' }}>
+                    <div className="min-w-0 px-4 text-primary-text text-sm text-right">{u.depth}</div>
+                    <div className="min-w-0 px-4 text-primary-muted text-sm text-right">
                       {formatMs(u.response_time_ms)}
                     </div>
                   </button>

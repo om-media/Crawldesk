@@ -218,6 +218,21 @@ async function runSmoke() {
     await page.waitForFunction(() => document.body.textContent?.includes('avanterrapark.com'))
     const resultRows = await visibleRows(page)
     record('results screen shows URL data', resultRows > 0, `${resultRows} visible rows`)
+    const resultsTableOverflow = await page.evaluate(() => {
+      const body = document.querySelector('[data-results-table-body]')
+      return {
+        viewport: document.documentElement.clientWidth,
+        pageScrollWidth: document.documentElement.scrollWidth,
+        tableClientWidth: body?.clientWidth ?? 0,
+        tableScrollWidth: body?.scrollWidth ?? 0,
+      }
+    })
+    record(
+      'results table does not create horizontal overflow',
+      resultsTableOverflow.pageScrollWidth <= resultsTableOverflow.viewport + 1 &&
+        resultsTableOverflow.tableScrollWidth <= resultsTableOverflow.tableClientWidth + 1,
+      JSON.stringify(resultsTableOverflow),
+    )
 
     await clickText(page, 'Issues', 'button')
     await page.waitForFunction(() => document.body.textContent?.includes('Issues Dashboard'))
