@@ -517,13 +517,26 @@ async function runSmoke() {
       }
     })
     record('schedules screen creates a schedule', scheduleState.hasSchedule, JSON.stringify(scheduleState))
+    await clickText(page, 'Edit', 'button')
+    await fillByLabel(page, 'Start URL', 'https://avanterrapark.com/smoke-schedule-edited')
+    await fillByLabel(page, 'Cron Expression', '0 */6 * * *')
+    await clickText(page, 'Save changes', 'button')
+    await page.waitForFunction(() => document.body.textContent?.includes('https://avanterrapark.com/smoke-schedule-edited'))
+    const scheduleEditState = await page.evaluate(async () => {
+      const rows = await window.crawldesk.schedules.list('1')
+      return {
+        count: rows.length,
+        edited: rows.some((row) => row.start_url === 'https://avanterrapark.com/smoke-schedule-edited' && row.cron_expression === '0 */6 * * *'),
+      }
+    })
+    record('schedules screen edits an existing schedule', scheduleEditState.edited, JSON.stringify(scheduleEditState))
     await clickText(page, 'Run now', 'button')
     await page.waitForFunction(() => document.body.textContent?.includes('Started scheduled crawl #'))
     const manualScheduleRunState = await page.evaluate(async () => {
       const rows = await window.crawldesk.schedules.list('1')
       const crawls = await window.crawldesk.crawls.listByProject('1')
       return {
-        hasLastRun: rows.some((row) => row.start_url === 'https://avanterrapark.com/smoke-schedule' && row.last_run_at),
+        hasLastRun: rows.some((row) => row.start_url === 'https://avanterrapark.com/smoke-schedule-edited' && row.last_run_at),
         crawlCount: crawls.length,
       }
     })

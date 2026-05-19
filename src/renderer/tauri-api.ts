@@ -505,6 +505,8 @@ function setupCrawldesk() {
           id: toId(id),
           input: {
             enabled: patch.enabled,
+            startUrl: patch.startUrl,
+            crawlSettingsJson: patch.crawlSettingsJson,
             cronExpression: patch.cronExpression,
           },
         })

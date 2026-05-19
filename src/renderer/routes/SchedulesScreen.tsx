@@ -7,6 +7,7 @@ interface Schedule {
   id: string
   project_id: string
   start_url: string
+  crawl_settings_json?: string
   cron_expression: string
   enabled: number
   last_run_at?: string | null
@@ -73,7 +74,10 @@ export default function SchedulesScreen() {
   const [loading, setLoading] = useState(false)
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState({ startUrl: '', cronExpression: '' })
+  const [editingScheduleId, setEditingScheduleId] = useState<string | null>(null)
+  const [editForm, setEditForm] = useState({ startUrl: '', cronExpression: '' })
   const [saving, setSaving] = useState(false)
+  const [updatingScheduleId, setUpdatingScheduleId] = useState<string | null>(null)
   const [runningScheduleId, setRunningScheduleId] = useState<string | null>(null)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
@@ -123,10 +127,7 @@ export default function SchedulesScreen() {
     e.preventDefault()
     setError('')
     setNotice('')
-    if (!selectedProjectId) { setError('Select a project before creating a schedule.'); return }
-    if (!form.startUrl.trim()) { setError('Start URL is required.'); return }
-    if (!form.cronExpression.trim()) { setError('Cron expression is required.'); return }
-    try { new URL(form.startUrl) } catch { setError('Start URL must be a valid URL.'); return }
+    if (!validateScheduleForm(form, 'creating')) return
     setSaving(true)
     try {
       await window.crawldesk.schedules.create({
@@ -144,6 +145,49 @@ export default function SchedulesScreen() {
       setError(err?.message || 'Failed to create schedule')
     } finally {
       setSaving(false)
+    }
+  }
+
+  function validateScheduleForm(values: { startUrl: string, cronExpression: string }, action: 'creating' | 'updating') {
+    if (!selectedProjectId) { setError(`Select a project before ${action} a schedule.`); return false }
+    if (!values.startUrl.trim()) { setError('Start URL is required.'); return false }
+    if (!values.cronExpression.trim()) { setError('Cron expression is required.'); return false }
+    try { new URL(values.startUrl) } catch { setError('Start URL must be a valid URL.'); return false }
+    return true
+  }
+
+  function startEditing(schedule: Schedule) {
+    setError('')
+    setNotice('')
+    setShowForm(false)
+    setEditingScheduleId(schedule.id)
+    setEditForm({ startUrl: schedule.start_url, cronExpression: schedule.cron_expression })
+  }
+
+  function cancelEditing() {
+    setEditingScheduleId(null)
+    setEditForm({ startUrl: '', cronExpression: '' })
+  }
+
+  async function saveScheduleEdit(schedule: Schedule) {
+    setError('')
+    setNotice('')
+    if (!validateScheduleForm(editForm, 'updating')) return
+    setUpdatingScheduleId(schedule.id)
+    try {
+      await window.crawldesk.schedules.update(schedule.id, {
+        startUrl: editForm.startUrl,
+        crawlSettingsJson: schedule.crawl_settings_json || '{}',
+        cronExpression: editForm.cronExpression,
+      })
+      setEditingScheduleId(null)
+      setNotice('Schedule updated.')
+      await loadSchedules()
+    } catch (err: any) {
+      console.error('[Schedules] Edit failed:', err.message)
+      setError(err?.message || 'Failed to update schedule')
+    } finally {
+      setUpdatingScheduleId(null)
     }
   }
 
@@ -236,31 +280,60 @@ export default function SchedulesScreen() {
         </div>
       )}
 
-      {!loading && schedules.map(s => (
+      {!loading && schedules.map(s => {
+        const isEditing = editingScheduleId === s.id
+        return (
         <div key={s.id} className="card p-4 mb-3 flex flex-col lg:flex-row lg:items-start gap-4" style={{ borderRadius: '12px' }}>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-3 mb-1">
-              <code className="font-mono text-teal-accent text-sm">{s.cron_expression}</code>
-              <span className="text-xs text-primary-muted ml-1">{describeCron(s.cron_expression)}</span>
-              <span className={`text-xs ${s.enabled ? 'text-emerald' : 'text-primary-muted'}`}>{s.enabled ? '● Active' : '○ Disabled'}</span>
+          {isEditing ? (
+            <div className="flex-1 min-w-0 grid grid-cols-1 lg:grid-cols-[minmax(220px,1fr)_minmax(180px,220px)] gap-3">
+              <div>
+                <label className="block text-xs text-primary-muted uppercase tracking-wider mb-1">Start URL</label>
+                <input value={editForm.startUrl} onChange={e => setEditForm(f => ({ ...f, startUrl: e.target.value }))} className="input-field w-full !py-2 !text-sm" required />
+              </div>
+              <div>
+                <label className="block text-xs text-primary-muted uppercase tracking-wider mb-1">Cron Expression</label>
+                <input value={editForm.cronExpression} onChange={e => setEditForm(f => ({ ...f, cronExpression: e.target.value }))} className="input-field w-full !py-2 !text-sm" required />
+                {editForm.cronExpression && <p className="text-xs text-teal-accent mt-1">{describeCron(editForm.cronExpression)}</p>}
+              </div>
             </div>
-            <p className="text-sm text-primary-text truncate">{s.start_url}</p>
-            <p className="text-xs text-primary-muted mt-1">
-              Last run: {s.last_run_at ? new Date(s.last_run_at).toLocaleString('en-US') : 'Never'}
-              {' · '}Next run: {s.next_run_at ? new Date(s.next_run_at).toLocaleString('en-US') : '—'}
-            </p>
-          </div>
+          ) : (
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-3 mb-1">
+                <code className="font-mono text-teal-accent text-sm">{s.cron_expression}</code>
+                <span className="text-xs text-primary-muted ml-1">{describeCron(s.cron_expression)}</span>
+                <span className={`text-xs ${s.enabled ? 'text-emerald' : 'text-primary-muted'}`}>{s.enabled ? '● Active' : '○ Disabled'}</span>
+              </div>
+              <p className="text-sm text-primary-text truncate">{s.start_url}</p>
+              <p className="text-xs text-primary-muted mt-1">
+                Last run: {s.last_run_at ? new Date(s.last_run_at).toLocaleString('en-US') : 'Never'}
+                {' · '}Next run: {s.next_run_at ? new Date(s.next_run_at).toLocaleString('en-US') : '—'}
+              </p>
+            </div>
+          )}
           <div className="flex items-center gap-2 shrink-0">
-            <button onClick={() => runScheduleNow(s.id)} disabled={runningScheduleId === s.id} className="btn-primary !py-1.5 !px-3 text-xs">
-              {runningScheduleId === s.id ? 'Starting...' : 'Run now'}
-            </button>
-            <button onClick={() => toggleEnabled(s.id, !s.enabled)} className={`btn-secondary !py-1.5 !px-3 text-xs ${s.enabled ? '' : '!opacity-60'}`}>
-              {s.enabled ? 'Disable' : 'Enable'}
-            </button>
-            <button onClick={() => deleteSchedule(s.id)} className="btn-secondary !py-1.5 !px-3 text-xs text-red-400 hover:text-red-300">Delete</button>
+            {isEditing ? (
+              <>
+                <button onClick={() => saveScheduleEdit(s)} disabled={updatingScheduleId === s.id} className="btn-primary !py-1.5 !px-3 text-xs">
+                  {updatingScheduleId === s.id ? 'Saving...' : 'Save changes'}
+                </button>
+                <button onClick={cancelEditing} className="btn-secondary !py-1.5 !px-3 text-xs">Cancel</button>
+              </>
+            ) : (
+              <>
+                <button onClick={() => runScheduleNow(s.id)} disabled={runningScheduleId === s.id} className="btn-primary !py-1.5 !px-3 text-xs">
+                  {runningScheduleId === s.id ? 'Starting...' : 'Run now'}
+                </button>
+                <button onClick={() => startEditing(s)} className="btn-secondary !py-1.5 !px-3 text-xs">Edit</button>
+                <button onClick={() => toggleEnabled(s.id, !s.enabled)} className={`btn-secondary !py-1.5 !px-3 text-xs ${s.enabled ? '' : '!opacity-60'}`}>
+                  {s.enabled ? 'Disable' : 'Enable'}
+                </button>
+                <button onClick={() => deleteSchedule(s.id)} className="btn-secondary !py-1.5 !px-3 text-xs text-red-400 hover:text-red-300">Delete</button>
+              </>
+            )}
           </div>
         </div>
-      ))}
+        )
+      })}
 
       {/* Diff Comparison Section */}
       {selectedProjectId && (

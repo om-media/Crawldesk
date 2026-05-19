@@ -749,6 +749,8 @@ export function setupMockCrawldesk() {
         await delay()
         const schedule = MOCK_SCHEDULES.find(schedule => String(schedule.id) === String(id))
         if (!schedule) throw new Error('Crawl schedule not found')
+        if (patch.startUrl !== undefined) schedule.start_url = patch.startUrl
+        if (patch.crawlSettingsJson !== undefined) schedule.crawl_settings_json = patch.crawlSettingsJson || '{}'
         if (patch.cronExpression !== undefined) schedule.cron_expression = patch.cronExpression
         if (patch.enabled !== undefined) {
           schedule.enabled = patch.enabled ? 1 : 0

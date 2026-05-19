@@ -38,6 +38,8 @@ pub struct CreateCrawlScheduleInput {
 #[serde(rename_all = "camelCase")]
 pub struct UpdateCrawlScheduleInput {
     pub enabled: Option<bool>,
+    pub start_url: Option<String>,
+    pub crawl_settings_json: Option<String>,
     pub cron_expression: Option<String>,
 }
 
@@ -158,8 +160,8 @@ async fn run_schedule_now(
     now: DateTime<Utc>,
 ) -> Result<DueScheduleRun, String> {
     let conn = db::get_connection().map_err(|e| e.to_string())?;
-    let schedule = get_schedule(&conn, schedule_id)?
-        .ok_or_else(|| "Crawl schedule not found".to_string())?;
+    let schedule =
+        get_schedule(&conn, schedule_id)?.ok_or_else(|| "Crawl schedule not found".to_string())?;
     let settings = settings_for_schedule(&schedule)?;
     drop(conn);
 
@@ -216,8 +218,8 @@ fn claim_due_schedules(
         .map_err(|e| e.to_string())?;
 
     for schedule in &due_schedules {
-        let next_run_at = next_run_for_cron(&schedule.cron_expression, now)
-            .map(|dt| dt.to_rfc3339());
+        let next_run_at =
+            next_run_for_cron(&schedule.cron_expression, now).map(|dt| dt.to_rfc3339());
         conn.execute(
             "UPDATE crawl_schedules
              SET last_run_at = ?1, next_run_at = ?2, updated_at = datetime('now')
@@ -315,6 +317,13 @@ fn update_schedule(
     if let Some(enabled) = input.enabled {
         existing.enabled = if enabled { 1 } else { 0 };
     }
+    if let Some(start_url) = input.start_url {
+        existing.start_url = validate_required("Start URL", start_url)?;
+    }
+    if let Some(crawl_settings_json) = input.crawl_settings_json {
+        validate_json_object(&crawl_settings_json)?;
+        existing.crawl_settings_json = crawl_settings_json;
+    }
     if let Some(cron_expression) = input.cron_expression {
         existing.cron_expression = validate_cron_expression(cron_expression)?;
     }
@@ -327,9 +336,16 @@ fn update_schedule(
 
     conn.execute(
         "UPDATE crawl_schedules
-         SET cron_expression = ?1, enabled = ?2, next_run_at = ?3, updated_at = datetime('now')
-         WHERE id = ?4",
+         SET start_url = ?1,
+             crawl_settings_json = ?2,
+             cron_expression = ?3,
+             enabled = ?4,
+             next_run_at = ?5,
+             updated_at = datetime('now')
+         WHERE id = ?6",
         params![
+            existing.start_url,
+            existing.crawl_settings_json,
             existing.cron_expression,
             existing.enabled,
             existing.next_run_at,
@@ -448,10 +464,7 @@ fn next_run_for_cron(expr: &str, now: DateTime<Utc>) -> Option<DateTime<Utc>> {
         return None;
     }
 
-    let mut candidate = now
-        .with_second(0)?
-        .with_nanosecond(0)?
-        + Duration::minutes(1);
+    let mut candidate = now.with_second(0)?.with_nanosecond(0)? + Duration::minutes(1);
 
     for _ in 0..(370 * 24 * 60) {
         if cron_field_matches(parts[0], candidate.minute(), true)
@@ -480,7 +493,10 @@ fn cron_field_matches(field: &str, value: u32, allow_step: bool) -> bool {
             return step > 0 && value % step == 0;
         }
     }
-    field.parse::<u32>().map(|expected| value == expected).unwrap_or(false)
+    field
+        .parse::<u32>()
+        .map(|expected| value == expected)
+        .unwrap_or(false)
 }
 
 #[cfg(test)]
@@ -531,6 +547,8 @@ mod tests {
             created.id,
             UpdateCrawlScheduleInput {
                 enabled: Some(false),
+                start_url: None,
+                crawl_settings_json: None,
                 cron_expression: Some("0 */6 * * *".to_string()),
             },
         )
@@ -542,6 +560,47 @@ mod tests {
 
         delete_crawl_schedule_for_test(&conn, updated.id).expect("delete schedule");
         assert!(list_schedules(&conn, 1).expect("list schedules").is_empty());
+    }
+
+    #[test]
+    fn update_schedule_updates_url_and_settings() {
+        let conn = setup_conn();
+        let created = create_schedule(
+            &conn,
+            CreateCrawlScheduleInput {
+                project_id: 1,
+                start_url: "https://example.com".to_string(),
+                crawl_settings_json: None,
+                cron_expression: "0 2 * * *".to_string(),
+            },
+        )
+        .expect("create schedule");
+
+        let updated = update_schedule(
+            &conn,
+            created.id,
+            UpdateCrawlScheduleInput {
+                enabled: None,
+                start_url: Some(" https://example.com/blog ".to_string()),
+                crawl_settings_json: Some("{\"maxUrls\":7,\"maxDepth\":2}".to_string()),
+                cron_expression: Some("0 */6 * * *".to_string()),
+            },
+        )
+        .expect("update schedule");
+
+        assert_eq!(updated.start_url, "https://example.com/blog");
+        assert_eq!(
+            updated.crawl_settings_json,
+            "{\"maxUrls\":7,\"maxDepth\":2}"
+        );
+        assert_eq!(updated.cron_expression, "0 */6 * * *");
+        let settings = settings_for_schedule(&updated).expect("schedule settings");
+        assert_eq!(
+            settings.start_url,
+            Some("https://example.com/blog".to_string())
+        );
+        assert_eq!(settings.max_urls, 7);
+        assert_eq!(settings.max_depth, 2);
     }
 
     #[test]
@@ -570,7 +629,10 @@ mod tests {
         assert_eq!(due[0].id, created.id);
         assert_eq!(due[0].start_url, "https://example.com/scheduled");
         let settings = settings_for_schedule(&due[0]).expect("schedule settings");
-        assert_eq!(settings.start_url, Some("https://example.com/scheduled".to_string()));
+        assert_eq!(
+            settings.start_url,
+            Some("https://example.com/scheduled".to_string())
+        );
         assert_eq!(settings.max_urls, 42);
         assert_eq!(settings.concurrency, 2);
         assert_eq!(settings.max_depth, CrawlSettings::default().max_depth);
@@ -659,6 +721,8 @@ mod tests {
             created.id,
             UpdateCrawlScheduleInput {
                 enabled: Some(false),
+                start_url: None,
+                crawl_settings_json: None,
                 cron_expression: None,
             },
         )
