@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import ErrorBanner from '../components/ErrorBanner'
 import { useResolvedCrawl } from '../hooks/use-resolved-crawl'
 import type { UrlRecord } from '@shared/types/url'
@@ -124,13 +124,7 @@ export default function ResultsScreen() {
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [searchInput, setSearchInput] = useState('')
 
-  // Virtual scroll refs
-  const tableBodyRef = useRef<HTMLDivElement>(null)
-  const [visibleRange, setVisibleRange] = useState({ start: 0, end: 20 })
   const ROW_HEIGHT = 36
-  const tableViewportHeight = urls.length > 0
-    ? Math.min(Math.max(urls.length * ROW_HEIGHT, ROW_HEIGHT * 10), ROW_HEIGHT * 20)
-    : ROW_HEIGHT * 6
 
   // Total pages
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
@@ -214,23 +208,6 @@ export default function ResultsScreen() {
     setDrawerOutlinks([])
   }, [selectedUrl?.id])
 
-  // ── Virtual scroll ────────────────────────────────
-
-  useEffect(() => {
-    const el = tableBodyRef.current
-    if (!el) return
-    const handleScroll = () => {
-      const scrollTop = el.scrollTop
-      const viewportHeight = el.clientHeight
-      const start = Math.floor(scrollTop / ROW_HEIGHT)
-      const end = Math.min(start + Math.ceil(viewportHeight / ROW_HEIGHT) + 5, urls.length)
-      setVisibleRange({ start: Math.max(0, start - 2), end })
-    }
-    el.addEventListener('scroll', handleScroll, { passive: true })
-    handleScroll()
-    return () => el.removeEventListener('scroll', handleScroll)
-  }, [urls.length])
-
   // ── Handlers ──────────────────────────────────────
 
   function toggleSort(field: string) {
@@ -255,9 +232,6 @@ export default function ResultsScreen() {
 
   // ── Render ────────────────────────────────────────
 
-  const virtualRows = useMemo(() => {
-    return urls.slice(visibleRange.start, visibleRange.end)
-  }, [urls, visibleRange])
   const selectedExtractions = selectedUrl?.extraction_results ?? []
 
   if (!activeCrawlId) return (
@@ -329,28 +303,25 @@ export default function ResultsScreen() {
           ))}
         </div>
 
-        {/* Virtual-scrolled body */}
+        {/* Table body */}
         <div
-          ref={tableBodyRef}
           data-results-table-body
-          className="relative overflow-y-auto overflow-x-hidden"
-          style={{ contain: 'strict', height: tableViewportHeight }}
+          className="relative overflow-visible"
         >
           {loading && urls.length === 0 ? (
             <div className="flex items-center justify-center py-16">
               <div className="animate-spin h-6 w-6 border-2 border-teal-accent border-t-transparent rounded-full"></div>
             </div>
           ) : (
-            <div style={{ height: urls.length * ROW_HEIGHT, position: 'relative' }}>
-              {virtualRows.map((u) => {
-                const idx = visibleRange.start + virtualRows.indexOf(u)
-                const top = idx * ROW_HEIGHT
+            <div>
+              {urls.map((u) => {
                 return (
                   <button
                     type="button"
                     key={u.id}
-                    className="absolute left-0 right-0 grid min-w-0 items-center border-b border-row hover:bg-[#0f1f2a] focus:bg-[#0f1f2a] focus:outline-none focus-visible:ring-1 focus-visible:ring-teal-accent cursor-pointer transition-colors text-left"
-                    style={{ top, height: ROW_HEIGHT, gridTemplateColumns: TABLE_GRID_COLUMNS }}
+                    data-results-row
+                    className="grid w-full min-w-0 items-center border-b border-row hover:bg-[#0f1f2a] focus:bg-[#0f1f2a] focus:outline-none focus-visible:ring-1 focus-visible:ring-teal-accent cursor-pointer transition-colors text-left"
+                    style={{ minHeight: ROW_HEIGHT, gridTemplateColumns: TABLE_GRID_COLUMNS }}
                     onClick={() => setSelectedUrl(u)}
                     aria-label={`Open URL details for ${u.url}`}
                   >

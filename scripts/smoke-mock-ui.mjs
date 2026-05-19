@@ -106,10 +106,11 @@ async function bodyIncludes(page, text) {
 async function visibleRows(page) {
   return page.evaluate(() => {
     const tableRows = document.querySelectorAll('tbody tr').length
+    const resultsRows = document.querySelectorAll('[data-results-row]').length
     const resultRows = Array.from(document.querySelectorAll('.absolute.left-0.right-0'))
       .filter((row) => row.textContent?.includes('http')).length
     const virtualRows = document.querySelectorAll('[role="row"], [data-row], .virtual-row').length
-    return Math.max(tableRows, resultRows, virtualRows)
+    return Math.max(tableRows, resultsRows, resultRows, virtualRows)
   })
 }
 
@@ -232,6 +233,20 @@ async function runSmoke() {
       resultsTableOverflow.pageScrollWidth <= resultsTableOverflow.viewport + 1 &&
         resultsTableOverflow.tableScrollWidth <= resultsTableOverflow.tableClientWidth + 1,
       JSON.stringify(resultsTableOverflow),
+    )
+    const resultsTableVerticalOverflow = await page.evaluate(() => {
+      const body = document.querySelector('[data-results-table-body]')
+      return {
+        clientHeight: body?.clientHeight ?? 0,
+        scrollHeight: body?.scrollHeight ?? 0,
+        overflowY: body ? getComputedStyle(body).overflowY : '',
+      }
+    })
+    record(
+      'results table does not create inner vertical scroll',
+      resultsTableVerticalOverflow.overflowY === 'visible' &&
+        resultsTableVerticalOverflow.scrollHeight <= resultsTableVerticalOverflow.clientHeight + 1,
+      JSON.stringify(resultsTableVerticalOverflow),
     )
 
     await clickText(page, 'Issues', 'button')
