@@ -99,6 +99,7 @@ pub fn run() {
             commands::schedule::run_due_crawl_schedules,
             // Diff commands
             commands::diff::list_crawl_diffs,
+            commands::diff::get_crawl_diff_detail,
             // Settings commands
             commands::settings::get_settings,
             commands::settings::update_settings,

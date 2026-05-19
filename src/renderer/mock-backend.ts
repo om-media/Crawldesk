@@ -122,6 +122,87 @@ const MOCK_DIFFS = [
   },
 ]
 
+const MOCK_DIFF_DETAILS: Record<string, any> = {
+  '1:2': {
+    summary: MOCK_DIFFS[0],
+    sampleLimit: 25,
+    newUrls: [
+      {
+        url: 'https://avanterrapark.com/activities/night-climb',
+        oldStatusCode: null,
+        newStatusCode: 200,
+        oldTitle: null,
+        newTitle: 'Night Climb - Avanterra Park',
+        oldIndexability: null,
+        newIndexability: 'indexable',
+      },
+      {
+        url: 'https://avanterrapark.com/birthday-parties',
+        oldStatusCode: null,
+        newStatusCode: 200,
+        oldTitle: null,
+        newTitle: 'Birthday Parties - Avanterra Park',
+        oldIndexability: null,
+        newIndexability: 'indexable',
+      },
+    ],
+    removedUrls: [
+      {
+        url: 'https://avanterrapark.com/summer-2025',
+        oldStatusCode: 200,
+        newStatusCode: null,
+        oldTitle: 'Summer 2025 - Avanterra Park',
+        newTitle: null,
+        oldIndexability: 'indexable',
+        newIndexability: null,
+      },
+    ],
+    changedUrls: [
+      {
+        url: 'https://avanterrapark.com/gallery',
+        oldStatusCode: 200,
+        newStatusCode: 404,
+        oldTitle: 'Gallery - Avanterra Park',
+        newTitle: 'Gallery Missing - Avanterra Park',
+        oldIndexability: 'indexable',
+        newIndexability: 'non_indexable',
+      },
+    ],
+    newIssues: [
+      {
+        issueType: 'internal_link_to_4xx',
+        severity: 'critical',
+        category: 'links',
+        url: 'https://avanterrapark.com/gallery',
+        message: 'Internal link returns 404',
+      },
+    ],
+    resolvedIssues: [
+      {
+        issueType: 'missing_meta_description',
+        severity: 'warning',
+        category: 'content',
+        url: 'https://avanterrapark.com/activities/zip-line',
+        message: 'Meta description is missing',
+      },
+    ],
+    newBrokenLinks: [
+      {
+        sourceUrl: 'https://avanterrapark.com/',
+        targetUrl: 'https://avanterrapark.com/gallery',
+        statusCode: 404,
+      },
+    ],
+    resolvedBrokenLinks: [
+      {
+        sourceUrl: 'https://avanterrapark.com/old-campaign',
+        targetUrl: 'https://avanterrapark.com/expired-offer',
+        statusCode: 404,
+      },
+    ],
+  },
+}
+
 const MOCK_URL_SUMMARY = {
   totalUrls: 247,
   total_urls: 247,
@@ -668,7 +749,8 @@ export function setupMockCrawldesk() {
     diff: {
       get: async (projectId: string | number, diffId: string) => {
         await delay()
-        return MOCK_DIFFS.find(diff => String(diff.project_id) === String(projectId) && diff.id === diffId) ?? null
+        const summary = MOCK_DIFFS.find(diff => String(diff.project_id) === String(projectId) && diff.id === diffId)
+        return summary ? MOCK_DIFF_DETAILS[diffId] ?? { summary, sampleLimit: 25 } : null
       },
       listByProject: async (projectId: string | number) => {
         await delay()

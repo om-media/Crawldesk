@@ -494,6 +494,12 @@ async function runSmoke() {
     await page.waitForFunction(() => document.body.textContent?.includes('Crawl Scheduling'))
     await page.waitForFunction(() => document.body.textContent?.includes('New URLs') && document.body.textContent?.includes('Broken Links'))
     record('crawl history diff table renders', await bodyIncludes(page, 'New URLs') && await bodyIncludes(page, 'Broken Links'))
+    await clickText(page, 'Details', 'button')
+    await page.waitForFunction(() => {
+      const text = document.body.textContent || ''
+      return text.includes('Changed URLs') && text.includes('New Broken Links') && text.includes('night-climb')
+    })
+    record('crawl history diff details expand', await bodyIncludes(page, 'Changed URLs') && await bodyIncludes(page, 'night-climb'))
     await clickText(page, 'New Schedule', 'button')
     await fillByLabel(page, 'Start URL', 'not-a-url')
     await fillByLabel(page, 'Cron Expression', '0 2 * * *')

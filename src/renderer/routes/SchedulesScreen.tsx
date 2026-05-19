@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { Fragment, useState, useEffect } from 'react'
 import { useProjectStore } from '../stores/project-store'
 import ErrorBanner from '../components/ErrorBanner'
 
@@ -16,6 +16,8 @@ interface Schedule {
 
 interface CrawlDiff {
   id: string
+  crawl_a_id?: string
+  crawl_b_id?: string
   url_count_delta: number
   new_urls_count: number
   removed_urls_count: number
@@ -23,6 +25,46 @@ interface CrawlDiff {
   issues_delta: number
   critical_issues_delta: number
   created_at: string
+}
+
+interface CrawlDiffUrlChange {
+  url: string
+  oldStatusCode?: number | null
+  newStatusCode?: number | null
+  oldTitle?: string | null
+  newTitle?: string | null
+  oldIndexability?: string | null
+  newIndexability?: string | null
+}
+
+interface CrawlDiffIssueChange {
+  issueType?: string
+  issue_type?: string
+  severity: string
+  category: string
+  url: string
+  message: string
+}
+
+interface CrawlDiffBrokenLinkChange {
+  sourceUrl?: string
+  source_url?: string
+  targetUrl?: string
+  target_url?: string
+  statusCode?: number | null
+  status_code?: number | null
+}
+
+interface CrawlDiffDetail {
+  summary: CrawlDiff
+  newUrls: CrawlDiffUrlChange[]
+  removedUrls: CrawlDiffUrlChange[]
+  changedUrls: CrawlDiffUrlChange[]
+  newIssues: CrawlDiffIssueChange[]
+  resolvedIssues: CrawlDiffIssueChange[]
+  newBrokenLinks: CrawlDiffBrokenLinkChange[]
+  resolvedBrokenLinks: CrawlDiffBrokenLinkChange[]
+  sampleLimit: number
 }
 
 export default function SchedulesScreen() {
@@ -208,11 +250,18 @@ function DiffViewer({ projectId }: { projectId: string }) {
   const [diffs, setDiffs] = useState<CrawlDiff[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [detailsById, setDetailsById] = useState<Record<string, CrawlDiffDetail>>({})
+  const [detailLoadingId, setDetailLoadingId] = useState<string | null>(null)
+  const [detailError, setDetailError] = useState('')
 
   useEffect(() => {
     let cancelled = false
     setLoading(true)
     setError('')
+    setExpandedId(null)
+    setDetailsById({})
+    setDetailError('')
     window.crawldesk.diff.listByProject(projectId)
       .then((rows: CrawlDiff[]) => {
         if (!cancelled) setDiffs(rows || [])
@@ -229,6 +278,29 @@ function DiffViewer({ projectId }: { projectId: string }) {
       })
     return () => { cancelled = true }
   }, [projectId])
+
+  async function toggleDetails(diffId: string) {
+    setDetailError('')
+    if (expandedId === diffId) {
+      setExpandedId(null)
+      return
+    }
+
+    setExpandedId(diffId)
+    if (detailsById[diffId]) return
+
+    setDetailLoadingId(diffId)
+    try {
+      const detail = await window.crawldesk.diff.get(projectId, diffId)
+      if (!detail) throw new Error('Diff detail not found')
+      setDetailsById(current => ({ ...current, [diffId]: normalizeDiffDetail(detail) }))
+    } catch (err: any) {
+      console.error('[Schedules] Failed to load crawl diff details:', err)
+      setDetailError(err?.message || 'Failed to load crawl diff details')
+    } finally {
+      setDetailLoadingId(null)
+    }
+  }
 
   if (loading) return <p className="text-sm text-primary-muted">Loading crawl diffs...</p>
   if (error) return <ErrorBanner message={error} onRetry={() => {
@@ -249,6 +321,7 @@ function DiffViewer({ projectId }: { projectId: string }) {
     <table className="w-full text-sm border-collapse">
       <thead>
         <tr className="border-b border-row">
+          <th className="py-2 px-3 text-left text-xs text-primary-muted uppercase tracking-wider font-medium">Run Pair</th>
           <th className="py-2 px-3 text-left text-xs text-primary-muted uppercase tracking-wider font-medium">URL Count Δ</th>
           <th className="py-2 px-3 text-left text-xs text-primary-muted uppercase tracking-wider font-medium">New URLs</th>
           <th className="py-2 px-3 text-left text-xs text-primary-muted uppercase tracking-wider font-medium">Removed URLs</th>
@@ -256,21 +329,171 @@ function DiffViewer({ projectId }: { projectId: string }) {
           <th className="py-2 px-3 text-left text-xs text-primary-muted uppercase tracking-wider font-medium">Issues Δ</th>
           <th className="py-2 px-3 text-left text-xs text-primary-muted uppercase tracking-wider font-medium">Critical Δ</th>
           <th className="py-2 px-3 text-left text-xs text-primary-muted uppercase tracking-wider font-medium">Date</th>
+          <th className="py-2 px-3 text-left text-xs text-primary-muted uppercase tracking-wider font-medium">Details</th>
         </tr>
       </thead>
       <tbody>
         {diffs.map((d) => (
-          <tr key={d.id} className="border-b border-row hover:bg-[#0f1f2a] transition-colors">
-            <td className={`py-2 px-3 ${d.url_count_delta >= 0 ? 'text-emerald' : 'text-red-400'}`}>{d.url_count_delta > 0 ? '+' : ''}{d.url_count_delta}</td>
-            <td className="py-2 px-3 text-emerald">{d.new_urls_count}</td>
-            <td className="py-2 px-3 text-red-400">{d.removed_urls_count}</td>
-            <td className={`py-2 px-3 ${d.broken_links_delta <= 0 ? 'text-emerald' : 'text-red-400'}`}>{d.broken_links_delta > 0 ? '+' : ''}{d.broken_links_delta}</td>
-            <td className={`py-2 px-3 ${d.issues_delta <= 0 ? 'text-emerald' : 'text-red-400'}`}>{d.issues_delta > 0 ? '+' : ''}{d.issues_delta}</td>
-            <td className={`py-2 px-3 ${d.critical_issues_delta <= 0 ? 'text-emerald' : 'text-red-400 font-bold'}`}>{d.critical_issues_delta > 0 ? '+' : ''}{d.critical_issues_delta}</td>
-            <td className="py-2 px-3 text-primary-muted text-xs">{new Date(d.created_at).toLocaleDateString('en-US')}</td>
-          </tr>
+          <Fragment key={d.id}>
+            <tr className="border-b border-row hover:bg-[#0f1f2a] transition-colors">
+              <td className="py-2 px-3 text-primary-muted text-xs whitespace-nowrap">#{d.crawl_a_id || d.id.split(':')[0]} → #{d.crawl_b_id || d.id.split(':')[1]}</td>
+              <td className={`py-2 px-3 ${d.url_count_delta >= 0 ? 'text-emerald' : 'text-red-400'}`}>{d.url_count_delta > 0 ? '+' : ''}{d.url_count_delta}</td>
+              <td className="py-2 px-3 text-emerald">{d.new_urls_count}</td>
+              <td className="py-2 px-3 text-red-400">{d.removed_urls_count}</td>
+              <td className={`py-2 px-3 ${d.broken_links_delta <= 0 ? 'text-emerald' : 'text-red-400'}`}>{d.broken_links_delta > 0 ? '+' : ''}{d.broken_links_delta}</td>
+              <td className={`py-2 px-3 ${d.issues_delta <= 0 ? 'text-emerald' : 'text-red-400'}`}>{d.issues_delta > 0 ? '+' : ''}{d.issues_delta}</td>
+              <td className={`py-2 px-3 ${d.critical_issues_delta <= 0 ? 'text-emerald' : 'text-red-400 font-bold'}`}>{d.critical_issues_delta > 0 ? '+' : ''}{d.critical_issues_delta}</td>
+              <td className="py-2 px-3 text-primary-muted text-xs">{new Date(d.created_at).toLocaleDateString('en-US')}</td>
+              <td className="py-2 px-3">
+                <button onClick={() => toggleDetails(d.id)} className="btn-secondary !py-1 !px-2 text-xs">
+                  {expandedId === d.id ? 'Hide' : 'Details'}
+                </button>
+              </td>
+            </tr>
+            {expandedId === d.id && (
+              <tr className="border-b border-row">
+                <td colSpan={9} className="py-3 px-3 bg-[#07131b]">
+                  {detailLoadingId === d.id ? (
+                    <p className="text-sm text-primary-muted">Loading diff details...</p>
+                  ) : detailError ? (
+                    <ErrorBanner message={detailError} onRetry={() => toggleDetails(d.id)} />
+                  ) : detailsById[d.id] ? (
+                    <DiffDetailPanel detail={detailsById[d.id]} />
+                  ) : null}
+                </td>
+              </tr>
+            )}
+          </Fragment>
         ))}
       </tbody>
     </table>
   )
+}
+
+function normalizeDiffDetail(detail: any): CrawlDiffDetail {
+  return {
+    summary: detail.summary,
+    newUrls: detail.newUrls || detail.new_urls || [],
+    removedUrls: detail.removedUrls || detail.removed_urls || [],
+    changedUrls: detail.changedUrls || detail.changed_urls || [],
+    newIssues: detail.newIssues || detail.new_issues || [],
+    resolvedIssues: detail.resolvedIssues || detail.resolved_issues || [],
+    newBrokenLinks: detail.newBrokenLinks || detail.new_broken_links || [],
+    resolvedBrokenLinks: detail.resolvedBrokenLinks || detail.resolved_broken_links || [],
+    sampleLimit: Number(detail.sampleLimit ?? detail.sample_limit ?? 25),
+  }
+}
+
+function DiffDetailPanel({ detail }: { detail: CrawlDiffDetail }) {
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+        <UrlChangeList title="New URLs" tone="good" rows={detail.newUrls} />
+        <UrlChangeList title="Removed URLs" tone="bad" rows={detail.removedUrls} />
+        <UrlChangeList title="Changed URLs" tone="warn" rows={detail.changedUrls} changed />
+      </div>
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+        <IssueChangeList title="New Issues" rows={detail.newIssues} tone="bad" />
+        <IssueChangeList title="Resolved Issues" rows={detail.resolvedIssues} tone="good" />
+      </div>
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+        <BrokenLinkChangeList title="New Broken Links" rows={detail.newBrokenLinks} tone="bad" />
+        <BrokenLinkChangeList title="Resolved Broken Links" rows={detail.resolvedBrokenLinks} tone="good" />
+      </div>
+      <p className="text-[11px] text-primary-muted">Showing up to {detail.sampleLimit} rows per section.</p>
+    </div>
+  )
+}
+
+function UrlChangeList({ title, rows, tone, changed = false }: { title: string, rows: CrawlDiffUrlChange[], tone: 'good' | 'bad' | 'warn', changed?: boolean }) {
+  return (
+    <div className="rounded border border-row bg-midnight/40 p-3 min-w-0">
+      <h3 className={`text-xs uppercase tracking-wider font-semibold mb-2 ${toneClass(tone)}`}>{title} ({rows.length})</h3>
+      {!rows.length ? <p className="text-xs text-primary-muted">No rows in this sample.</p> : (
+        <div className="space-y-2">
+          {rows.map((row, index) => (
+            <div key={`${row.url}-${index}`} className="min-w-0">
+              <p className="text-xs text-primary-text truncate" title={row.url}>{row.url}</p>
+              {changed ? (
+                <p className="text-[11px] text-primary-muted truncate">
+                  Status {displayValue(row.oldStatusCode)} → {displayValue(row.newStatusCode)}
+                  {' · '}Title {displayValue(row.oldTitle)} → {displayValue(row.newTitle)}
+                </p>
+              ) : (
+                <p className="text-[11px] text-primary-muted">
+                  Status {displayValue(row.newStatusCode ?? row.oldStatusCode)}
+                  {' · '}Indexability {displayValue(row.newIndexability ?? row.oldIndexability)}
+                </p>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function IssueChangeList({ title, rows, tone }: { title: string, rows: CrawlDiffIssueChange[], tone: 'good' | 'bad' }) {
+  return (
+    <div className="rounded border border-row bg-midnight/40 p-3 min-w-0">
+      <h3 className={`text-xs uppercase tracking-wider font-semibold mb-2 ${toneClass(tone)}`}>{title} ({rows.length})</h3>
+      {!rows.length ? <p className="text-xs text-primary-muted">No rows in this sample.</p> : (
+        <div className="space-y-2">
+          {rows.map((row, index) => (
+            <div key={`${row.url}-${row.message}-${index}`} className="min-w-0">
+              <p className="text-xs text-primary-text truncate" title={row.url}>{row.url}</p>
+              <p className="text-[11px] text-primary-muted truncate">
+                <span className={severityClass(row.severity)}>{row.severity}</span>
+                {' · '}{labelize(row.issueType || row.issue_type || '')}
+                {' · '}{row.message}
+              </p>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function BrokenLinkChangeList({ title, rows, tone }: { title: string, rows: CrawlDiffBrokenLinkChange[], tone: 'good' | 'bad' }) {
+  return (
+    <div className="rounded border border-row bg-midnight/40 p-3 min-w-0">
+      <h3 className={`text-xs uppercase tracking-wider font-semibold mb-2 ${toneClass(tone)}`}>{title} ({rows.length})</h3>
+      {!rows.length ? <p className="text-xs text-primary-muted">No rows in this sample.</p> : (
+        <div className="space-y-2">
+          {rows.map((row, index) => {
+            const source = row.sourceUrl || row.source_url || ''
+            const target = row.targetUrl || row.target_url || ''
+            return (
+              <div key={`${source}-${target}-${index}`} className="min-w-0">
+                <p className="text-xs text-primary-text truncate" title={target}>{target}</p>
+                <p className="text-[11px] text-primary-muted truncate" title={source}>
+                  {displayValue(row.statusCode ?? row.status_code)} from {source}
+                </p>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function toneClass(tone: 'good' | 'bad' | 'warn') {
+  if (tone === 'good') return 'text-emerald'
+  if (tone === 'bad') return 'text-red-400'
+  return 'text-amber-300'
+}
+
+function severityClass(severity: string) {
+  return severity === 'critical' ? 'text-red-400 font-semibold' : severity === 'warning' ? 'text-amber-300' : 'text-primary-muted'
+}
+
+function labelize(value: string) {
+  return value.replace(/_/g, ' ').replace(/\b\w/g, char => char.toUpperCase())
+}
+
+function displayValue(value: string | number | null | undefined) {
+  if (value === null || value === undefined || value === '') return '—'
+  return String(value)
 }

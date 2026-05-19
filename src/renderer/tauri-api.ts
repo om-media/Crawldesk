@@ -227,6 +227,20 @@ function normalizeCrawlDiff(record: any) {
   }
 }
 
+function normalizeCrawlDiffDetail(record: any) {
+  return {
+    summary: normalizeCrawlDiff(record?.summary ?? {}),
+    newUrls: Array.isArray(record?.newUrls) ? record.newUrls : [],
+    removedUrls: Array.isArray(record?.removedUrls) ? record.removedUrls : [],
+    changedUrls: Array.isArray(record?.changedUrls) ? record.changedUrls : [],
+    newIssues: Array.isArray(record?.newIssues) ? record.newIssues : [],
+    resolvedIssues: Array.isArray(record?.resolvedIssues) ? record.resolvedIssues : [],
+    newBrokenLinks: Array.isArray(record?.newBrokenLinks) ? record.newBrokenLinks : [],
+    resolvedBrokenLinks: Array.isArray(record?.resolvedBrokenLinks) ? record.resolvedBrokenLinks : [],
+    sampleLimit: Number(record?.sampleLimit ?? 25),
+  }
+}
+
 function normalizeProjectRecord(record: any) {
   return {
     id: String(record.id ?? ''),
@@ -501,9 +515,12 @@ function setupCrawldesk() {
     },
     diff: {
       get: async (projectId: string | number, diffId: string) => {
-        const rows = await invoke<Array<any>>('list_crawl_diffs', { projectId: toId(projectId) })
-        const match = (rows || []).map(normalizeCrawlDiff).find(diff => diff.id === diffId)
-        return match ?? null
+        const row = await invoke<any>('get_crawl_diff_detail', {
+          projectId: toId(projectId),
+          diffId,
+          sampleLimit: 25,
+        })
+        return row ? normalizeCrawlDiffDetail(row) : null
       },
       listByProject: async (projectId: string | number) => {
         const rows = await invoke<Array<any>>('list_crawl_diffs', { projectId: toId(projectId) })

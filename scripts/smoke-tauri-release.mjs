@@ -302,6 +302,7 @@ async function runSmoke() {
       const secondExtractionRules = await window.crawldesk.extractions.list(secondCrawl.id)
       const secondUrls = await window.crawldesk.urls.list({ projectId: project.id, crawlId: secondCrawl.id, page: 0, pageSize: 50 })
       const diffRows = await window.crawldesk.diff.listByProject(project.id)
+      const diffDetail = diffRows[0] ? await window.crawldesk.diff.get(project.id, diffRows[0].id) : null
       const excludedCrawl = await window.crawldesk.crawls.create(project.id, {
         ...crawlSettings,
         excludePatterns: ['*/tag/*'],
@@ -392,6 +393,7 @@ async function runSmoke() {
         schedulesBeforeDelete,
         schedulesAfterDelete,
         diffRows,
+        diffDetail,
         projectDeleted: !projectsAfterDelete.some((item) => String(item.id) === String(project.id)),
       }
     }, { fixtureBase })
@@ -426,6 +428,7 @@ async function runSmoke() {
     record('release custom extraction results are applied during crawl', result.activeExtractionRule?.name === 'Smoke H1' && result.secondExtractionRules.length >= 1 && result.secondExtractionResults.some((item) => item.name === 'Smoke H1' && Array.isArray(item.values) && item.values.some((value) => value.includes('Smoke Fixture'))), JSON.stringify({ rules: result.secondExtractionRules, results: result.secondExtractionResults }))
     record('release crawl schedules CRUD works', result.scheduleUpdated?.enabled === 0 && result.scheduleUpdated?.next_run_at == null && result.schedulesBeforeDelete.length === 1 && result.schedulesAfterDelete.length === 0, JSON.stringify({ updated: result.scheduleUpdated, before: result.schedulesBeforeDelete, after: result.schedulesAfterDelete }))
     record('release crawl diff command compares completed crawls', result.secondStatus === 'completed' && result.diffRows.length >= 1 && result.diffRows.some((item) => String(item.crawl_b_id) === String(result.secondCrawlId)), JSON.stringify({ secondStatus: result.secondStatus, diffs: result.diffRows }))
+    record('release crawl diff detail command returns sections', Boolean(result.diffDetail?.summary?.id) && Array.isArray(result.diffDetail?.newUrls) && Array.isArray(result.diffDetail?.changedUrls) && Array.isArray(result.diffDetail?.newBrokenLinks), JSON.stringify(result.diffDetail))
     record('release crawl exclude patterns filter URLs', result.excludedStatus === 'completed' && !result.excludedUrls.some((url) => url.includes('/tag/')), JSON.stringify({ status: result.excludedStatus, urls: result.excludedUrls }))
     record('release crawl custom headers are sent', result.headerStatus === 'completed' && result.headerUrls.some((item) => item.url.endsWith('/private') && item.status === 200), JSON.stringify({ status: result.headerStatus, urls: result.headerUrls }))
     record('release project delete cascades', result.projectDeleted, `projectId=${result.projectId}`)
