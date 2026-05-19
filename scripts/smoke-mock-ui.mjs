@@ -202,6 +202,15 @@ async function runSmoke() {
       liveCrawlState.hasRunning && liveCrawlState.cards.some((card) => card.includes('Queued') && /[1-9]/.test(card)),
       JSON.stringify(liveCrawlState),
     )
+    const liveCrawlOverflow = await page.evaluate(() => ({
+      viewport: document.documentElement.clientWidth,
+      scrollWidth: document.documentElement.scrollWidth,
+    }))
+    record(
+      'live crawl screen does not create page-level horizontal overflow',
+      liveCrawlOverflow.scrollWidth <= liveCrawlOverflow.viewport + 1,
+      JSON.stringify(liveCrawlOverflow),
+    )
 
     await page.waitForFunction(() => Array.from(document.querySelectorAll('button')).some((button) => button.textContent?.includes('All URLs') && !button.disabled))
     await clickText(page, 'All URLs', 'button')

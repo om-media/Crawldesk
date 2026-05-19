@@ -19,11 +19,17 @@ impl ScopeService {
     pub fn new(root_url: &str) -> Self {
         let parsed = Url::parse(root_url).expect("Invalid root URL");
         let hostname = parsed.host_str().unwrap_or("").to_lowercase();
+        let mut allowed_hostnames = vec![hostname.clone()];
+        if let Some(apex) = hostname.strip_prefix("www.") {
+            allowed_hostnames.push(apex.to_string());
+        } else {
+            allowed_hostnames.push(format!("www.{}", hostname));
+        }
 
         Self {
             root_hostname: hostname.clone(),
             root_scheme: parsed.scheme().to_string(),
-            allowed_hostnames: vec![hostname.clone()],
+            allowed_hostnames,
             blocked_hostnames: Vec::new(),
             include_patterns: Vec::new(),
             exclude_patterns: Vec::new(),
@@ -150,7 +156,14 @@ mod tests {
         scope.add_allowed_hostname("blog.example.com");
         assert!(scope.is_in_scope("https://www.example.com/"));
         assert!(scope.is_in_scope("https://blog.example.com/post"));
-        assert!(!scope.is_in_scope("https://example.com/page"));
+        assert!(scope.is_in_scope("https://example.com/page"));
+    }
+
+    #[test]
+    fn test_www_root_allows_apex_redirect_target() {
+        let scope = ScopeService::new("https://www.example.com/");
+        assert!(scope.is_in_scope("https://www.example.com/page"));
+        assert!(scope.is_in_scope("https://example.com/page"));
     }
 
     #[test]

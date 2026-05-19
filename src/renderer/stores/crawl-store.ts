@@ -13,6 +13,7 @@ interface CrawlProgressState {
   urlsPerMinute: number
   avgResponseTimeMs: number
   elapsedTimeSeconds: number
+  currentUrl: string | null
   status: string
 }
 
@@ -32,6 +33,7 @@ const defaultProgress: Omit<CrawlProgressState, 'crawlId'> = {
   urlsPerMinute: 0,
   avgResponseTimeMs: 0,
   elapsedTimeSeconds: 0,
+  currentUrl: null,
   status: 'running',
 }
 
@@ -54,6 +56,7 @@ export const useCrawlStore = create<CrawlStore>((set) => ({
         urlsPerMinute: data.urls_per_minute ?? data.urlsPerMinute ?? s.progress?.urlsPerMinute ?? 0,
         avgResponseTimeMs: data.avg_response_time_ms ?? data.avgResponseTimeMs ?? s.progress?.avgResponseTimeMs ?? 0,
         elapsedTimeSeconds: data.elapsed_time_seconds ?? data.elapsedTimeSeconds ?? s.progress?.elapsedTimeSeconds ?? 0,
+        currentUrl: data.current_url ?? data.currentUrl ?? s.progress?.currentUrl ?? null,
         status: terminalStatus && (!incomingStatus || incomingStatus === 'running') ? s.progress!.status : incomingStatus ?? s.progress?.status ?? 'running',
       }
     })()

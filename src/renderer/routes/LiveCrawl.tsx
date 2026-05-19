@@ -94,8 +94,11 @@ export default function LiveCrawl({ onCompleted }: Props) {
     return `${m}:${s.toString().padStart(2, '0')}`
   }
 
+  const activeUrl = progress?.currentUrl
+  const hasRecentUrls = recentUrls.length > 0
+
   return (
-    <div>
+    <div className="min-w-0">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
@@ -132,7 +135,7 @@ export default function LiveCrawl({ onCompleted }: Props) {
       )}
 
       {/* Progress Cards */}
-      <div className="grid grid-cols-3 md:grid-cols-6 gap-4 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4 mb-6">
         {[
           { label: 'Completed', value: progress?.total_completed ?? 0, color: 'text-emerald' },
           { label: 'Queued', value: progress?.total_queued ?? 0, color: 'text-[#3B82F6]' },
@@ -149,19 +152,32 @@ export default function LiveCrawl({ onCompleted }: Props) {
       </div>
 
       {/* Recent URLs Table */}
-      <h2 className="text-base font-semibold text-primary-text mb-3">Recent Crawled URLs ({recentUrls.length})</h2>
+      <div className="mb-3 flex min-w-0 items-center justify-between gap-3">
+        <h2 className="text-base font-semibold text-primary-text">Recent Crawled URLs ({recentUrls.length})</h2>
+        {activeUrl && (
+          <span className="min-w-0 truncate rounded-md border border-lumen bg-panel-dark px-3 py-1.5 text-xs text-primary-muted">
+            Current: <span className="font-mono text-teal-text">{activeUrl}</span>
+          </span>
+        )}
+      </div>
       {!progress && recentUrls.length === 0 && (
         <div className="card py-8 text-center text-primary-muted">No crawl in progress. Start a crawl from the Crawl Setup screen.</div>
       )}
       {recentUrls.length === 0 && progress?.status === 'running' && !error && (
-        <div className="flex items-center gap-2 text-sm text-primary-muted py-8 justify-center">
+        <div className="flex min-w-0 items-center gap-3 rounded-md border border-lumen bg-panel-dark px-4 py-5 text-sm text-primary-muted">
           <div className="animate-spin h-4 w-4 border-2 border-teal-accent border-t-transparent rounded-full"></div>
-          Waiting for first results...
+          <div className="min-w-0">
+            <div className="font-medium text-primary-text">Crawl is running</div>
+            <div className="truncate">
+              {activeUrl ? `Fetching ${activeUrl}` : 'Waiting for the first fetched URL to be reported.'}
+            </div>
+          </div>
         </div>
       )}
-      {recentUrls.length > 0 && (
-        <div className="overflow-x-auto border border-lumen rounded-lg bg-panel-dark">
-          <table className="w-full text-sm text-left whitespace-nowrap">
+      {hasRecentUrls && (
+        <div className="min-w-0 overflow-hidden rounded-lg border border-lumen bg-panel-dark">
+          <div className="max-h-[420px] overflow-auto">
+          <table className="min-w-[760px] w-full table-fixed text-sm text-left">
             <thead>
               <tr className="bg-midnight border-b border-row">
                 <th className="px-4 py-2.5 font-medium text-primary-muted">URL</th>
@@ -175,19 +191,20 @@ export default function LiveCrawl({ onCompleted }: Props) {
                 const code = u.status_code ?? 0
                 return (
                   <tr key={`${u.url}-${i}`} className={`border-b border-row transition-colors ${i === recentUrls.length - 1 ? 'animate-pulse' : ''}`}>
-                    <td className="px-4 py-2 max-w-xs truncate text-teal-text">{typeof u === 'string' ? u : u.url}</td>
+                    <td className="px-4 py-2 truncate text-teal-text">{typeof u === 'string' ? u : u.url}</td>
                     <td className="px-4 py-2">
                       {code >= 200 && code < 300 && <span className="pill-success">{code}</span>}
                       {code >= 300 && code < 400 && <span className="pill-warning">{code}</span>}
                       {(code < 200 || code >= 400) && <span className="pill-error">{code || '-'}</span>}
                     </td>
-                    <td className="px-4 py-2 max-w-[200px] truncate text-primary-text">{u.title || '-'}</td>
+                    <td className="px-4 py-2 truncate text-primary-text">{u.title || '-'}</td>
                     <td className="px-4 py-2 text-primary-text">{u.depth ?? '-'}</td>
                   </tr>
                 )
               })}
             </tbody>
           </table>
+          </div>
         </div>
       )}
     </div>
