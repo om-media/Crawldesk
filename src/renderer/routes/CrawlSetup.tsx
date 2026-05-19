@@ -86,15 +86,14 @@ export default function CrawlSetup({ onComplete }: Props) {
       return
     }
 
-    setCreating(true)
+    let payload: Record<string, unknown> & { startUrl: string }
     try {
-      resetCrawlProgress()
       const includePats = lines(settings.includePatterns)
       const excludePats = lines(settings.excludePatterns)
       const allowedHostnames = lines(settings.allowedHostnames)
       const blockedHostnames = lines(settings.blockedHostnames)
       const customHeaders = parseCustomHeaders(settings.customHeaders)
-      const payload = {
+      payload = {
         ...settings,
         startUrl: settings.startUrl,
         includePatterns: includePats,
@@ -104,6 +103,14 @@ export default function CrawlSetup({ onComplete }: Props) {
         maxUrlLength: settings.maxUrlLength,
         customHeaders,
       }
+    } catch (err: any) {
+      setError(err?.message || 'Invalid crawl settings')
+      return
+    }
+
+    setCreating(true)
+    try {
+      resetCrawlProgress()
       const crawl = await window.crawldesk.crawls.create(selectedProjectId, payload)
       setActiveCrawlId(crawl.id)
       updateProgress({

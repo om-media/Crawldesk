@@ -208,6 +208,22 @@ async function runSmoke() {
 
     await clickText(page, 'Crawl Setup', 'button')
     await page.waitForFunction(() => document.body.textContent?.includes('Target Website'))
+    const crawlCountBeforeInvalidHeaders = await page.evaluate(async () => {
+      const crawls = await window.crawldesk.crawls.listByProject('1')
+      return crawls.length
+    })
+    await fillByLabel(page, 'Custom Request Headers', 'InvalidHeaderLine')
+    await clickText(page, 'Start Crawl', 'form button')
+    await page.waitForFunction(() => document.body.textContent?.includes('Invalid custom header line'))
+    const crawlCountAfterInvalidHeaders = await page.evaluate(async () => {
+      const crawls = await window.crawldesk.crawls.listByProject('1')
+      return crawls.length
+    })
+    record(
+      'crawl setup rejects invalid custom headers before creating crawl',
+      crawlCountAfterInvalidHeaders === crawlCountBeforeInvalidHeaders,
+      `${crawlCountBeforeInvalidHeaders} -> ${crawlCountAfterInvalidHeaders}`,
+    )
     await fillByLabel(page, 'Exclude Patterns', '*/tag/*\n*.pdf$')
     await fillByLabel(page, 'Allowed Hostnames', 'blog.avanterrapark.com')
     await fillByLabel(page, 'Blocked Hostnames', 'staging.avanterrapark.com')
