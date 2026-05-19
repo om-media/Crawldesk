@@ -194,10 +194,32 @@ export default function SchedulesScreen() {
 
 function DiffViewer({ projectId }: { projectId: string }) {
   const [diffs, setDiffs] = useState<any[]>([])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+
   useEffect(() => {
-    window.crawldesk.diff.listByProject(projectId).then(setDiffs).catch(() => {})
+    let cancelled = false
+    setLoading(true)
+    setError('')
+    window.crawldesk.diff.listByProject(projectId)
+      .then((rows) => {
+        if (!cancelled) setDiffs(rows || [])
+      })
+      .catch((err: any) => {
+        if (!cancelled) {
+          console.error('[Schedules] Failed to load crawl diffs:', err)
+          setError(err?.message || 'Failed to load crawl diffs')
+          setDiffs([])
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => { cancelled = true }
   }, [projectId])
 
+  if (loading) return <p className="text-sm text-primary-muted">Loading crawl diffs...</p>
+  if (error) return <div className="bg-[#3b171b] border border-red-900 rounded-lg p-3 text-sm text-red-400">{error}</div>
   if (!diffs.length) return <p className="text-sm text-primary-muted">No diff data available yet — diffs appear after the second crawl on a project.</p>
 
   return (

@@ -121,6 +121,25 @@ async function fillByLabel(page, labelText, value, selector = 'input,textarea') 
   if (!filled) throw new Error(`Could not fill field labelled: ${labelText}`)
 }
 
+async function fillByPlaceholder(page, placeholderText, value) {
+  const filled = await page.evaluate(({ placeholderText, value }) => {
+    const input = Array.from(document.querySelectorAll('input,textarea')).find((element) => {
+      return element.getAttribute('placeholder')?.toLowerCase().includes(placeholderText.toLowerCase())
+    })
+    if (!(input instanceof HTMLInputElement || input instanceof HTMLTextAreaElement)) return false
+
+    const prototype = input instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype
+    const valueSetter = Object.getOwnPropertyDescriptor(prototype, 'value')?.set
+    valueSetter?.call(input, value)
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+    input.dispatchEvent(new Event('change', { bubbles: true }))
+    input.blur()
+    return true
+  }, { placeholderText, value })
+
+  if (!filled) throw new Error(`Could not fill field with placeholder: ${placeholderText}`)
+}
+
 async function bodyIncludes(page, text) {
   return page.evaluate((expected) => document.body.textContent?.includes(expected) ?? false, text)
 }
@@ -390,6 +409,14 @@ async function runSmoke() {
     record('performance screen is reachable', await bodyIncludes(page, 'URLs Analyzed'))
     await page.waitForFunction(() => document.body.textContent?.includes('Est. CO2'))
     record('performance screen shows carbon estimate', await bodyIncludes(page, 'Est. CO2'))
+    await page.waitForFunction(() => document.body.textContent?.includes('Slow Pages') && document.body.textContent?.includes('Large Pages'))
+    record('performance screen shows crawl-derived slow and large page counts', await bodyIncludes(page, 'Slow Pages') && await bodyIncludes(page, 'Large Pages'))
+    await fillByPlaceholder(page, 'Filter by URL', 'gallery')
+    await page.waitForFunction(() => {
+      const text = document.body.textContent || ''
+      return text.includes('https://avanterrapark.com/gallery') && !text.includes('https://avanterrapark.com/activities/zip-line')
+    })
+    record('performance filter narrows rows by URL', await bodyIncludes(page, 'https://avanterrapark.com/gallery'))
 
     await clickText(page, 'Extractions', 'button')
     await page.waitForFunction(() => document.body.textContent?.includes('Custom Extractions'))
@@ -413,6 +440,8 @@ async function runSmoke() {
 
     await clickText(page, 'Schedules', 'button')
     await page.waitForFunction(() => document.body.textContent?.includes('Crawl Scheduling'))
+    await page.waitForFunction(() => document.body.textContent?.includes('New URLs') && document.body.textContent?.includes('Broken Links'))
+    record('crawl history diff table renders', await bodyIncludes(page, 'New URLs') && await bodyIncludes(page, 'Broken Links'))
     await clickText(page, 'New Schedule', 'button')
     await fillByLabel(page, 'Start URL', 'not-a-url')
     await fillByLabel(page, 'Cron Expression', '0 2 * * *')

@@ -19,6 +19,8 @@ interface PsiSummary {
   avgLcpMs: number | null; avgCls: number | null; avgTtfbMs?: number | null; avgSizeBytes?: number | null
   avgCarbonGrams?: number | null; totalCarbonGrams?: number | null
   totalUrlsWithPsi: number
+  slowPages?: number
+  largePages?: number
 }
 
 function scoreColor(score: number): string {
@@ -42,12 +44,14 @@ export default function PerformanceScreen() {
   const [summary, setSummary] = useState<PsiSummary | null>(null)
   const [loading, setLoading] = useState(false)
   const [filterText, setFilterText] = useState('')
+  const [error, setError] = useState('')
 
   useEffect(() => { loadData() }, [activeCrawlId])
 
   async function loadData() {
     if (!activeCrawlId) return
     setLoading(true)
+    setError('')
     try {
       const [rows, summ] = await Promise.all([
         window.crawldesk.psi.listByCrawl(activeCrawlId),
@@ -55,7 +59,12 @@ export default function PerformanceScreen() {
       ])
       setResults((rows || []).map(normalizePerformanceRow))
       setSummary(summ || null)
-    } catch (e) { console.error('[Performance] Failed to load:', e); setResults([]); setSummary(null) }
+    } catch (e: any) {
+      console.error('[Performance] Failed to load:', e)
+      setError(e?.message || 'Failed to load performance data')
+      setResults([])
+      setSummary(null)
+    }
     finally { setLoading(false) }
   }
 
@@ -71,6 +80,7 @@ export default function PerformanceScreen() {
   return (
     <div>
       <h1 className="text-[30px] leading-none tracking-tight font-bold text-primary-text mb-6">Performance</h1>
+      {error && <div className="bg-[#3b171b] border border-red-900 rounded-lg p-3 text-sm text-red-400 mb-4">{error}</div>}
 
       {/* Summary cards */}
       {summary && summary.totalUrlsWithPsi > 0 && (
@@ -124,11 +134,21 @@ export default function PerformanceScreen() {
 
       {/* Stats row */}
       <div className="kpi-card mb-6">
-        <div className="flex items-center gap-3">
-          <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-teal-accent/15 text-teal-accent">⚡</span>
+        <div className="grid grid-cols-3 gap-4">
+          <div className="flex items-center gap-3">
+            <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-teal-accent/15 text-teal-accent">P</span>
+            <div>
+              <p className="text-xs text-primary-muted uppercase">URLs Analyzed</p>
+              <p className="text-2xl font-bold text-primary-text">{summary?.totalUrlsWithPsi || results.length}</p>
+            </div>
+          </div>
           <div>
-            <p className="text-xs text-primary-muted uppercase">URLs Analyzed</p>
-            <p className="text-2xl font-bold text-primary-text">{summary?.totalUrlsWithPsi || results.length}</p>
+            <p className="text-xs text-primary-muted uppercase">Slow Pages</p>
+            <p className="text-2xl font-bold text-primary-text">{summary?.slowPages ?? 0}</p>
+          </div>
+          <div>
+            <p className="text-xs text-primary-muted uppercase">Large Pages</p>
+            <p className="text-2xl font-bold text-primary-text">{summary?.largePages ?? 0}</p>
           </div>
         </div>
       </div>
@@ -145,9 +165,9 @@ export default function PerformanceScreen() {
       </div>
 
       {loading ? (
-        <p className="text-primary-muted">Loading PSI data...</p>
+        <p className="text-primary-muted">Loading performance data...</p>
       ) : filtered.length === 0 ? (
-        <p className="text-primary-muted">No PageSpeed Insights data available.</p>
+        <p className="text-primary-muted">No crawl performance data available.</p>
       ) : (
         <div className="overflow-x-auto card rounded-xl">
           <table className="w-full text-sm">
