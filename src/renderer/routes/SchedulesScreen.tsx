@@ -15,6 +15,14 @@ interface Schedule {
   created_at: string
 }
 
+interface ScheduleForm {
+  startUrl: string
+  cronExpression: string
+  maxUrls: string
+  maxDepth: string
+  concurrency: string
+}
+
 interface CrawlDiff {
   id: string
   crawl_a_id?: string
@@ -68,14 +76,22 @@ interface CrawlDiffDetail {
   sampleLimit: number
 }
 
+const defaultScheduleForm: ScheduleForm = {
+  startUrl: '',
+  cronExpression: '',
+  maxUrls: '10000',
+  maxDepth: '10',
+  concurrency: '10',
+}
+
 export default function SchedulesScreen() {
   const { selectedProjectId } = useProjectStore()
   const [schedules, setSchedules] = useState<Schedule[]>([])
   const [loading, setLoading] = useState(false)
   const [showForm, setShowForm] = useState(false)
-  const [form, setForm] = useState({ startUrl: '', cronExpression: '' })
+  const [form, setForm] = useState<ScheduleForm>(defaultScheduleForm)
   const [editingScheduleId, setEditingScheduleId] = useState<string | null>(null)
-  const [editForm, setEditForm] = useState({ startUrl: '', cronExpression: '' })
+  const [editForm, setEditForm] = useState<ScheduleForm>(defaultScheduleForm)
   const [saving, setSaving] = useState(false)
   const [updatingScheduleId, setUpdatingScheduleId] = useState<string | null>(null)
   const [runningScheduleId, setRunningScheduleId] = useState<string | null>(null)
@@ -133,10 +149,10 @@ export default function SchedulesScreen() {
       await window.crawldesk.schedules.create({
         projectId: selectedProjectId,
         startUrl: form.startUrl,
-        crawlSettingsJson: '{}',
+        crawlSettingsJson: scheduleSettingsJson(form),
         cronExpression: form.cronExpression
       })
-      setForm({ startUrl: '', cronExpression: '' })
+      setForm(defaultScheduleForm)
       setShowForm(false)
       setNotice('Schedule created.')
       await loadSchedules()
@@ -148,11 +164,14 @@ export default function SchedulesScreen() {
     }
   }
 
-  function validateScheduleForm(values: { startUrl: string, cronExpression: string }, action: 'creating' | 'updating') {
+  function validateScheduleForm(values: ScheduleForm, action: 'creating' | 'updating') {
     if (!selectedProjectId) { setError(`Select a project before ${action} a schedule.`); return false }
     if (!values.startUrl.trim()) { setError('Start URL is required.'); return false }
     if (!values.cronExpression.trim()) { setError('Cron expression is required.'); return false }
     try { new URL(values.startUrl) } catch { setError('Start URL must be a valid URL.'); return false }
+    if (!positiveInteger(values.maxUrls, 1, 1000000)) { setError('Max URLs must be between 1 and 1,000,000.'); return false }
+    if (!positiveInteger(values.maxDepth, 0, 1000)) { setError('Max depth must be between 0 and 1,000.'); return false }
+    if (!positiveInteger(values.concurrency, 1, 100)) { setError('Concurrency must be between 1 and 100.'); return false }
     return true
   }
 
@@ -161,12 +180,12 @@ export default function SchedulesScreen() {
     setNotice('')
     setShowForm(false)
     setEditingScheduleId(schedule.id)
-    setEditForm({ startUrl: schedule.start_url, cronExpression: schedule.cron_expression })
+    setEditForm(scheduleToForm(schedule))
   }
 
   function cancelEditing() {
     setEditingScheduleId(null)
-    setEditForm({ startUrl: '', cronExpression: '' })
+    setEditForm(defaultScheduleForm)
   }
 
   async function saveScheduleEdit(schedule: Schedule) {
@@ -177,7 +196,7 @@ export default function SchedulesScreen() {
     try {
       await window.crawldesk.schedules.update(schedule.id, {
         startUrl: editForm.startUrl,
-        crawlSettingsJson: schedule.crawl_settings_json || '{}',
+        crawlSettingsJson: scheduleSettingsJson(editForm),
         cronExpression: editForm.cronExpression,
       })
       setEditingScheduleId(null)
@@ -243,7 +262,7 @@ export default function SchedulesScreen() {
       {!showForm ? (
         <button onClick={() => { setError(''); setShowForm(true) }} className="btn-secondary !py-2 !px-4 text-sm mb-4">+ New Schedule</button>
       ) : (
-        <form onSubmit={createSchedule} className="card p-4 mb-4 grid grid-cols-1 lg:grid-cols-[minmax(220px,1fr)_minmax(180px,220px)_minmax(180px,220px)_auto_auto] gap-3 items-end" style={{ borderRadius: '12px' }}>
+        <form onSubmit={createSchedule} className="card p-4 mb-4 grid grid-cols-1 md:grid-cols-3 xl:grid-cols-[minmax(220px,1fr)_minmax(180px,220px)_minmax(120px,150px)_minmax(120px,150px)_minmax(120px,150px)_minmax(180px,220px)_auto_auto] gap-3 items-end" style={{ borderRadius: '12px' }}>
           <div>
             <label className="block text-xs text-primary-muted uppercase tracking-wider mb-1">Start URL</label>
             <input value={form.startUrl} onChange={e => setForm(f => ({ ...f, startUrl: e.target.value }))} placeholder="https://example.com" className="input-field w-full !py-2 !text-sm" required />
@@ -253,6 +272,9 @@ export default function SchedulesScreen() {
             <input value={form.cronExpression} onChange={e => setForm(f => ({ ...f, cronExpression: e.target.value }))} placeholder="0 2 * * *" className="input-field w-full !py-2 !text-sm" required />
             {form.cronExpression && <p className="text-xs text-teal-accent mt-1">{describeCron(form.cronExpression)}</p>}
           </div>
+          <NumberField label="Max URLs" value={form.maxUrls} onChange={value => setForm(f => ({ ...f, maxUrls: value }))} min={1} />
+          <NumberField label="Max Depth" value={form.maxDepth} onChange={value => setForm(f => ({ ...f, maxDepth: value }))} min={0} />
+          <NumberField label="Concurrency" value={form.concurrency} onChange={value => setForm(f => ({ ...f, concurrency: value }))} min={1} />
           <div>
             <label className="block text-xs text-primary-muted uppercase tracking-wider mb-1">Quick Presets</label>
             <select onChange={e => { if (e.target.value) setForm(f => ({ ...f, cronExpression: e.target.value })) }} className="input-field w-full !py-2 !text-sm" defaultValue="">
@@ -285,7 +307,7 @@ export default function SchedulesScreen() {
         return (
         <div key={s.id} className="card p-4 mb-3 flex flex-col lg:flex-row lg:items-start gap-4" style={{ borderRadius: '12px' }}>
           {isEditing ? (
-            <div className="flex-1 min-w-0 grid grid-cols-1 lg:grid-cols-[minmax(220px,1fr)_minmax(180px,220px)] gap-3">
+            <div className="flex-1 min-w-0 grid grid-cols-1 md:grid-cols-3 xl:grid-cols-[minmax(220px,1fr)_minmax(180px,220px)_minmax(110px,130px)_minmax(110px,130px)_minmax(110px,130px)] gap-3">
               <div>
                 <label className="block text-xs text-primary-muted uppercase tracking-wider mb-1">Start URL</label>
                 <input value={editForm.startUrl} onChange={e => setEditForm(f => ({ ...f, startUrl: e.target.value }))} className="input-field w-full !py-2 !text-sm" required />
@@ -295,6 +317,9 @@ export default function SchedulesScreen() {
                 <input value={editForm.cronExpression} onChange={e => setEditForm(f => ({ ...f, cronExpression: e.target.value }))} className="input-field w-full !py-2 !text-sm" required />
                 {editForm.cronExpression && <p className="text-xs text-teal-accent mt-1">{describeCron(editForm.cronExpression)}</p>}
               </div>
+              <NumberField label="Max URLs" value={editForm.maxUrls} onChange={value => setEditForm(f => ({ ...f, maxUrls: value }))} min={1} />
+              <NumberField label="Max Depth" value={editForm.maxDepth} onChange={value => setEditForm(f => ({ ...f, maxDepth: value }))} min={0} />
+              <NumberField label="Concurrency" value={editForm.concurrency} onChange={value => setEditForm(f => ({ ...f, concurrency: value }))} min={1} />
             </div>
           ) : (
             <div className="flex-1 min-w-0">
@@ -308,6 +333,7 @@ export default function SchedulesScreen() {
                 Last run: {s.last_run_at ? new Date(s.last_run_at).toLocaleString('en-US') : 'Never'}
                 {' · '}Next run: {s.next_run_at ? new Date(s.next_run_at).toLocaleString('en-US') : '—'}
               </p>
+              <p className="text-xs text-primary-muted mt-1">{scheduleSettingsSummary(s)}</p>
             </div>
           )}
           <div className="flex items-center gap-2 shrink-0">
@@ -344,6 +370,68 @@ export default function SchedulesScreen() {
       )}
     </div>
   )
+}
+
+function NumberField({ label, value, onChange, min }: { label: string, value: string, onChange: (value: string) => void, min: number }) {
+  return (
+    <div>
+      <label className="block text-xs text-primary-muted uppercase tracking-wider mb-1">{label}</label>
+      <input
+        type="number"
+        min={min}
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        className="input-field w-full !py-2 !text-sm"
+        required
+      />
+    </div>
+  )
+}
+
+function scheduleToForm(schedule: Schedule): ScheduleForm {
+  const settings = parseScheduleSettings(schedule.crawl_settings_json)
+  return {
+    startUrl: schedule.start_url,
+    cronExpression: schedule.cron_expression,
+    maxUrls: String(settings.maxUrls),
+    maxDepth: String(settings.maxDepth),
+    concurrency: String(settings.concurrency),
+  }
+}
+
+function scheduleSettingsJson(values: ScheduleForm) {
+  return JSON.stringify({
+    maxUrls: Number(values.maxUrls),
+    maxDepth: Number(values.maxDepth),
+    concurrency: Number(values.concurrency),
+  })
+}
+
+function scheduleSettingsSummary(schedule: Schedule) {
+  const settings = parseScheduleSettings(schedule.crawl_settings_json)
+  return `Max URLs: ${settings.maxUrls.toLocaleString('en-US')} · Depth: ${settings.maxDepth} · Concurrency: ${settings.concurrency}`
+}
+
+function parseScheduleSettings(settingsJson?: string) {
+  try {
+    const parsed = JSON.parse(settingsJson || '{}')
+    return {
+      maxUrls: Number.isFinite(Number(parsed.maxUrls)) ? Number(parsed.maxUrls) : Number(defaultScheduleForm.maxUrls),
+      maxDepth: Number.isFinite(Number(parsed.maxDepth)) ? Number(parsed.maxDepth) : Number(defaultScheduleForm.maxDepth),
+      concurrency: Number.isFinite(Number(parsed.concurrency)) ? Number(parsed.concurrency) : Number(defaultScheduleForm.concurrency),
+    }
+  } catch {
+    return {
+      maxUrls: Number(defaultScheduleForm.maxUrls),
+      maxDepth: Number(defaultScheduleForm.maxDepth),
+      concurrency: Number(defaultScheduleForm.concurrency),
+    }
+  }
+}
+
+function positiveInteger(value: string, min: number, max: number) {
+  const parsed = Number(value)
+  return Number.isInteger(parsed) && parsed >= min && parsed <= max
 }
 
 function DiffViewer({ projectId }: { projectId: string }) {

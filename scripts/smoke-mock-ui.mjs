@@ -507,29 +507,49 @@ async function runSmoke() {
     await page.waitForFunction(() => document.body.textContent?.includes('Start URL must be a valid URL'))
     record('schedules screen validates URL before save', await bodyIncludes(page, 'Start URL must be a valid URL'))
     await fillByLabel(page, 'Start URL', 'https://avanterrapark.com/smoke-schedule')
+    await fillByLabel(page, 'Max URLs', '12')
+    await fillByLabel(page, 'Max Depth', '2')
+    await fillByLabel(page, 'Concurrency', '3')
     await clickText(page, 'Save', 'form button')
     await page.waitForFunction(() => document.body.textContent?.includes('https://avanterrapark.com/smoke-schedule'))
     const scheduleState = await page.evaluate(async () => {
       const rows = await window.crawldesk.schedules.list('1')
       return {
         count: rows.length,
-        hasSchedule: rows.some((row) => row.start_url === 'https://avanterrapark.com/smoke-schedule' && row.cron_expression === '0 2 * * *'),
+        hasSchedule: rows.some((row) => {
+          const settings = JSON.parse(row.crawl_settings_json || '{}')
+          return row.start_url === 'https://avanterrapark.com/smoke-schedule'
+            && row.cron_expression === '0 2 * * *'
+            && settings.maxUrls === 12
+            && settings.maxDepth === 2
+            && settings.concurrency === 3
+        }),
       }
     })
-    record('schedules screen creates a schedule', scheduleState.hasSchedule, JSON.stringify(scheduleState))
+    record('schedules screen creates a schedule with crawl settings', scheduleState.hasSchedule, JSON.stringify(scheduleState))
     await clickText(page, 'Edit', 'button')
     await fillByLabel(page, 'Start URL', 'https://avanterrapark.com/smoke-schedule-edited')
     await fillByLabel(page, 'Cron Expression', '0 */6 * * *')
+    await fillByLabel(page, 'Max URLs', '8')
+    await fillByLabel(page, 'Max Depth', '1')
+    await fillByLabel(page, 'Concurrency', '2')
     await clickText(page, 'Save changes', 'button')
     await page.waitForFunction(() => document.body.textContent?.includes('https://avanterrapark.com/smoke-schedule-edited'))
     const scheduleEditState = await page.evaluate(async () => {
       const rows = await window.crawldesk.schedules.list('1')
       return {
         count: rows.length,
-        edited: rows.some((row) => row.start_url === 'https://avanterrapark.com/smoke-schedule-edited' && row.cron_expression === '0 */6 * * *'),
+        edited: rows.some((row) => {
+          const settings = JSON.parse(row.crawl_settings_json || '{}')
+          return row.start_url === 'https://avanterrapark.com/smoke-schedule-edited'
+            && row.cron_expression === '0 */6 * * *'
+            && settings.maxUrls === 8
+            && settings.maxDepth === 1
+            && settings.concurrency === 2
+        }),
       }
     })
-    record('schedules screen edits an existing schedule', scheduleEditState.edited, JSON.stringify(scheduleEditState))
+    record('schedules screen edits an existing schedule with crawl settings', scheduleEditState.edited, JSON.stringify(scheduleEditState))
     await clickText(page, 'Run now', 'button')
     await page.waitForFunction(() => document.body.textContent?.includes('Started scheduled crawl #'))
     const manualScheduleRunState = await page.evaluate(async () => {
