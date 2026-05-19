@@ -407,7 +407,16 @@ async function runSmoke() {
     record('links screen shows anchor text summary', await bodyIncludes(page, 'Top Anchor Text') && await bodyIncludes(page, 'click here'))
 
     await clickText(page, 'Internal', 'button')
-    await page.waitForFunction(() => document.body.textContent?.includes('Internal Links'))
+    await page.waitForFunction(() => {
+      const rows = Array.from(document.querySelectorAll('tbody tr')).filter((row) => {
+        const firstCell = row.querySelector('td')
+        return firstCell?.textContent?.includes('http')
+      })
+      return rows.length > 0 && rows.every((row) => {
+        const cells = row.querySelectorAll('td')
+        return cells[4]?.textContent?.includes('Yes')
+      })
+    })
     const internalPageLabel = await page.evaluate(() => document.body.textContent?.includes('Page 1 of'))
     record('links internal filter resets to first page', internalPageLabel)
     const internalCellsOk = await page.evaluate(() => {
@@ -435,6 +444,9 @@ async function runSmoke() {
       return rows.length === 1 && rows[0].includes('zip') && !rows.some((row) => row.includes('adventure'))
     })
     record('keywords filter narrows visible phrases', await bodyIncludes(page, 'Showing 1 of'))
+    await clickText(page, 'Export CSV', 'button')
+    await page.waitForFunction(() => document.body.textContent?.includes('Exported 1 keywords'))
+    record('keywords screen exports filtered rows', await bodyIncludes(page, 'Exported 1 keywords'))
     await fillByPlaceholder(page, 'Filter keywords', '')
 
     await clickText(page, 'Bigrams', 'button')

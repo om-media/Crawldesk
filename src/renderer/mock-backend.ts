@@ -570,6 +570,13 @@ export function setupMockCrawldesk() {
       exportUrls: async () => { await delay(); return { filePath: '/tmp/urls-1.csv', rowCount: 247 } },
       exportIssues: async () => { await delay(); return { filePath: '/tmp/issues-1.csv', rowCount: 12 } },
       exportLinks: async () => { await delay(); return { filePath: '/tmp/links-1.csv', rowCount: 1834 } },
+      exportKeywords: async (input: any = {}) => {
+        await delay()
+        const search = String(input.filters?.search || '').trim().toLowerCase()
+        const gramType = input.gramType || 'unigrams'
+        const rowCount = search === 'zip' ? 1 : gramType === 'trigrams' ? 9 : gramType === 'bigrams' ? 15 : 30
+        return { filePath: '/tmp/keywords-1.csv', rowCount }
+      },
       exportPerformance: async (input: any = {}) => {
         await delay()
         const mode = input.filters?.mode

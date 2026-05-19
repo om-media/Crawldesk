@@ -265,6 +265,11 @@ async function runSmoke() {
         filters: { mode: 'all', search: '' },
         sort: { mode: 'slowest' },
       })
+      const keywordExport = await window.crawldesk.exports.exportKeywords({
+        crawlId: crawl.id,
+        gramType: 'bigrams',
+        filters: { search: 'adventure' },
+      })
       const extractionRule = await window.crawldesk.extractions.create({
         crawlId: crawl.id,
         name: 'Smoke title',
@@ -396,6 +401,7 @@ async function runSmoke() {
         issueExport,
         linkExport,
         performanceExport,
+        keywordExport,
         extractionRuleUpdated,
         extractionRulesBeforeDelete,
         extractionRulesAfterDelete,
@@ -438,7 +444,8 @@ async function runSmoke() {
     record('release issue CSV export works', result.issueExport?.rowCount > 0 && result.issueExport?.fileSize > 0, JSON.stringify(result.issueExport))
     record('release link CSV export works', result.linkExport?.rowCount > 0 && result.linkExport?.fileSize > 0, JSON.stringify(result.linkExport))
     record('release performance CSV export works', result.performanceExport?.rowCount >= 3 && result.performanceExport?.fileSize > 0, JSON.stringify(result.performanceExport))
-    for (const exportResult of [result.urlExport, result.issueExport, result.linkExport, result.performanceExport]) {
+    record('release keyword CSV export works', result.keywordExport?.rowCount > 0 && result.keywordExport?.fileSize > 0, JSON.stringify(result.keywordExport))
+    for (const exportResult of [result.urlExport, result.issueExport, result.linkExport, result.performanceExport, result.keywordExport]) {
       if (exportResult?.filePath) rmSync(exportResult.filePath, { force: true })
     }
     record('release extraction rules CRUD works', result.extractionRuleUpdated?.name === 'Smoke meta description' && result.extractionRuleUpdated?.active === 0 && result.extractionRulesBeforeDelete.length === 1 && result.extractionRulesAfterDelete.length === 0, JSON.stringify({ updated: result.extractionRuleUpdated, before: result.extractionRulesBeforeDelete, after: result.extractionRulesAfterDelete }))

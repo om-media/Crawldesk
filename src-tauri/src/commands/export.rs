@@ -1,4 +1,4 @@
-//! Export commands — CSV export of URLs, issues, links, and performance rows.
+//! Export commands — CSV export of URLs, issues, links, keywords, and performance rows.
 
 use crate::core::storage::{db, queries};
 use serde::Serialize;
@@ -77,6 +77,15 @@ struct PerformanceCsvRow {
     size_bytes: String,
     carbon_footprint_grams: String,
     fetched_at: String,
+}
+
+// ─── Keyword CSV Row ────────────────────────────────────────────
+
+struct KeywordCsvRow {
+    gram_type: String,
+    phrase: String,
+    count: String,
+    frequency: String,
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────
@@ -425,6 +434,61 @@ pub fn export_links_csv(
 
     let row_count = all_links.len();
     info!("Exported {} links to {}", row_count, output_path);
+    finish_csv(writer, path, row_count)
+}
+
+// ─── export_keywords_csv ────────────────────────────────────────
+
+#[tauri::command]
+pub fn export_keywords_csv(
+    crawl_id: i64,
+    output_path: String,
+    gram_type: Option<String>,
+    search: Option<String>,
+) -> Result<ExportResult, String> {
+    let gram_type = match gram_type.as_deref() {
+        Some("bigrams") => "bigrams".to_string(),
+        Some("trigrams") => "trigrams".to_string(),
+        _ => "unigrams".to_string(),
+    };
+    let mut rows = crate::commands::keyword::analyze_keywords(crawl_id, gram_type.clone())?.keywords;
+
+    let search = search.map(|value| value.to_lowercase()).unwrap_or_default();
+    if !search.is_empty() {
+        rows.retain(|row| row.phrase.to_lowercase().contains(&search));
+    }
+
+    let path = Path::new(&output_path);
+    let file = create_csv_file(path)?;
+    let mut writer = csv::Writer::from_writer(file);
+
+    writer
+        .write_record(&["gram_type", "phrase", "count", "frequency"])
+        .map_err(|e| format!("CSV write error: {}", e))?;
+
+    for row in &rows {
+        let csv_row = KeywordCsvRow {
+            gram_type: gram_type.clone(),
+            phrase: row.phrase.clone(),
+            count: row.count.to_string(),
+            frequency: row.frequency.to_string(),
+        };
+
+        writer
+            .write_record(&[
+                &csv_row.gram_type,
+                &csv_row.phrase,
+                &csv_row.count,
+                &csv_row.frequency,
+            ])
+            .map_err(|e| format!("CSV write error: {}", e))?;
+    }
+
+    let row_count = rows.len();
+    info!(
+        "Exported {} {} keyword rows to {}",
+        row_count, gram_type, output_path
+    );
     finish_csv(writer, path, row_count)
 }
 

@@ -426,6 +426,16 @@ function setupCrawldesk() {
         })
         return normalizeExportResult(result)
       },
+      exportKeywords: async (input: any) => {
+        const crawlId = input.crawlId ?? input.projectId
+        const result = await invoke('export_keywords_csv', {
+          crawlId: toId(crawlId),
+          outputPath: await exportPath('keywords', crawlId),
+          gramType: input.gramType,
+          search: input.filters?.search,
+        })
+        return normalizeExportResult(result)
+      },
       exportPerformance: async (input: any) => {
         const crawlId = input.crawlId ?? input.projectId
         const result = await invoke('export_performance_csv', {
