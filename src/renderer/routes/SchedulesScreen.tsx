@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useProjectStore } from '../stores/project-store'
+import ErrorBanner from '../components/ErrorBanner'
 
 
 interface Schedule {
@@ -115,30 +116,30 @@ export default function SchedulesScreen() {
     <div>
       <h1 className="text-[30px] leading-none tracking-tight font-bold text-primary-text mb-2">Crawl Scheduling</h1>
       <p className="text-sm text-primary-muted mb-6">Set up recurring crawls with cron expressions. Compare results across runs to track SEO changes over time.</p>
-      {error && <div className="bg-[#3b171b] border border-red-900 rounded-lg p-3 text-sm text-red-400 mb-4">{error}</div>}
+      {error && <ErrorBanner message={error} onRetry={error.startsWith('Failed') ? loadSchedules : undefined} />}
 
       {/* New Schedule Form */}
       {!showForm ? (
         <button onClick={() => { setError(''); setShowForm(true) }} className="btn-secondary !py-2 !px-4 text-sm mb-4">+ New Schedule</button>
       ) : (
-        <form onSubmit={createSchedule} className="card p-4 mb-4 flex gap-3 items-end" style={{ borderRadius: '12px' }}>
-          <div className="flex-1">
+        <form onSubmit={createSchedule} className="card p-4 mb-4 grid grid-cols-1 lg:grid-cols-[minmax(220px,1fr)_minmax(180px,220px)_minmax(180px,220px)_auto_auto] gap-3 items-end" style={{ borderRadius: '12px' }}>
+          <div>
             <label className="block text-xs text-primary-muted uppercase tracking-wider mb-1">Start URL</label>
             <input value={form.startUrl} onChange={e => setForm(f => ({ ...f, startUrl: e.target.value }))} placeholder="https://example.com" className="input-field w-full !py-2 !text-sm" required />
           </div>
-          <div className="w-48">
+          <div>
             <label className="block text-xs text-primary-muted uppercase tracking-wider mb-1">Cron Expression</label>
             <input value={form.cronExpression} onChange={e => setForm(f => ({ ...f, cronExpression: e.target.value }))} placeholder="0 2 * * *" className="input-field w-full !py-2 !text-sm" required />
             {form.cronExpression && <p className="text-xs text-teal-accent mt-1">{describeCron(form.cronExpression)}</p>}
           </div>
-          <div className="w-48">
+          <div>
             <label className="block text-xs text-primary-muted uppercase tracking-wider mb-1">Quick Presets</label>
             <select onChange={e => { if (e.target.value) setForm(f => ({ ...f, cronExpression: e.target.value })) }} className="input-field w-full !py-2 !text-sm" defaultValue="">
               <option value="">Choose...</option>
               {cronPresets.map(p => <option key={p.expr} value={p.expr}>{p.label}</option>)}
             </select>
           </div>
-          <button type="submit" disabled={saving || !selectedProjectId} className="btn-primary !py-2 !px-4">{saving ? 'Saving...' : 'Save'}</button>
+          <button type="submit" disabled={saving || !selectedProjectId} className="btn-primary !py-2 !px-4 whitespace-nowrap">{saving ? 'Saving...' : 'Save'}</button>
           <button type="button" onClick={() => setShowForm(false)} className="btn-secondary !py-2 !px-3">Cancel</button>
         </form>
       )}
@@ -159,7 +160,7 @@ export default function SchedulesScreen() {
       )}
 
       {!loading && schedules.map(s => (
-        <div key={s.id} className="card p-4 mb-3 flex items-start gap-4" style={{ borderRadius: '12px' }}>
+        <div key={s.id} className="card p-4 mb-3 flex flex-col lg:flex-row lg:items-start gap-4" style={{ borderRadius: '12px' }}>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-3 mb-1">
               <code className="font-mono text-teal-accent text-sm">{s.cron_expression}</code>
@@ -168,8 +169,8 @@ export default function SchedulesScreen() {
             </div>
             <p className="text-sm text-primary-text truncate">{s.start_url}</p>
             <p className="text-xs text-primary-muted mt-1">
-              Last run: {s.last_run_at ? new Date(s.last_run_at).toLocaleString() : 'Never'}
-              {' · '}Next run: {s.next_run_at ? new Date(s.next_run_at).toLocaleString() : '—'}
+              Last run: {s.last_run_at ? new Date(s.last_run_at).toLocaleString('en-US') : 'Never'}
+              {' · '}Next run: {s.next_run_at ? new Date(s.next_run_at).toLocaleString('en-US') : '—'}
             </p>
           </div>
           <div className="flex items-center gap-2 shrink-0">
@@ -219,7 +220,18 @@ function DiffViewer({ projectId }: { projectId: string }) {
   }, [projectId])
 
   if (loading) return <p className="text-sm text-primary-muted">Loading crawl diffs...</p>
-  if (error) return <div className="bg-[#3b171b] border border-red-900 rounded-lg p-3 text-sm text-red-400">{error}</div>
+  if (error) return <ErrorBanner message={error} onRetry={() => {
+    setLoading(true)
+    setError('')
+    window.crawldesk.diff.listByProject(projectId)
+      .then((rows) => setDiffs(rows || []))
+      .catch((err: any) => {
+        console.error('[Schedules] Failed to load crawl diffs:', err)
+        setError(err?.message || 'Failed to load crawl diffs')
+        setDiffs([])
+      })
+      .finally(() => setLoading(false))
+  }} />
   if (!diffs.length) return <p className="text-sm text-primary-muted">No diff data available yet — diffs appear after the second crawl on a project.</p>
 
   return (
@@ -244,7 +256,7 @@ function DiffViewer({ projectId }: { projectId: string }) {
             <td className={`py-2 px-3 ${d.broken_links_delta <= 0 ? 'text-emerald' : 'text-red-400'}`}>{d.broken_links_delta > 0 ? '+' : ''}{d.broken_links_delta}</td>
             <td className={`py-2 px-3 ${d.issues_delta <= 0 ? 'text-emerald' : 'text-red-400'}`}>{d.issues_delta > 0 ? '+' : ''}{d.issues_delta}</td>
             <td className={`py-2 px-3 ${d.critical_issues_delta <= 0 ? 'text-emerald' : 'text-red-400 font-bold'}`}>{d.critical_issues_delta > 0 ? '+' : ''}{d.critical_issues_delta}</td>
-            <td className="py-2 px-3 text-primary-muted text-xs">{new Date(d.created_at).toLocaleDateString()}</td>
+            <td className="py-2 px-3 text-primary-muted text-xs">{new Date(d.created_at).toLocaleDateString('en-US')}</td>
           </tr>
         ))}
       </tbody>

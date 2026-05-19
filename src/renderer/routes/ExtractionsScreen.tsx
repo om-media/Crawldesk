@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
-import { useProjectStore } from '../stores/project-store'
+import ErrorBanner from '../components/ErrorBanner'
+import { useResolvedCrawl } from '../hooks/use-resolved-crawl'
 
 
 interface ExtractionRule {
@@ -9,7 +10,7 @@ interface ExtractionRule {
 }
 
 export default function ExtractionsScreen() {
-  const { activeCrawlId } = useProjectStore()
+  const { activeCrawlId, resolvingCrawl, resolveError } = useResolvedCrawl()
   const [rules, setRules] = useState<ExtractionRule[]>([])
   const [editing, setEditing] = useState<string | null>(null)
   const [formName, setFormName] = useState('')
@@ -81,8 +82,8 @@ export default function ExtractionsScreen() {
 
   if (!activeCrawlId) return (
     <div className="card py-16 text-center">
-      <p className="text-lg font-semibold text-primary-muted">No extraction rules yet.</p>
-      <p className="text-sm text-primary-muted mt-2">Start a crawl first and define custom extractions here.</p>
+      <p className="text-lg font-semibold text-primary-muted">{resolvingCrawl ? 'Loading latest crawl...' : 'No extraction rules yet.'}</p>
+      <p className="text-sm text-primary-muted mt-2">{resolveError || (resolvingCrawl ? 'Finding the most recent crawl for extraction rules.' : 'Start a crawl first and define custom extractions here.')}</p>
     </div>
   )
 
@@ -93,8 +94,8 @@ export default function ExtractionsScreen() {
       {/* Add / Edit form */}
       <form onSubmit={handleSubmit} className="card mb-6">
         <h2 className="text-xs uppercase font-semibold text-primary-muted mb-4">{editing ? 'Edit Rule' : 'New Extraction Rule'}</h2>
-        {error && <div className="bg-[#3b171b] border border-red-900 rounded-lg p-3 text-sm text-red-400 mb-4">{error}</div>}
-        <div className="grid grid-cols-2 gap-4">
+        {error && <ErrorBanner message={error} onRetry={error.startsWith('Failed') ? loadRules : undefined} />}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-xs font-medium text-primary-muted uppercase tracking-wider mb-1">Rule Name *</label>
             <input value={formName} onChange={e => setFormName(e.target.value)} placeholder="e.g. Meta description" className="input-field" required />
@@ -107,11 +108,11 @@ export default function ExtractionsScreen() {
               <option value="regex">Regex</option>
             </select>
           </div>
-          <div className="col-span-2">
+          <div className="md:col-span-2">
             <label className="block text-xs font-medium text-primary-muted uppercase tracking-wider mb-1">Selector / Pattern *</label>
             <input value={formSelector} onChange={e => setFormSelector(e.target.value)} placeholder={`e.g. meta[name="description"]`} className="input-field" required />
           </div>
-          <div className="col-span-2">
+          <div className="md:col-span-2">
             <label className="block text-xs font-medium text-primary-muted uppercase tracking-wider mb-1">Attribute (optional)</label>
             <input value={formAttribute} onChange={e => setFormAttribute(e.target.value)} placeholder='e.g. content, href' className="input-field" />
           </div>
@@ -130,7 +131,7 @@ export default function ExtractionsScreen() {
         ) : (
           <div className="space-y-2">
             {rules.map(r => (
-              <div key={r.id} className={`flex items-center gap-4 p-3 rounded-lg ${r.active ? 'bg-sidebar' : 'bg-midnight/30 opacity-60'} border border-lumen/50`}>
+              <div key={r.id} className={`flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 p-3 rounded-lg ${r.active ? 'bg-sidebar' : 'bg-midnight/30 opacity-60'} border border-lumen/50`}>
                 <input
                   type="checkbox" checked={!!r.active} onChange={() => toggleActive(r.id, r.active ? 0 : 1)}
                   className="w-4 h-4 rounded border-lumen text-teal-accent bg-panel-dark mt-1" title={r.active ? 'Deactivate' : 'Activate'}
@@ -144,8 +145,10 @@ export default function ExtractionsScreen() {
                   </div>
                   <p className="text-xs text-primary-muted truncate mt-0.5" title={r.selector}>{r.selector}{r.attribute ? ` → ${r.attribute}` : ''}</p>
                 </div>
-                <button onClick={() => startEdit(r)} className="text-xs text-teal-accent hover:underline shrink-0">Edit</button>
-                <button onClick={() => deleteRule(r.id)} className="text-xs text-red-400 hover:text-red-300 shrink-0">Delete</button>
+                <div className="flex items-center gap-3 shrink-0">
+                  <button onClick={() => startEdit(r)} className="text-xs text-teal-accent hover:underline">Edit</button>
+                  <button onClick={() => deleteRule(r.id)} className="text-xs text-red-400 hover:text-red-300">Delete</button>
+                </div>
               </div>
             ))}
           </div>
