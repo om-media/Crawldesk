@@ -570,6 +570,11 @@ export function setupMockCrawldesk() {
       exportUrls: async () => { await delay(); return { filePath: '/tmp/urls-1.csv', rowCount: 247 } },
       exportIssues: async () => { await delay(); return { filePath: '/tmp/issues-1.csv', rowCount: 12 } },
       exportLinks: async () => { await delay(); return { filePath: '/tmp/links-1.csv', rowCount: 1834 } },
+      exportPerformance: async (input: any = {}) => {
+        await delay()
+        const mode = input.filters?.mode
+        return { filePath: '/tmp/performance-1.csv', rowCount: mode === 'large' ? 1 : 3 }
+      },
     },
     app: {
       getVersion: async () => '0.1.0-mock',

@@ -426,6 +426,17 @@ function setupCrawldesk() {
         })
         return normalizeExportResult(result)
       },
+      exportPerformance: async (input: any) => {
+        const crawlId = input.crawlId ?? input.projectId
+        const result = await invoke('export_performance_csv', {
+          crawlId: toId(crawlId),
+          outputPath: await exportPath('performance', crawlId),
+          filterMode: input.filters?.mode,
+          search: input.filters?.search,
+          sortBy: input.sort?.mode,
+        })
+        return normalizeExportResult(result)
+      },
     },
     app: {
       getVersion: () => invoke('get_version'),

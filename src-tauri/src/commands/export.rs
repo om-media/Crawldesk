@@ -1,4 +1,4 @@
-//! Export commands — CSV export of URLs, issues, and links.
+//! Export commands — CSV export of URLs, issues, links, and performance rows.
 
 use crate::core::storage::{db, queries};
 use serde::Serialize;
@@ -67,6 +67,18 @@ struct LinkCsvRow {
     detected_at: String,
 }
 
+// ─── Performance CSV Row ───────────────────────────────────────
+
+struct PerformanceCsvRow {
+    url: String,
+    strategy: String,
+    performance_score: String,
+    ttfb_ms: String,
+    size_bytes: String,
+    carbon_footprint_grams: String,
+    fetched_at: String,
+}
+
 // ─── Helpers ─────────────────────────────────────────────────────
 
 fn opt_to_string(v: Option<String>) -> String {
@@ -74,6 +86,10 @@ fn opt_to_string(v: Option<String>) -> String {
 }
 
 fn opt_i32_to_string(v: Option<i32>) -> String {
+    v.map_or_else(String::new, |n| n.to_string())
+}
+
+fn opt_i64_to_string(v: Option<i64>) -> String {
     v.map_or_else(String::new, |n| n.to_string())
 }
 
@@ -409,5 +425,91 @@ pub fn export_links_csv(
 
     let row_count = all_links.len();
     info!("Exported {} links to {}", row_count, output_path);
+    finish_csv(writer, path, row_count)
+}
+
+// ─── export_performance_csv ─────────────────────────────────────
+
+#[tauri::command]
+pub fn export_performance_csv(
+    crawl_id: i64,
+    output_path: String,
+    filter_mode: Option<String>,
+    search: Option<String>,
+    sort_by: Option<String>,
+) -> Result<ExportResult, String> {
+    let mut rows = crate::commands::performance::list_performance_by_crawl(crawl_id)?;
+
+    let search = search.map(|value| value.to_lowercase()).unwrap_or_default();
+    if !search.is_empty() {
+        rows.retain(|row| row.url.to_lowercase().contains(&search));
+    }
+
+    match filter_mode.as_deref() {
+        Some("slow") => rows.retain(|row| row.ttfb_ms.map(|value| value > 1000.0).unwrap_or(false)),
+        Some("large") => {
+            rows.retain(|row| row.size_bytes.map(|value| value > 1_000_000).unwrap_or(false))
+        }
+        _ => {}
+    }
+
+    match sort_by.as_deref().unwrap_or("slowest") {
+        "largest" => rows.sort_by(|a, b| b.size_bytes.unwrap_or(0).cmp(&a.size_bytes.unwrap_or(0))),
+        "worstScore" => rows.sort_by(|a, b| {
+            a.performance_score
+                .unwrap_or(101)
+                .cmp(&b.performance_score.unwrap_or(101))
+        }),
+        "url" => rows.sort_by(|a, b| a.url.cmp(&b.url)),
+        _ => rows.sort_by(|a, b| {
+            b.ttfb_ms
+                .unwrap_or(0.0)
+                .partial_cmp(&a.ttfb_ms.unwrap_or(0.0))
+                .unwrap_or(std::cmp::Ordering::Equal)
+        }),
+    }
+
+    let path = Path::new(&output_path);
+    let file = create_csv_file(path)?;
+    let mut writer = csv::Writer::from_writer(file);
+
+    writer
+        .write_record(&[
+            "url",
+            "strategy",
+            "performance_score",
+            "ttfb_ms",
+            "size_bytes",
+            "carbon_footprint_grams",
+            "fetched_at",
+        ])
+        .map_err(|e| format!("CSV write error: {}", e))?;
+
+    for row in &rows {
+        let csv_row = PerformanceCsvRow {
+            url: row.url.clone(),
+            strategy: row.strategy.clone(),
+            performance_score: opt_i64_to_string(row.performance_score),
+            ttfb_ms: opt_f64_to_string(row.ttfb_ms),
+            size_bytes: opt_i64_to_string(row.size_bytes),
+            carbon_footprint_grams: opt_f64_to_string(row.carbon_footprint_grams),
+            fetched_at: row.fetched_at.clone().unwrap_or_default(),
+        };
+
+        writer
+            .write_record(&[
+                &csv_row.url,
+                &csv_row.strategy,
+                &csv_row.performance_score,
+                &csv_row.ttfb_ms,
+                &csv_row.size_bytes,
+                &csv_row.carbon_footprint_grams,
+                &csv_row.fetched_at,
+            ])
+            .map_err(|e| format!("CSV write error: {}", e))?;
+    }
+
+    let row_count = rows.len();
+    info!("Exported {} performance rows to {}", row_count, output_path);
     finish_csv(writer, path, row_count)
 }

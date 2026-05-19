@@ -306,7 +306,7 @@ export default function ResultsScreen() {
         {/* Table body */}
         <div
           data-results-table-body
-          className="relative overflow-visible"
+          className="relative min-w-0 overflow-visible"
         >
           {loading && urls.length === 0 ? (
             <div className="flex items-center justify-center py-16">
@@ -320,7 +320,7 @@ export default function ResultsScreen() {
                     type="button"
                     key={u.id}
                     data-results-row
-                    className="grid w-full min-w-0 items-center border-b border-row hover:bg-[#0f1f2a] focus:bg-[#0f1f2a] focus:outline-none focus-visible:ring-1 focus-visible:ring-teal-accent cursor-pointer transition-colors text-left"
+                    className="grid w-full max-w-full min-w-0 items-center border-b border-row hover:bg-[#0f1f2a] focus:bg-[#0f1f2a] focus:outline-none focus-visible:ring-1 focus-visible:ring-teal-accent cursor-pointer transition-colors text-left"
                     style={{ minHeight: ROW_HEIGHT, gridTemplateColumns: TABLE_GRID_COLUMNS }}
                     onClick={() => setSelectedUrl(u)}
                     aria-label={`Open URL details for ${u.url}`}

@@ -260,6 +260,11 @@ async function runSmoke() {
       const urlExport = await window.crawldesk.exports.exportUrls({ crawlId: crawl.id })
       const issueExport = await window.crawldesk.exports.exportIssues({ crawlId: crawl.id })
       const linkExport = await window.crawldesk.exports.exportLinks({ crawlId: crawl.id })
+      const performanceExport = await window.crawldesk.exports.exportPerformance({
+        crawlId: crawl.id,
+        filters: { mode: 'all', search: '' },
+        sort: { mode: 'slowest' },
+      })
       const extractionRule = await window.crawldesk.extractions.create({
         crawlId: crawl.id,
         name: 'Smoke title',
@@ -390,6 +395,7 @@ async function runSmoke() {
         urlExport,
         issueExport,
         linkExport,
+        performanceExport,
         extractionRuleUpdated,
         extractionRulesBeforeDelete,
         extractionRulesAfterDelete,
@@ -431,7 +437,8 @@ async function runSmoke() {
     record('release URL CSV export works', result.urlExport?.rowCount >= 3 && result.urlExport?.fileSize > 0, JSON.stringify(result.urlExport))
     record('release issue CSV export works', result.issueExport?.rowCount > 0 && result.issueExport?.fileSize > 0, JSON.stringify(result.issueExport))
     record('release link CSV export works', result.linkExport?.rowCount > 0 && result.linkExport?.fileSize > 0, JSON.stringify(result.linkExport))
-    for (const exportResult of [result.urlExport, result.issueExport, result.linkExport]) {
+    record('release performance CSV export works', result.performanceExport?.rowCount >= 3 && result.performanceExport?.fileSize > 0, JSON.stringify(result.performanceExport))
+    for (const exportResult of [result.urlExport, result.issueExport, result.linkExport, result.performanceExport]) {
       if (exportResult?.filePath) rmSync(exportResult.filePath, { force: true })
     }
     record('release extraction rules CRUD works', result.extractionRuleUpdated?.name === 'Smoke meta description' && result.extractionRuleUpdated?.active === 0 && result.extractionRulesBeforeDelete.length === 1 && result.extractionRulesAfterDelete.length === 0, JSON.stringify({ updated: result.extractionRuleUpdated, before: result.extractionRulesBeforeDelete, after: result.extractionRulesAfterDelete }))

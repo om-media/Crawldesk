@@ -476,6 +476,9 @@ async function runSmoke() {
       return text.includes('Showing 1 of') && text.includes('https://avanterrapark.com/gallery') && !text.includes('https://avanterrapark.com/activities/zip-line')
     })
     record('performance large page filter isolates heavy rows', await bodyIncludes(page, 'Showing 1 of') && await bodyIncludes(page, 'https://avanterrapark.com/gallery'))
+    await clickText(page, 'Export CSV', 'button')
+    await page.waitForFunction(() => document.body.textContent?.includes('Exported 1 performance rows'))
+    record('performance screen exports filtered rows', await bodyIncludes(page, 'Exported 1 performance rows'))
 
     await clickText(page, 'Extractions', 'button')
     await page.waitForFunction(() => document.body.textContent?.includes('Custom Extractions'))

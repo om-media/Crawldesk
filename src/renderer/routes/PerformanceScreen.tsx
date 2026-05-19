@@ -47,6 +47,8 @@ export default function PerformanceScreen() {
   const [filterText, setFilterText] = useState('')
   const [filterMode, setFilterMode] = useState<'all' | 'slow' | 'large'>('all')
   const [sortMode, setSortMode] = useState<'slowest' | 'largest' | 'worstScore' | 'url'>('slowest')
+  const [exporting, setExporting] = useState(false)
+  const [exportStatus, setExportStatus] = useState('')
   const [error, setError] = useState('')
 
   useEffect(() => { loadData() }, [activeCrawlId])
@@ -80,6 +82,26 @@ export default function PerformanceScreen() {
     })
     .sort((a, b) => sortPerformanceRows(a, b, sortMode))
 
+  async function exportPerformance() {
+    if (!activeCrawlId) return
+    setError('')
+    setExportStatus('')
+    setExporting(true)
+    try {
+      const result = await window.crawldesk.exports.exportPerformance({
+        crawlId: activeCrawlId,
+        filters: { mode: filterMode, search: filterText },
+        sort: { mode: sortMode },
+      })
+      setExportStatus(`Exported ${result.rowCount} performance rows to ${result.filePath}`)
+    } catch (e: any) {
+      console.error('[Performance] Export failed:', e)
+      setError(e?.message || 'Failed to export performance rows')
+    } finally {
+      setExporting(false)
+    }
+  }
+
   if (!activeCrawlId) return (
     <div className="card py-16 text-center">
       <p className="text-lg font-semibold text-primary-muted">{resolvingCrawl ? 'Loading latest crawl...' : 'No performance data yet.'}</p>
@@ -99,6 +121,7 @@ export default function PerformanceScreen() {
         </button>
       </div>
       {error && <ErrorBanner message={error} onRetry={loadData} />}
+      {exportStatus && <div className="mb-4 text-sm text-emerald bg-emerald/10 border border-emerald/30 rounded px-3 py-2">{exportStatus}</div>}
 
       {/* Summary cards */}
       {summary && summary.totalUrlsWithPsi > 0 && (
@@ -205,6 +228,9 @@ export default function PerformanceScreen() {
             <option value="url">URL A-Z</option>
           </select>
         </div>
+        <button type="button" onClick={exportPerformance} disabled={exporting || loading || filtered.length === 0} className="btn-primary !py-2 !px-4 text-sm">
+          {exporting ? 'Exporting...' : 'Export CSV'}
+        </button>
       </div>
       <p className="text-xs text-primary-muted mb-3">Showing {filtered.length} of {results.length} performance rows.</p>
 
