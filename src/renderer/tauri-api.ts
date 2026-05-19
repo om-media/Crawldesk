@@ -497,6 +497,7 @@ function setupCrawldesk() {
         return normalizeSchedule(row)
       },
       delete: (id: string | number) => invoke('delete_crawl_schedule', { id: toId(id) }),
+      runDue: () => invoke('run_due_crawl_schedules'),
     },
     diff: {
       get: async (projectId: string | number, diffId: string) => {

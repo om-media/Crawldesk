@@ -37,6 +37,9 @@ pub fn run() {
             core::storage::db::init_db(&db_path)?;
 
             info!("Database initialized at {:?}", db_path);
+            let crawl_manager = app.state::<CrawlManager>().inner().clone();
+            commands::schedule::spawn_schedule_runner(app.handle().clone(), crawl_manager);
+            info!("Scheduled crawl runner started");
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -93,6 +96,7 @@ pub fn run() {
             commands::schedule::create_crawl_schedule,
             commands::schedule::update_crawl_schedule,
             commands::schedule::delete_crawl_schedule,
+            commands::schedule::run_due_crawl_schedules,
             // Diff commands
             commands::diff::list_crawl_diffs,
             // Settings commands

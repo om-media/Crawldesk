@@ -1,9 +1,14 @@
 //! Crawl schedule commands.
 
+use crate::core::events::CrawlManager;
 use crate::core::storage::db;
+use crate::core::storage::models::CrawlSettings;
 use chrono::{DateTime, Datelike, Duration, Timelike, Utc};
 use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
+use tauri::{AppHandle, State};
+use tracing::{info, warn};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
@@ -34,6 +39,13 @@ pub struct CreateCrawlScheduleInput {
 pub struct UpdateCrawlScheduleInput {
     pub enabled: Option<bool>,
     pub cron_expression: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct DueScheduleRun {
+    pub schedule_id: i64,
+    pub crawl_id: i64,
 }
 
 #[tauri::command]
@@ -69,6 +81,67 @@ pub fn delete_crawl_schedule(id: i64) -> Result<(), String> {
     Ok(())
 }
 
+#[tauri::command]
+pub async fn run_due_crawl_schedules(
+    app: AppHandle,
+    state: State<'_, CrawlManager>,
+) -> Result<Vec<DueScheduleRun>, String> {
+    run_due_schedules_once(app, (*state).clone(), Utc::now()).await
+}
+
+pub fn spawn_schedule_runner(app: AppHandle, crawl_manager: CrawlManager) {
+    tauri::async_runtime::spawn(async move {
+        loop {
+            tokio::time::sleep(std::time::Duration::from_secs(60)).await;
+            if let Err(error) =
+                run_due_schedules_once(app.clone(), crawl_manager.clone(), Utc::now()).await
+            {
+                warn!("Scheduled crawl check failed: {}", error);
+            }
+        }
+    });
+}
+
+pub async fn run_due_schedules_once(
+    app: AppHandle,
+    crawl_manager: CrawlManager,
+    now: DateTime<Utc>,
+) -> Result<Vec<DueScheduleRun>, String> {
+    let conn = db::get_connection().map_err(|e| e.to_string())?;
+    let due_schedules = claim_due_schedules(&conn, now)?;
+    drop(conn);
+
+    let mut runs = Vec::new();
+    for schedule in due_schedules {
+        let settings = settings_for_schedule(&schedule)?;
+        match crate::commands::crawl::start_crawl_with_manager(
+            app.clone(),
+            schedule.project_id,
+            settings,
+            crawl_manager.clone(),
+        )
+        .await
+        {
+            Ok(crawl_id) => {
+                info!(
+                    "Started scheduled crawl {} from schedule {}",
+                    crawl_id, schedule.id
+                );
+                runs.push(DueScheduleRun {
+                    schedule_id: schedule.id,
+                    crawl_id,
+                });
+            }
+            Err(error) => warn!(
+                "Failed to start scheduled crawl for schedule {}: {}",
+                schedule.id, error
+            ),
+        }
+    }
+
+    Ok(runs)
+}
+
 fn list_schedules(conn: &Connection, project_id: i64) -> rusqlite::Result<Vec<CrawlSchedule>> {
     let mut stmt = conn.prepare(
         "SELECT id, project_id, start_url, crawl_settings_json, cron_expression, enabled,
@@ -79,6 +152,65 @@ fn list_schedules(conn: &Connection, project_id: i64) -> rusqlite::Result<Vec<Cr
     )?;
     let rows = stmt.query_map(params![project_id], map_schedule_row)?;
     rows.collect()
+}
+
+fn claim_due_schedules(
+    conn: &Connection,
+    now: DateTime<Utc>,
+) -> Result<Vec<CrawlSchedule>, String> {
+    let now_string = now.to_rfc3339();
+    let mut stmt = conn
+        .prepare(
+            "SELECT id, project_id, start_url, crawl_settings_json, cron_expression, enabled,
+                    last_run_at, next_run_at, created_at, updated_at
+             FROM crawl_schedules
+             WHERE enabled = 1
+               AND next_run_at IS NOT NULL
+               AND next_run_at <= ?1
+             ORDER BY next_run_at ASC, id ASC",
+        )
+        .map_err(|e| e.to_string())?;
+    let rows = stmt
+        .query_map(params![now_string], map_schedule_row)
+        .map_err(|e| e.to_string())?;
+    let due_schedules = rows
+        .collect::<rusqlite::Result<Vec<_>>>()
+        .map_err(|e| e.to_string())?;
+
+    for schedule in &due_schedules {
+        let next_run_at = next_run_for_cron(&schedule.cron_expression, now)
+            .map(|dt| dt.to_rfc3339());
+        conn.execute(
+            "UPDATE crawl_schedules
+             SET last_run_at = ?1, next_run_at = ?2, updated_at = datetime('now')
+             WHERE id = ?3",
+            params![now.to_rfc3339(), next_run_at, schedule.id],
+        )
+        .map_err(|e| e.to_string())?;
+    }
+
+    Ok(due_schedules)
+}
+
+fn settings_for_schedule(schedule: &CrawlSchedule) -> Result<CrawlSettings, String> {
+    let mut base = serde_json::to_value(CrawlSettings::default()).map_err(|e| e.to_string())?;
+    let patch: Value = serde_json::from_str(&schedule.crawl_settings_json)
+        .map_err(|e| format!("Crawl settings JSON is invalid: {}", e))?;
+    merge_json_objects(&mut base, patch)?;
+    let mut settings: CrawlSettings = serde_json::from_value(base).map_err(|e| e.to_string())?;
+    settings.start_url = Some(schedule.start_url.clone());
+    Ok(settings)
+}
+
+fn merge_json_objects(base: &mut Value, patch: Value) -> Result<(), String> {
+    let (Some(base_object), Some(patch_object)) = (base.as_object_mut(), patch.as_object()) else {
+        return Err("Crawl settings JSON must be an object".to_string());
+    };
+
+    for (key, value) in patch_object {
+        base_object.insert(key.clone(), value.clone());
+    }
+    Ok(())
 }
 
 fn create_schedule(
@@ -256,107 +388,39 @@ fn next_run_for_cron(expr: &str, now: DateTime<Utc>) -> Option<DateTime<Utc>> {
         return None;
     }
 
-    let minute = parts[0].parse::<u32>().ok()?;
-    let hour_field = parts[1];
-    let day_of_month = parts[2];
-    let month = parts[3];
-    let day_of_week = parts[4];
-
-    if day_of_month == "*" && month == "*" && day_of_week == "*" {
-        if hour_field == "*" {
-            return next_hourly(minute, now);
-        }
-        if let Some(step) = hour_field.strip_prefix("*/") {
-            return next_hour_step(minute, step.parse::<u32>().ok()?, now);
-        }
-        return next_daily(minute, hour_field.parse::<u32>().ok()?, now);
-    }
-
-    if day_of_month == "*" && month == "*" {
-        return next_weekly(
-            minute,
-            hour_field.parse::<u32>().ok()?,
-            day_of_week.parse::<u32>().ok()?,
-            now,
-        );
-    }
-
-    if month == "*" && day_of_week == "*" {
-        return next_monthly(
-            minute,
-            hour_field.parse::<u32>().ok()?,
-            day_of_month.parse::<u32>().ok()?,
-            now,
-        );
-    }
-
-    None
-}
-
-fn next_hourly(minute: u32, now: DateTime<Utc>) -> Option<DateTime<Utc>> {
     let mut candidate = now
-        .with_minute(minute)?
         .with_second(0)?
-        .with_nanosecond(0)?;
-    if candidate <= now {
-        candidate = candidate + Duration::hours(1);
-    }
-    Some(candidate)
-}
+        .with_nanosecond(0)?
+        + Duration::minutes(1);
 
-fn next_hour_step(minute: u32, step: u32, now: DateTime<Utc>) -> Option<DateTime<Utc>> {
-    if step == 0 {
-        return None;
-    }
-    let mut candidate = now
-        .with_minute(minute)?
-        .with_second(0)?
-        .with_nanosecond(0)?;
-    while candidate <= now || candidate.hour() % step != 0 {
-        candidate = candidate + Duration::hours(1);
-    }
-    Some(candidate)
-}
-
-fn next_daily(minute: u32, hour: u32, now: DateTime<Utc>) -> Option<DateTime<Utc>> {
-    let mut candidate = now
-        .with_hour(hour)?
-        .with_minute(minute)?
-        .with_second(0)?
-        .with_nanosecond(0)?;
-    if candidate <= now {
-        candidate = candidate + Duration::days(1);
-    }
-    Some(candidate)
-}
-
-fn next_weekly(
-    minute: u32,
-    hour: u32,
-    day_of_week: u32,
-    now: DateTime<Utc>,
-) -> Option<DateTime<Utc>> {
-    let mut candidate = next_daily(minute, hour, now)?;
-    while candidate.weekday().num_days_from_sunday() != day_of_week {
-        candidate = candidate + Duration::days(1);
-    }
-    Some(candidate)
-}
-
-fn next_monthly(
-    minute: u32,
-    hour: u32,
-    day_of_month: u32,
-    now: DateTime<Utc>,
-) -> Option<DateTime<Utc>> {
-    let mut candidate = next_daily(minute, hour, now)?;
-    for _ in 0..370 {
-        if candidate.day() == day_of_month {
+    for _ in 0..(370 * 24 * 60) {
+        if cron_field_matches(parts[0], candidate.minute(), true)
+            && cron_field_matches(parts[1], candidate.hour(), true)
+            && cron_field_matches(parts[2], candidate.day(), false)
+            && cron_field_matches(parts[3], candidate.month(), false)
+            && cron_field_matches(parts[4], candidate.weekday().num_days_from_sunday(), false)
+        {
             return Some(candidate);
         }
-        candidate = candidate + Duration::days(1);
+        candidate = candidate + Duration::minutes(1);
     }
+
     None
+}
+
+fn cron_field_matches(field: &str, value: u32, allow_step: bool) -> bool {
+    if field == "*" {
+        return true;
+    }
+    if allow_step {
+        if let Some(step) = field.strip_prefix("*/") {
+            let Ok(step) = step.parse::<u32>() else {
+                return false;
+            };
+            return step > 0 && value % step == 0;
+        }
+    }
+    field.parse::<u32>().map(|expected| value == expected).unwrap_or(false)
 }
 
 #[cfg(test)]
@@ -421,6 +485,75 @@ mod tests {
     }
 
     #[test]
+    fn claim_due_schedules_advances_next_run_once() {
+        let conn = setup_conn();
+        let now = Utc.with_ymd_and_hms(2026, 5, 16, 1, 30, 0).unwrap();
+        let created = create_schedule(
+            &conn,
+            CreateCrawlScheduleInput {
+                project_id: 1,
+                start_url: "https://example.com/scheduled".to_string(),
+                crawl_settings_json: Some("{\"maxUrls\":42,\"concurrency\":2}".to_string()),
+                cron_expression: "0 2 * * *".to_string(),
+            },
+        )
+        .expect("create schedule");
+        conn.execute(
+            "UPDATE crawl_schedules SET next_run_at = ?1 WHERE id = ?2",
+            params!["2026-05-16T01:00:00+00:00", created.id],
+        )
+        .expect("force due schedule");
+
+        let due = claim_due_schedules(&conn, now).expect("claim due schedules");
+
+        assert_eq!(due.len(), 1);
+        assert_eq!(due[0].id, created.id);
+        assert_eq!(due[0].start_url, "https://example.com/scheduled");
+        let settings = settings_for_schedule(&due[0]).expect("schedule settings");
+        assert_eq!(settings.start_url, Some("https://example.com/scheduled".to_string()));
+        assert_eq!(settings.max_urls, 42);
+        assert_eq!(settings.concurrency, 2);
+        assert_eq!(settings.max_depth, CrawlSettings::default().max_depth);
+
+        let updated = get_schedule(&conn, created.id)
+            .expect("load updated schedule")
+            .expect("schedule exists");
+        assert_eq!(updated.last_run_at, Some(now.to_rfc3339()));
+        assert_eq!(
+            updated.next_run_at,
+            Some("2026-05-16T02:00:00+00:00".to_string())
+        );
+        assert!(claim_due_schedules(&conn, now)
+            .expect("claim again")
+            .is_empty());
+    }
+
+    #[test]
+    fn schedule_settings_default_when_json_is_empty_object() {
+        let schedule = CrawlSchedule {
+            id: 1,
+            project_id: 1,
+            start_url: "https://example.com/from-schedule".to_string(),
+            crawl_settings_json: "{}".to_string(),
+            cron_expression: "0 2 * * *".to_string(),
+            enabled: 1,
+            last_run_at: None,
+            next_run_at: None,
+            created_at: "2026-05-16 00:00:00".to_string(),
+            updated_at: "2026-05-16 00:00:00".to_string(),
+        };
+
+        let settings = settings_for_schedule(&schedule).expect("settings");
+
+        assert_eq!(
+            settings.start_url,
+            Some("https://example.com/from-schedule".to_string())
+        );
+        assert_eq!(settings.max_urls, CrawlSettings::default().max_urls);
+        assert_eq!(settings.user_agent, CrawlSettings::default().user_agent);
+    }
+
+    #[test]
     fn rejects_invalid_cron_expression() {
         let conn = setup_conn();
         let err = create_schedule(
@@ -473,6 +606,19 @@ mod tests {
         assert_eq!(
             next_run_for_cron("0 */6 * * *", now).unwrap(),
             Utc.with_ymd_and_hms(2026, 5, 16, 6, 0, 0).unwrap()
+        );
+    }
+
+    #[test]
+    fn computes_next_run_for_every_minute_and_step_minutes() {
+        let now = Utc.with_ymd_and_hms(2026, 5, 16, 1, 30, 10).unwrap();
+        assert_eq!(
+            next_run_for_cron("* * * * *", now).unwrap(),
+            Utc.with_ymd_and_hms(2026, 5, 16, 1, 31, 0).unwrap()
+        );
+        assert_eq!(
+            next_run_for_cron("*/15 * * * *", now).unwrap(),
+            Utc.with_ymd_and_hms(2026, 5, 16, 1, 45, 0).unwrap()
         );
     }
 

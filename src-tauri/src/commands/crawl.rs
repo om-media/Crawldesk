@@ -82,6 +82,15 @@ pub async fn start_crawl(
     settings: CrawlSettings,
     state: State<'_, CrawlManager>,
 ) -> Result<i64, String> {
+    start_crawl_with_manager(app, project_id, settings, (*state).clone()).await
+}
+
+pub async fn start_crawl_with_manager(
+    app: AppHandle,
+    project_id: i64,
+    settings: CrawlSettings,
+    state: CrawlManager,
+) -> Result<i64, String> {
     let conn = db::get_connection()?;
 
     // Create crawl record
@@ -202,7 +211,7 @@ pub async fn start_crawl(
     //   1. WriteHandle (for SQLite persistence)
     //   2. Tauri frontend events (for UI progress updates)
     //   3. CrawlManager state (for in-memory progress queries)
-    let state_clone = (*state).clone();
+    let state_clone = state.clone();
     let app_clone = app.clone();
 
     engine.on_event(move |event| {

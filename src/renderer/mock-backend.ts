@@ -652,6 +652,18 @@ export function setupMockCrawldesk() {
         if (idx >= 0) MOCK_SCHEDULES.splice(idx, 1)
         return {}
       },
+      runDue: async () => {
+        await delay()
+        const now = new Date()
+        return MOCK_SCHEDULES
+          .filter(schedule => schedule.enabled && schedule.next_run_at && new Date(schedule.next_run_at) <= now)
+          .map(schedule => {
+            schedule.last_run_at = now.toISOString()
+            schedule.next_run_at = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString()
+            schedule.updated_at = now.toISOString()
+            return { scheduleId: schedule.id, crawlId: String(nextCrawlId++) }
+          })
+      },
     },
     diff: {
       get: async (projectId: string | number, diffId: string) => {
