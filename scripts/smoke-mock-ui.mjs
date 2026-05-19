@@ -413,6 +413,13 @@ async function runSmoke() {
     await page.waitForFunction(() => document.body.textContent?.includes('Total Words Analyzed'))
     await page.waitForFunction(() => document.body.textContent?.includes('adventure'))
     record('keywords screen shows unigram data', await bodyIncludes(page, 'adventure'))
+    await fillByPlaceholder(page, 'Filter keywords', 'zip')
+    await page.waitForFunction(() => {
+      const rows = Array.from(document.querySelectorAll('tbody tr')).map((row) => row.textContent || '')
+      return rows.length === 1 && rows[0].includes('zip') && !rows.some((row) => row.includes('adventure'))
+    })
+    record('keywords filter narrows visible phrases', await bodyIncludes(page, 'Showing 1 of'))
+    await fillByPlaceholder(page, 'Filter keywords', '')
 
     await clickText(page, 'Bigrams', 'button')
     await page.waitForFunction(() => document.body.textContent?.includes('adventure park'))
@@ -422,6 +429,12 @@ async function runSmoke() {
     await page.waitForFunction(() => document.body.textContent?.includes('Content Clusters'))
     await page.waitForFunction(() => document.body.textContent?.includes('zip'))
     record('clusters screen shows cluster data', await bodyIncludes(page, 'zip'))
+    await fillByPlaceholder(page, 'Filter clusters', 'birthday')
+    await page.waitForFunction(() => {
+      const text = document.body.textContent || ''
+      return text.includes('birthday') && text.includes('Showing 1 of')
+    })
+    record('clusters filter narrows visible groups', await bodyIncludes(page, 'Showing 1 of'))
 
     await clickText(page, 'Sitemaps', 'button')
     await page.waitForFunction(() => document.body.textContent?.includes('Sitemap Coverage'))

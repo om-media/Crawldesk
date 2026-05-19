@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useResolvedCrawl } from '../hooks/use-resolved-crawl'
 import ErrorBanner from '../components/ErrorBanner'
 
@@ -33,6 +33,22 @@ export default function ClustersScreen() {
   const [loading, setLoading] = useState(false)
   const [expandedCluster, setExpandedCluster] = useState<number | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [search, setSearch] = useState('')
+
+  const filteredClusters = useMemo(() => {
+    const query = search.trim().toLowerCase()
+    if (!query) return clusters
+    return clusters.filter(cluster => {
+      const searchable = [
+        cluster.representativeUrl,
+        ...cluster.keywords,
+        ...cluster.members.map(member => member.url),
+      ].join(' ').toLowerCase()
+      return searchable.includes(query)
+    })
+  }, [clusters, search])
+
+  const filteredUrlCount = filteredClusters.reduce((sum, cluster) => sum + cluster.members.length, 0)
 
   async function analyze() {
     if (!activeCrawlId) return
@@ -66,6 +82,19 @@ export default function ClustersScreen() {
 
       {loadError && <ErrorBanner message={loadError} onRetry={analyze} />}
 
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+        <input
+          value={search}
+          onChange={event => setSearch(event.target.value)}
+          placeholder="Filter clusters..."
+          className="input-field !w-64"
+          type="text"
+        />
+        <span className="text-xs text-primary-muted">
+          Showing {filteredClusters.length.toLocaleString()} of {clusters.length.toLocaleString()} clusters, {filteredUrlCount.toLocaleString()} URLs
+        </span>
+      </div>
+
       {loading && (
         <div className="flex items-center justify-center py-16">
           <div className="animate-spin h-8 w-8 border-2 border-teal-accent border-t-transparent rounded-full mr-3"></div>
@@ -80,7 +109,14 @@ export default function ClustersScreen() {
         </div>
       )}
 
-      {!loading && clusters.map(cluster => (
+      {!loading && clusters.length > 0 && filteredClusters.length === 0 && (
+        <div className="card py-10 text-center">
+          <p className="text-primary-text">No clusters match this filter.</p>
+          <p className="text-sm text-primary-muted mt-2">Search by URL fragment or shared keyword.</p>
+        </div>
+      )}
+
+      {!loading && filteredClusters.map(cluster => (
         <div key={cluster.id} className="mb-4 border border-lumen rounded-lg bg-panel-dark overflow-hidden">
           <button onClick={() => setExpandedCluster(expandedCluster === cluster.id ? null : cluster.id)} className="w-full px-5 py-4 flex items-center justify-between hover:bg-[#0f1f2a] transition-colors text-left">
             <div>

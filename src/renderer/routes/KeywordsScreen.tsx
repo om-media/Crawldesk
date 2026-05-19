@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useResolvedCrawl } from '../hooks/use-resolved-crawl'
 import ErrorBanner from '../components/ErrorBanner'
 
@@ -15,6 +15,13 @@ export default function KeywordsScreen() {
   const [totalWords, setTotalWords] = useState(0)
   const [totalPhrases, setTotalPhrases] = useState(0)
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [search, setSearch] = useState('')
+
+  const filteredKeywords = useMemo(() => {
+    const query = search.trim().toLowerCase()
+    if (!query) return keywords
+    return keywords.filter(keyword => keyword.phrase.toLowerCase().includes(query))
+  }, [keywords, search])
 
   useEffect(() => { loadKeywords() }, [activeCrawlId, activeTab])
 
@@ -24,9 +31,10 @@ export default function KeywordsScreen() {
     setLoadError(null)
     try {
       const result = await window.crawldesk.keywords.analyze(activeCrawlId, activeTab)
-      setKeywords(result?.keywords || [])
+      const rows = result?.keywords || []
+      setKeywords(rows)
       setTotalWords(result?.totalWords || 0)
-      setTotalPhrases(result?.totalPhrases || 0)
+      setTotalPhrases(result?.totalPhrases || rows.length)
     } catch (e: any) {
       console.error('[Keywords] Failed to load:', e)
       setKeywords([])
@@ -73,13 +81,27 @@ export default function KeywordsScreen() {
       </div>
 
       {/* Tab Navigation */}
-      <div className="flex items-center gap-2 mb-4 border-b border-lumen pb-1">
-        {(['unigrams', 'bigrams', 'trigrams'] as TabKey[]).map(tab => (
-          <button key={tab} onClick={() => setActiveTab(tab)}
-            className={`px-4 py-2 rounded-t-lg text-sm font-medium transition-colors capitalize ${activeTab === tab ? 'bg-teal-bg border-x border-t border-lumen text-teal-accent' : 'text-primary-muted hover:text-primary-text'}`}>
-            {tab}
-          </button>
-        ))}
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-4 border-b border-lumen pb-2">
+        <div className="flex items-center gap-2">
+          {(['unigrams', 'bigrams', 'trigrams'] as TabKey[]).map(tab => (
+            <button key={tab} onClick={() => setActiveTab(tab)}
+              className={`px-4 py-2 rounded-t-lg text-sm font-medium transition-colors capitalize ${activeTab === tab ? 'bg-teal-bg border-x border-t border-lumen text-teal-accent' : 'text-primary-muted hover:text-primary-text'}`}>
+              {tab}
+            </button>
+          ))}
+        </div>
+        <div className="flex items-center gap-3">
+          <input
+            value={search}
+            onChange={event => setSearch(event.target.value)}
+            placeholder="Filter keywords..."
+            className="input-field !w-56"
+            type="text"
+          />
+          <span className="text-xs text-primary-muted whitespace-nowrap">
+            Showing {filteredKeywords.length.toLocaleString()} of {keywords.length.toLocaleString()}
+          </span>
+        </div>
       </div>
 
       {/* Results Table */}
@@ -91,6 +113,11 @@ export default function KeywordsScreen() {
             <p className="text-primary-text">No keywords found for this crawl.</p>
             <p className="text-sm text-primary-muted mt-2">Only HTML pages with extracted text are included.</p>
           </div>
+        ) : filteredKeywords.length === 0 ? (
+          <div className="bg-panel-dark border border-lumen rounded-lg py-10 text-center">
+            <p className="text-primary-text">No keywords match this filter.</p>
+            <p className="text-sm text-primary-muted mt-2">Try a broader phrase or switch n-gram tabs.</p>
+          </div>
         ) : (
         <table className="w-full text-sm text-left border border-lumen rounded-lg bg-panel-dark overflow-hidden">
           <thead><tr className="border-b border-lumen">
@@ -98,7 +125,7 @@ export default function KeywordsScreen() {
             <th className="px-4 py-2 font-medium text-primary-muted">Keyword Phrase</th>
             <th className="px-4 py-2 font-medium text-primary-muted w-24 text-right">Count</th>
           </tr></thead>
-          <tbody>{keywords.map((k, i) => (
+          <tbody>{filteredKeywords.map((k, i) => (
             <tr key={i} className="border-b border-lumen hover:bg-[#0c1820]">
               <td className="px-4 py-2 text-primary-muted">{i + 1}</td>
               <td className="px-4 py-2 text-primary-text">{k.phrase}</td>

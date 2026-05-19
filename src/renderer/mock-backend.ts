@@ -506,7 +506,7 @@ export function setupMockCrawldesk() {
           { phrase: 'group discount prices', count: 15 }, { phrase: 'seasonal adventure packages', count: 13 },
         ]
         const data = gramType === 'bigrams' ? bigrams : gramType === 'trigrams' ? trigrams : unigrams
-        return { keywords: data, totalWords: 14832 }
+        return { keywords: data, totalWords: 14832, totalPhrases: data.length }
       },
     },
     content: {
