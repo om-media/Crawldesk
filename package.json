@@ -11,7 +11,7 @@
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build",
     "dev": "vite",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc -p tsconfig.check.json --noEmit",
     "lint": "eslint src/ shared/",
     "test": "vitest run",
     "test:watch": "vitest",

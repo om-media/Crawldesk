@@ -14,6 +14,17 @@ interface Schedule {
   created_at: string
 }
 
+interface CrawlDiff {
+  id: string
+  url_count_delta: number
+  new_urls_count: number
+  removed_urls_count: number
+  broken_links_delta: number
+  issues_delta: number
+  critical_issues_delta: number
+  created_at: string
+}
+
 export default function SchedulesScreen() {
   const { selectedProjectId } = useProjectStore()
   const [schedules, setSchedules] = useState<Schedule[]>([])
@@ -194,7 +205,7 @@ export default function SchedulesScreen() {
 }
 
 function DiffViewer({ projectId }: { projectId: string }) {
-  const [diffs, setDiffs] = useState<any[]>([])
+  const [diffs, setDiffs] = useState<CrawlDiff[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
@@ -203,7 +214,7 @@ function DiffViewer({ projectId }: { projectId: string }) {
     setLoading(true)
     setError('')
     window.crawldesk.diff.listByProject(projectId)
-      .then((rows) => {
+      .then((rows: CrawlDiff[]) => {
         if (!cancelled) setDiffs(rows || [])
       })
       .catch((err: any) => {
@@ -224,7 +235,7 @@ function DiffViewer({ projectId }: { projectId: string }) {
     setLoading(true)
     setError('')
     window.crawldesk.diff.listByProject(projectId)
-      .then((rows) => setDiffs(rows || []))
+      .then((rows: CrawlDiff[]) => setDiffs(rows || []))
       .catch((err: any) => {
         console.error('[Schedules] Failed to load crawl diffs:', err)
         setError(err?.message || 'Failed to load crawl diffs')
@@ -248,7 +259,7 @@ function DiffViewer({ projectId }: { projectId: string }) {
         </tr>
       </thead>
       <tbody>
-        {diffs.map((d: any) => (
+        {diffs.map((d) => (
           <tr key={d.id} className="border-b border-row hover:bg-[#0f1f2a] transition-colors">
             <td className={`py-2 px-3 ${d.url_count_delta >= 0 ? 'text-emerald' : 'text-red-400'}`}>{d.url_count_delta > 0 ? '+' : ''}{d.url_count_delta}</td>
             <td className="py-2 px-3 text-emerald">{d.new_urls_count}</td>
