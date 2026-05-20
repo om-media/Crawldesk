@@ -329,6 +329,9 @@ async function runSmoke() {
     await page.waitForFunction(() => document.body.textContent?.includes('avanterrapark.com'))
     const resultRows = await visibleRows(page)
     record('results screen shows URL data', resultRows > 0, `${resultRows} visible rows`)
+    await clickText(page, 'Export CSV', 'button')
+    await page.waitForFunction(() => document.body.textContent?.includes('Exported 247 URLs'))
+    record('results screen export shows completion', await bodyIncludes(page, 'Exported 247 URLs'))
     const resultsTableOverflow = await page.evaluate(() => {
       const body = document.querySelector('[data-results-table-body]')
       return {

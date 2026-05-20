@@ -111,6 +111,8 @@ export default function ResultsScreen() {
   const [page, setPage] = useState(0)
   const [loading, setLoading] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [exporting, setExporting] = useState(false)
+  const [exportStatus, setExportStatus] = useState<string | null>(null)
   const [filters, setFilters] = useState<UrlFilters>({ search: '', statusCategory: '', indexability: '' })
   const [sortField, setSortField] = useState<string>('url')
   const [sortDir, setSortDir] = useState<SortDir>('asc')
@@ -227,7 +229,16 @@ export default function ResultsScreen() {
 
   async function exportCurrentView() {
     if (!activeCrawlId) return
-    await window.crawldesk.exports.exportUrls({ crawlId: activeCrawlId, filtered: true, filters })
+    setExporting(true)
+    setExportStatus(null)
+    try {
+      const result = await window.crawldesk.exports.exportUrls({ crawlId: activeCrawlId, filtered: true, filters })
+      setExportStatus(`Exported ${Number(result.rowCount || 0).toLocaleString('en-US')} URLs to ${result.filePath}`)
+    } catch (e: any) {
+      setExportStatus(e?.message || 'Failed to export URLs.')
+    } finally {
+      setExporting(false)
+    }
   }
 
   // ── Render ────────────────────────────────────────
@@ -247,6 +258,12 @@ export default function ResultsScreen() {
 
       {loadError && (
         <ErrorBanner message={loadError} onRetry={retry} />
+      )}
+
+      {exportStatus && (
+        <div className={`mb-4 rounded border px-3 py-2 text-sm ${exportStatus.startsWith('Exported') ? 'border-teal-accent/40 bg-teal-accent/10 text-teal-accent' : 'border-red-500/40 bg-red-500/10 text-red-300'}`}>
+          {exportStatus}
+        </div>
       )}
 
       {/* Filters */}
@@ -279,7 +296,13 @@ export default function ResultsScreen() {
           <option value="non_indexable">Non-indexable</option>
           <option value="unknown">Unknown</option>
         </select>
-        <button onClick={exportCurrentView} className="btn-secondary ml-auto">Export CSV</button>
+        <button
+          onClick={exportCurrentView}
+          disabled={exporting || loading || total === 0}
+          className="btn-secondary ml-auto disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {exporting ? 'Exporting...' : 'Export CSV'}
+        </button>
       </div>
 
       {/* Table */}
