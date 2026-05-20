@@ -270,6 +270,10 @@ async function runSmoke() {
         gramType: 'bigrams',
         filters: { search: 'adventure' },
       })
+      const contentAuditExport = await window.crawldesk.exports.exportContentAudit({
+        crawlId: crawl.id,
+        filters: { search: 'fixture' },
+      })
       const extractionRule = await window.crawldesk.extractions.create({
         crawlId: crawl.id,
         name: 'Smoke title',
@@ -402,6 +406,7 @@ async function runSmoke() {
         linkExport,
         performanceExport,
         keywordExport,
+        contentAuditExport,
         extractionRuleUpdated,
         extractionRulesBeforeDelete,
         extractionRulesAfterDelete,
@@ -445,7 +450,8 @@ async function runSmoke() {
     record('release link CSV export works', result.linkExport?.rowCount > 0 && result.linkExport?.fileSize > 0, JSON.stringify(result.linkExport))
     record('release performance CSV export works', result.performanceExport?.rowCount >= 3 && result.performanceExport?.fileSize > 0, JSON.stringify(result.performanceExport))
     record('release keyword CSV export works', result.keywordExport?.rowCount > 0 && result.keywordExport?.fileSize > 0, JSON.stringify(result.keywordExport))
-    for (const exportResult of [result.urlExport, result.issueExport, result.linkExport, result.performanceExport, result.keywordExport]) {
+    record('release content audit CSV export works', result.contentAuditExport?.rowCount > 0 && result.contentAuditExport?.fileSize > 0, JSON.stringify(result.contentAuditExport))
+    for (const exportResult of [result.urlExport, result.issueExport, result.linkExport, result.performanceExport, result.keywordExport, result.contentAuditExport]) {
       if (exportResult?.filePath) rmSync(exportResult.filePath, { force: true })
     }
     record('release extraction rules CRUD works', result.extractionRuleUpdated?.name === 'Smoke meta description' && result.extractionRuleUpdated?.active === 0 && result.extractionRulesBeforeDelete.length === 1 && result.extractionRulesAfterDelete.length === 0, JSON.stringify({ updated: result.extractionRuleUpdated, before: result.extractionRulesBeforeDelete, after: result.extractionRulesAfterDelete }))

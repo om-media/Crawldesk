@@ -398,6 +398,9 @@ async function runSmoke() {
       return text.includes('Corporate Team Building') && text.includes('Showing 1 of') && !text.includes('Zip Line Experience')
     })
     record('content audit filter narrows rows', await bodyIncludes(page, 'Corporate Team Building'))
+    await clickText(page, 'Export CSV', 'button')
+    await page.waitForFunction(() => document.body.textContent?.includes('Exported 1 content audit rows'))
+    record('content audit exports filtered rows', await bodyIncludes(page, 'Exported 1 content audit rows'))
 
     await clickText(page, 'Links', 'button')
     await page.waitForFunction(() => document.body.textContent?.includes('Broken Links'))

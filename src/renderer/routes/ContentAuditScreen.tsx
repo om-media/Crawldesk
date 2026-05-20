@@ -44,6 +44,8 @@ export default function ContentAuditScreen() {
   const [loading, setLoading] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [filterText, setFilterText] = useState('')
+  const [exporting, setExporting] = useState(false)
+  const [exportStatus, setExportStatus] = useState('')
 
   useEffect(() => { loadAudit() }, [activeCrawlId])
 
@@ -60,6 +62,25 @@ export default function ContentAuditScreen() {
       setLoadError(e?.message || 'Failed to load content audit for this crawl.')
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function exportContentAudit() {
+    if (!activeCrawlId) return
+    setLoadError(null)
+    setExportStatus('')
+    setExporting(true)
+    try {
+      const result = await window.crawldesk.exports.exportContentAudit({
+        crawlId: activeCrawlId,
+        filters: { search: filterText },
+      })
+      setExportStatus(`Exported ${result.rowCount} content audit rows to ${result.filePath}`)
+    } catch (e: any) {
+      console.error('[Content] Export failed:', e)
+      setLoadError(e?.message || 'Failed to export content audit.')
+    } finally {
+      setExporting(false)
     }
   }
 
@@ -90,6 +111,7 @@ export default function ContentAuditScreen() {
       </div>
 
       {loadError && <ErrorBanner message={loadError} onRetry={loadAudit} />}
+      {exportStatus && <div className="mb-4 text-sm text-emerald bg-emerald/10 border border-emerald/30 rounded px-3 py-2">{exportStatus}</div>}
 
       <div className="mb-6 grid grid-cols-1 gap-3 md:grid-cols-4">
         <div className="kpi-card">
@@ -130,6 +152,9 @@ export default function ContentAuditScreen() {
           <span className="text-xs text-primary-muted">
             Showing {filteredPages.length.toLocaleString('en-US')} of {pages.length.toLocaleString('en-US')} pages
           </span>
+          <button type="button" onClick={exportContentAudit} disabled={exporting || loading || filteredPages.length === 0} className="btn-primary !py-2 !px-4 text-sm">
+            {exporting ? 'Exporting...' : 'Export CSV'}
+          </button>
         </div>
         {filteredPages.length === 0 ? (
           <div className="rounded-lg border border-lumen bg-panel-dark py-10 text-center">

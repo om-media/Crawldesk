@@ -1,4 +1,4 @@
-//! Export commands — CSV export of URLs, issues, links, keywords, and performance rows.
+//! Export commands — CSV export of URLs, issues, links, keywords, content audits, and performance rows.
 
 use crate::core::storage::{db, queries};
 use serde::Serialize;
@@ -86,6 +86,21 @@ struct KeywordCsvRow {
     phrase: String,
     count: String,
     frequency: String,
+}
+
+// ─── Content Audit CSV Row ──────────────────────────────────────
+
+struct ContentAuditCsvRow {
+    url: String,
+    title: String,
+    status_code: String,
+    word_count: String,
+    sentence_count: String,
+    syllable_count: String,
+    avg_words_per_sentence: String,
+    flesch_reading_ease: String,
+    flesch_kincaid_grade: String,
+    reading_level: String,
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────
@@ -489,6 +504,84 @@ pub fn export_keywords_csv(
         "Exported {} {} keyword rows to {}",
         row_count, gram_type, output_path
     );
+    finish_csv(writer, path, row_count)
+}
+
+// ─── export_content_audit_csv ───────────────────────────────────
+
+#[tauri::command]
+pub fn export_content_audit_csv(
+    crawl_id: i64,
+    output_path: String,
+    search: Option<String>,
+) -> Result<ExportResult, String> {
+    let mut rows = crate::commands::content::audit_content_for_export(crawl_id)?.pages;
+
+    let search = search.map(|value| value.to_lowercase()).unwrap_or_default();
+    if !search.is_empty() {
+        rows.retain(|row| {
+            [
+                row.url.as_str(),
+                row.title.as_deref().unwrap_or_default(),
+                row.reading_level.as_str(),
+            ]
+            .join(" ")
+            .to_lowercase()
+            .contains(&search)
+        });
+    }
+
+    let path = Path::new(&output_path);
+    let file = create_csv_file(path)?;
+    let mut writer = csv::Writer::from_writer(file);
+
+    writer
+        .write_record(&[
+            "url",
+            "title",
+            "status_code",
+            "word_count",
+            "sentence_count",
+            "syllable_count",
+            "avg_words_per_sentence",
+            "flesch_reading_ease",
+            "flesch_kincaid_grade",
+            "reading_level",
+        ])
+        .map_err(|e| format!("CSV write error: {}", e))?;
+
+    for row in &rows {
+        let csv_row = ContentAuditCsvRow {
+            url: row.url.clone(),
+            title: row.title.clone().unwrap_or_default(),
+            status_code: row.status_code.map_or_else(String::new, |value| value.to_string()),
+            word_count: row.word_count.to_string(),
+            sentence_count: row.sentence_count.to_string(),
+            syllable_count: row.syllable_count.to_string(),
+            avg_words_per_sentence: row.avg_words_per_sentence.to_string(),
+            flesch_reading_ease: row.flesch_reading_ease.to_string(),
+            flesch_kincaid_grade: row.flesch_kincaid_grade.to_string(),
+            reading_level: row.reading_level.clone(),
+        };
+
+        writer
+            .write_record(&[
+                &csv_row.url,
+                &csv_row.title,
+                &csv_row.status_code,
+                &csv_row.word_count,
+                &csv_row.sentence_count,
+                &csv_row.syllable_count,
+                &csv_row.avg_words_per_sentence,
+                &csv_row.flesch_reading_ease,
+                &csv_row.flesch_kincaid_grade,
+                &csv_row.reading_level,
+            ])
+            .map_err(|e| format!("CSV write error: {}", e))?;
+    }
+
+    let row_count = rows.len();
+    info!("Exported {} content audit rows to {}", row_count, output_path);
     finish_csv(writer, path, row_count)
 }
 

@@ -577,6 +577,11 @@ export function setupMockCrawldesk() {
         const rowCount = search === 'zip' ? 1 : gramType === 'trigrams' ? 9 : gramType === 'bigrams' ? 15 : 30
         return { filePath: '/tmp/keywords-1.csv', rowCount }
       },
+      exportContentAudit: async (input: any = {}) => {
+        await delay()
+        const search = String(input.filters?.search || '').trim().toLowerCase()
+        return { filePath: '/tmp/content-audit-1.csv', rowCount: search === 'corporate' ? 1 : 3 }
+      },
       exportPerformance: async (input: any = {}) => {
         await delay()
         const mode = input.filters?.mode

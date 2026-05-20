@@ -33,8 +33,19 @@ pub struct ContentAuditResult {
 
 #[tauri::command]
 pub fn audit_content(crawl_id: i64, limit: Option<i64>) -> Result<ContentAuditResult, String> {
+    let limit = Some(limit.unwrap_or(250).clamp(1, 1000));
+    audit_content_internal(crawl_id, limit)
+}
+
+pub fn audit_content_for_export(crawl_id: i64) -> Result<ContentAuditResult, String> {
+    audit_content_internal(crawl_id, None)
+}
+
+fn audit_content_internal(
+    crawl_id: i64,
+    limit: Option<i64>,
+) -> Result<ContentAuditResult, String> {
     let conn = db::get_connection().map_err(|e| e.to_string())?;
-    let limit = limit.unwrap_or(250).clamp(1, 1000);
     let mut stmt = conn
         .prepare(
             "SELECT id, url, title, status_code, word_count, seo_data_json
@@ -44,7 +55,7 @@ pub fn audit_content(crawl_id: i64, limit: Option<i64>) -> Result<ContentAuditRe
                AND (content_type IS NULL OR content_type LIKE 'text/html%')
                AND (status_code IS NULL OR (status_code >= 200 AND status_code < 400))
              ORDER BY word_count ASC, id ASC
-             LIMIT ?2",
+             LIMIT COALESCE(?2, -1)",
         )
         .map_err(|e| format!("Failed to prepare content audit: {}", e))?;
 
