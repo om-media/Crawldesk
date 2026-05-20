@@ -568,7 +568,16 @@ export function setupMockCrawldesk() {
     },
     exports: {
       exportUrls: async () => { await delay(); return { filePath: '/tmp/urls-1.csv', rowCount: 247 } },
-      exportIssues: async () => { await delay(); return { filePath: '/tmp/issues-1.csv', rowCount: 12 } },
+      exportIssues: async (input: any = {}) => {
+        await delay()
+        const issueType = input.filters?.issueType
+        const rowCounts: Record<string, number> = {
+          sitemap_url_not_crawled: 2,
+          crawled_url_missing_from_sitemap: 3,
+          sitemap_url_error_status: 1,
+        }
+        return { filePath: '/tmp/issues-1.csv', rowCount: issueType ? rowCounts[issueType] ?? 0 : 12 }
+      },
       exportLinks: async () => { await delay(); return { filePath: '/tmp/links-1.csv', rowCount: 1834 } },
       exportKeywords: async (input: any = {}) => {
         await delay()

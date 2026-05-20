@@ -33,6 +33,8 @@ export default function SitemapsScreen() {
   const [affectedTotal, setAffectedTotal] = useState(0)
   const [loading, setLoading] = useState(false)
   const [affectedLoading, setAffectedLoading] = useState(false)
+  const [exporting, setExporting] = useState(false)
+  const [exportStatus, setExportStatus] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [affectedError, setAffectedError] = useState<string | null>(null)
 
@@ -70,6 +72,7 @@ export default function SitemapsScreen() {
     if (!activeCrawlId) return
     setAffectedLoading(true)
     setAffectedError(null)
+    setExportStatus(null)
     try {
       const result = await window.crawldesk.issues.list({
         crawlId: activeCrawlId,
@@ -86,6 +89,23 @@ export default function SitemapsScreen() {
       setAffectedError('Failed to load affected sitemap URLs.')
     } finally {
       setAffectedLoading(false)
+    }
+  }
+
+  async function exportSelectedGroup() {
+    if (!activeCrawlId) return
+    setExporting(true)
+    setExportStatus(null)
+    try {
+      const result = await window.crawldesk.exports.exportIssues({
+        crawlId: activeCrawlId,
+        filters: { issueType: selectedType },
+      })
+      setExportStatus(`Exported ${Number(result.rowCount || 0).toLocaleString('en-US')} sitemap rows to ${result.filePath}`)
+    } catch (e: any) {
+      setExportStatus(e?.message || 'Failed to export sitemap rows.')
+    } finally {
+      setExporting(false)
     }
   }
 
@@ -160,13 +180,29 @@ export default function SitemapsScreen() {
       </div>
 
       <div className="card overflow-hidden">
-        <div className="flex items-center justify-between border-b border-lumen px-4 py-3">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-lumen px-4 py-3">
           <div>
             <h2 className="text-base font-semibold text-primary-text">{SITEMAP_LABELS[selectedType]}</h2>
             <p className="text-xs text-primary-muted">{affectedTotal} affected URLs</p>
           </div>
-          {affectedLoading && <div className="animate-spin h-4 w-4 border border-teal-accent border-t-transparent rounded-full" />}
+          <div className="flex items-center gap-3">
+            {affectedLoading && <div className="animate-spin h-4 w-4 border border-teal-accent border-t-transparent rounded-full" />}
+            <button
+              type="button"
+              onClick={exportSelectedGroup}
+              disabled={exporting || affectedLoading || loading || affectedTotal === 0}
+              className="btn-secondary !py-1.5 !px-3 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {exporting ? 'Exporting...' : 'Export CSV'}
+            </button>
+          </div>
         </div>
+
+        {exportStatus && (
+          <div className={`mx-4 mt-4 rounded border px-3 py-2 text-xs ${exportStatus.startsWith('Exported') ? 'border-teal-accent/40 bg-teal-accent/10 text-teal-accent' : 'border-red-500/40 bg-red-500/10 text-red-300'}`}>
+            {exportStatus}
+          </div>
+        )}
 
         {affectedError ? (
           <div className="p-4">

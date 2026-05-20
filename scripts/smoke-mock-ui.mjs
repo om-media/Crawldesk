@@ -473,6 +473,14 @@ async function runSmoke() {
     await clickText(page, 'Sitemaps', 'button')
     await page.waitForFunction(() => document.body.textContent?.includes('Sitemap Coverage'))
     record('sitemaps screen is reachable', await bodyIncludes(page, 'Sitemap URLs Not Crawled'))
+    await page.waitForFunction(() => {
+      const text = document.body.textContent || ''
+      const exportButton = Array.from(document.querySelectorAll('button')).find((button) => button.textContent?.includes('Export CSV'))
+      return text.includes('2 affected URLs') && exportButton && !exportButton.disabled
+    })
+    await clickText(page, 'Export CSV', 'button')
+    await page.waitForFunction(() => document.body.textContent?.includes('Exported 2 sitemap rows'))
+    record('sitemaps screen exports selected issue group', await bodyIncludes(page, 'Exported 2 sitemap rows'))
 
     await clickText(page, 'Performance', 'button')
     await page.waitForFunction(() => document.body.textContent?.includes('URLs Analyzed'))
