@@ -615,15 +615,37 @@ async function runSmoke() {
     record('exports screen can export issues', await bodyIncludes(page, 'Exported 12 issues'))
     await clickText(page, 'Links CSV', 'button')
     await page.waitForFunction(() => document.body.textContent?.includes('Exported 1834 links'))
+    await clickText(page, 'Keywords CSV', 'button')
+    await page.waitForFunction(() => document.body.textContent?.includes('Exported 30 keywords'))
+    await clickText(page, 'Content Audit CSV', 'button')
+    await page.waitForFunction(() => document.body.textContent?.includes('Exported 3 content audit rows'))
+    await clickText(page, 'Clusters CSV', 'button')
+    await page.waitForFunction(() => document.body.textContent?.includes('Exported 17 cluster rows'))
+    await clickText(page, 'Performance CSV', 'button')
+    await page.waitForFunction(() => document.body.textContent?.includes('Exported 3 performance rows'))
     const exportStatus = await page.evaluate(() => {
       const text = document.body.textContent || ''
       return {
         urls: text.includes('Exported 247 URLs'),
         issues: text.includes('Exported 12 issues'),
         links: text.includes('Exported 1834 links'),
+        keywords: text.includes('Exported 30 keywords'),
+        contentAudit: text.includes('Exported 3 content audit rows'),
+        clusters: text.includes('Exported 17 cluster rows'),
+        performance: text.includes('Exported 3 performance rows'),
       }
     })
-    record('exports screen preserves independent export statuses', exportStatus.urls && exportStatus.issues && exportStatus.links, JSON.stringify(exportStatus))
+    record(
+      'exports screen preserves independent export statuses',
+      exportStatus.urls
+        && exportStatus.issues
+        && exportStatus.links
+        && exportStatus.keywords
+        && exportStatus.contentAudit
+        && exportStatus.clusters
+        && exportStatus.performance,
+      JSON.stringify(exportStatus),
+    )
 
     await clickText(page, 'Settings', 'button')
     await page.waitForFunction(() => document.body.textContent?.includes('Crawl Defaults'))

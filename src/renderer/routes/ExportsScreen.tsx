@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useResolvedCrawl } from '../hooks/use-resolved-crawl'
 
-type ExportKind = 'urls' | 'issues' | 'links'
+type ExportKind = 'urls' | 'issues' | 'links' | 'keywords' | 'contentAudit' | 'clusters' | 'performance'
 
 type ExportStatus = {
   state: 'idle' | 'running' | 'success' | 'error'
@@ -12,6 +12,10 @@ const initialStatuses: Record<ExportKind, ExportStatus> = {
   urls: { state: 'idle', message: '' },
   issues: { state: 'idle', message: '' },
   links: { state: 'idle', message: '' },
+  keywords: { state: 'idle', message: '' },
+  contentAudit: { state: 'idle', message: '' },
+  clusters: { state: 'idle', message: '' },
+  performance: { state: 'idle', message: '' },
 }
 
 export default function ExportsScreen() {
@@ -60,6 +64,38 @@ export default function ExportsScreen() {
       desc: 'Export all internal and external links found.',
       action: () => window.crawldesk.exports.exportLinks({ crawlId: activeCrawlId }),
     },
+    {
+      kind: 'keywords' as const,
+      label: 'Keywords CSV',
+      entity: 'keywords',
+      desc: 'Export crawl keyword frequencies for spreadsheet analysis.',
+      action: () => window.crawldesk.exports.exportKeywords({ crawlId: activeCrawlId, gramType: 'unigrams' }),
+    },
+    {
+      kind: 'contentAudit' as const,
+      label: 'Content Audit CSV',
+      entity: 'content audit rows',
+      desc: 'Export readability, word count, and reading-level metrics.',
+      action: () => window.crawldesk.exports.exportContentAudit({ crawlId: activeCrawlId }),
+    },
+    {
+      kind: 'clusters' as const,
+      label: 'Clusters CSV',
+      entity: 'cluster rows',
+      desc: 'Export content clusters with member URLs and similarity scores.',
+      action: () => window.crawldesk.exports.exportClusters({ crawlId: activeCrawlId }),
+    },
+    {
+      kind: 'performance' as const,
+      label: 'Performance CSV',
+      entity: 'performance rows',
+      desc: 'Export crawl timing, size, score, and carbon estimate data.',
+      action: () => window.crawldesk.exports.exportPerformance({
+        crawlId: activeCrawlId,
+        filters: { mode: 'all', search: '' },
+        sort: { mode: 'slowest' },
+      }),
+    },
   ]
 
   if (!activeCrawlId) return (
@@ -72,7 +108,7 @@ export default function ExportsScreen() {
   return (
     <div>
       <h1 className="text-[30px] leading-none tracking-tight font-bold text-primary-text mb-6">Exports</h1>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
         {exportItems.map(item => {
           const status = statuses[item.kind]
           const isRunning = status.state === 'running'
