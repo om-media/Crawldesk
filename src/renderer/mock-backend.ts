@@ -582,6 +582,11 @@ export function setupMockCrawldesk() {
         const search = String(input.filters?.search || '').trim().toLowerCase()
         return { filePath: '/tmp/content-audit-1.csv', rowCount: search === 'corporate' ? 1 : 3 }
       },
+      exportClusters: async (input: any = {}) => {
+        await delay()
+        const search = String(input.filters?.search || '').trim().toLowerCase()
+        return { filePath: '/tmp/clusters-1.csv', rowCount: search === 'birthday' ? 5 : 17 }
+      },
       exportPerformance: async (input: any = {}) => {
         await delay()
         const mode = input.filters?.mode

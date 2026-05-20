@@ -445,6 +445,15 @@ function setupCrawldesk() {
         })
         return normalizeExportResult(result)
       },
+      exportClusters: async (input: any) => {
+        const crawlId = input.crawlId ?? input.projectId
+        const result = await invoke('export_clusters_csv', {
+          crawlId: toId(crawlId),
+          outputPath: await exportPath('clusters', crawlId),
+          search: input.filters?.search,
+        })
+        return normalizeExportResult(result)
+      },
       exportPerformance: async (input: any) => {
         const crawlId = input.crawlId ?? input.projectId
         const result = await invoke('export_performance_csv', {

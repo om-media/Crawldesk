@@ -1,4 +1,4 @@
-//! Export commands — CSV export of URLs, issues, links, keywords, content audits, and performance rows.
+//! Export commands — CSV export of URLs, issues, links, keywords, content audits, clusters, and performance rows.
 
 use crate::core::storage::{db, queries};
 use serde::Serialize;
@@ -101,6 +101,17 @@ struct ContentAuditCsvRow {
     flesch_reading_ease: String,
     flesch_kincaid_grade: String,
     reading_level: String,
+}
+
+// ─── Cluster CSV Row ──────────────────────────────────────────────
+
+struct ClusterCsvRow {
+    cluster_id: String,
+    representative_url: String,
+    cluster_size: String,
+    keywords: String,
+    member_url: String,
+    member_score: String,
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────
@@ -582,6 +593,78 @@ pub fn export_content_audit_csv(
 
     let row_count = rows.len();
     info!("Exported {} content audit rows to {}", row_count, output_path);
+    finish_csv(writer, path, row_count)
+}
+
+// ─── export_clusters_csv ──────────────────────────────────────────
+
+#[tauri::command]
+pub fn export_clusters_csv(
+    crawl_id: i64,
+    output_path: String,
+    search: Option<String>,
+) -> Result<ExportResult, String> {
+    let mut clusters = crate::commands::cluster::find_clusters(crawl_id)?;
+
+    let search = search.map(|value| value.to_lowercase()).unwrap_or_default();
+    if !search.is_empty() {
+        clusters.retain(|cluster| {
+            let keywords = cluster.keywords.join(" ");
+            let member_urls = cluster
+                .members
+                .iter()
+                .map(|member| member.url.as_str())
+                .collect::<Vec<_>>()
+                .join(" ");
+            format!("{} {} {}", cluster.representative_url, keywords, member_urls)
+                .to_lowercase()
+                .contains(&search)
+        });
+    }
+
+    let path = Path::new(&output_path);
+    let file = create_csv_file(path)?;
+    let mut writer = csv::Writer::from_writer(file);
+
+    writer
+        .write_record(&[
+            "cluster_id",
+            "representative_url",
+            "cluster_size",
+            "keywords",
+            "member_url",
+            "member_score",
+        ])
+        .map_err(|e| format!("CSV write error: {}", e))?;
+
+    let mut row_count = 0;
+    for cluster in &clusters {
+        let keywords = cluster.keywords.join("; ");
+        for member in &cluster.members {
+            let row = ClusterCsvRow {
+                cluster_id: cluster.cluster_id.to_string(),
+                representative_url: cluster.representative_url.clone(),
+                cluster_size: cluster.size.to_string(),
+                keywords: keywords.clone(),
+                member_url: member.url.clone(),
+                member_score: member.score.to_string(),
+            };
+
+            writer
+                .write_record(&[
+                    &row.cluster_id,
+                    &row.representative_url,
+                    &row.cluster_size,
+                    &row.keywords,
+                    &row.member_url,
+                    &row.member_score,
+                ])
+                .map_err(|e| format!("CSV write error: {}", e))?;
+            row_count += 1;
+        }
+    }
+
+    info!("Exported {} cluster rows to {}", row_count, output_path);
     finish_csv(writer, path, row_count)
 }
 

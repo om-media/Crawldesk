@@ -33,6 +33,8 @@ export default function ClustersScreen() {
   const [loading, setLoading] = useState(false)
   const [expandedCluster, setExpandedCluster] = useState<number | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [exporting, setExporting] = useState(false)
+  const [exportStatus, setExportStatus] = useState<string | null>(null)
   const [search, setSearch] = useState('')
 
   const filteredClusters = useMemo(() => {
@@ -54,6 +56,7 @@ export default function ClustersScreen() {
     if (!activeCrawlId) return
     setLoading(true)
     setLoadError(null)
+    setExportStatus(null)
     try {
       const result = await window.crawldesk.clusters.find(activeCrawlId)
       setClusters((Array.isArray(result) ? result : []).map(normalizeCluster))
@@ -63,6 +66,24 @@ export default function ClustersScreen() {
       setLoadError(e?.message || 'Failed to analyze content clusters for this crawl.')
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function exportClusters() {
+    if (!activeCrawlId) return
+    setExporting(true)
+    setExportStatus(null)
+    try {
+      const result = await window.crawldesk.exports.exportClusters({
+        crawlId: activeCrawlId,
+        filters: { search },
+      })
+      setExportStatus(`Exported ${result.rowCount.toLocaleString()} cluster rows to ${result.filePath}`)
+    } catch (e: any) {
+      console.error('[Clusters] Failed to export clusters:', e.message)
+      setExportStatus(e?.message || 'Failed to export content clusters.')
+    } finally {
+      setExporting(false)
     }
   }
 
@@ -90,10 +111,25 @@ export default function ClustersScreen() {
           className="input-field !w-64"
           type="text"
         />
-        <span className="text-xs text-primary-muted">
-          Showing {filteredClusters.length.toLocaleString()} of {clusters.length.toLocaleString()} clusters, {filteredUrlCount.toLocaleString()} URLs
-        </span>
+        <div className="flex flex-wrap items-center justify-end gap-3">
+          <span className="text-xs text-primary-muted">
+            Showing {filteredClusters.length.toLocaleString()} of {clusters.length.toLocaleString()} clusters, {filteredUrlCount.toLocaleString()} URLs
+          </span>
+          <button
+            onClick={exportClusters}
+            disabled={exporting || loading || filteredClusters.length === 0}
+            className="btn-secondary text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {exporting ? 'Exporting...' : 'Export CSV'}
+          </button>
+        </div>
       </div>
+
+      {exportStatus && (
+        <div className={`mb-4 rounded border px-3 py-2 text-xs ${exportStatus.startsWith('Exported') ? 'border-teal-accent/40 bg-teal-accent/10 text-teal-accent' : 'border-red-500/40 bg-red-500/10 text-red-300'}`}>
+          {exportStatus}
+        </div>
+      )}
 
       {loading && (
         <div className="flex items-center justify-center py-16">

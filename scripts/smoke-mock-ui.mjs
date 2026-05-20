@@ -466,6 +466,9 @@ async function runSmoke() {
       return text.includes('birthday') && text.includes('Showing 1 of')
     })
     record('clusters filter narrows visible groups', await bodyIncludes(page, 'Showing 1 of'))
+    await clickText(page, 'Export CSV', 'button')
+    await page.waitForFunction(() => document.body.textContent?.includes('Exported 5 cluster rows'))
+    record('clusters screen exports filtered rows', await bodyIncludes(page, 'Exported 5 cluster rows'))
 
     await clickText(page, 'Sitemaps', 'button')
     await page.waitForFunction(() => document.body.textContent?.includes('Sitemap Coverage'))

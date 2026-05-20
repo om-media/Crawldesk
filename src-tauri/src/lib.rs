@@ -88,6 +88,7 @@ pub fn run() {
             commands::export::export_links_csv,
             commands::export::export_keywords_csv,
             commands::export::export_content_audit_csv,
+            commands::export::export_clusters_csv,
             commands::export::export_performance_csv,
             // Custom extraction commands
             commands::extraction::list_extraction_rules,
