@@ -37,14 +37,12 @@ serde_json = "1"
 
 # Database
 rusqlite = { version = "0.32", features = ["bundled", "limits"] }
-sqlx = { version = "0.8", features = ["runtime-tokio", "sqlite", "chrono"], optional = true }
 
 # Time
 chrono = { version = "0.4", features = ["serde"] }
 time = { version = "0.3", features = ["serde"] }
 
-# Networking / DNS
-trust-dns-resolver = "0.23"
+# Networking
 ipnet = "2.9"
 
 # Robots.txt parser
