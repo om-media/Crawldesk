@@ -1,8 +1,5 @@
-import type { Project, CreateProjectInput, UpdateProjectInput } from './project'
-import type { Crawl, CrawlSettingsInput, CrawlProgress as CrawlProgressData } from './crawl'
-import type { UrlRecord, Indexability } from './url'
-import type { IssueRecord, IssueSummary } from './issue'
-import type { LinkRecord, LinkSummary } from './link'
+import type { Crawl, CrawlProgress as CrawlProgressData } from './crawl'
+import type { Indexability } from './url'
 
 export interface PaginatedResult<T> {
   items: T[]

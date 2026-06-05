@@ -29,7 +29,6 @@ const projectNavItems: NavItem[] = [
 
 export default function Sidebar({ currentRoute, onNavigate }: SidebarProps) {
   const { selectedProjectId, projects } = useProjectStore()
-  const project = projects.find(p => p.id === selectedProjectId)
   const [version, setVersion] = React.useState('v0.1')
 
   React.useEffect(() => {

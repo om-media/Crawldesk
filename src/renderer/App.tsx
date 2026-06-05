@@ -176,12 +176,22 @@ export default function App() {
           </button>
           {activeCrawlId && crawlProgress?.status === 'running' && (
             <button className="toolbar-button" onClick={async () => {
-              try { await window.crawldesk.crawls.pause(activeCrawlId); useCrawlStore.getState().updateProgress({ status: 'paused' }) } catch {}
+              try {
+                await window.crawldesk.crawls.pause(activeCrawlId)
+                useCrawlStore.getState().updateProgress({ status: 'paused' })
+              } catch (error) {
+                console.error('[App] Failed to pause crawl:', error)
+              }
             }}>Ⅱ Pause</button>
           )}
           {activeCrawlId && crawlProgress?.status === 'paused' && (
             <button className="toolbar-button" onClick={async () => {
-              try { await window.crawldesk.crawls.resume(activeCrawlId); useCrawlStore.getState().updateProgress({ status: 'running' }) } catch {}
+              try {
+                await window.crawldesk.crawls.resume(activeCrawlId)
+                useCrawlStore.getState().updateProgress({ status: 'running' })
+              } catch (error) {
+                console.error('[App] Failed to resume crawl:', error)
+              }
             }}>▶ Resume</button>
           )}
           {activeCrawlId && (

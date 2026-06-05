@@ -145,7 +145,7 @@ export default function ResultsScreen() {
         pageSize: PAGE_SIZE,
         sort: { field: sortField, direction: sortDir },
         filters: Object.fromEntries(
-          Object.entries(filters).filter(([_, v]) => v !== '')
+          Object.entries(filters).filter(([, v]) => v !== '')
         ),
       })
       const items = (result.items || []).map(normalizeUrlRecord)

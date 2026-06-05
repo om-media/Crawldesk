@@ -62,7 +62,7 @@ export default function ClientErrorsScreen() {
   async function exportCurrentView() {
     if (!activeCrawlId) return
     setExportMessage(null)
-    let f: Record<string, unknown> = { statusCategory: '4xx' }
+    const f: Record<string, unknown> = { statusCategory: '4xx' }
     if (statusFilter && statusFilter !== 'other') f.statusCode = Number(statusFilter)
     if (statusFilter === 'other') f.excludedStatusCodes = [403, 404, 410]
     try {

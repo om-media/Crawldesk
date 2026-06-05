@@ -22,7 +22,6 @@ export default function IssuesScreen() {
   const [exportMessage, setExportMessage] = useState<string | null>(null)
   const [affectedUrls, setAffectedUrls] = useState<IssueRecord[]>([])
   const [affectedTotal, setAffectedTotal] = useState(0)
-  const [affectedPage, setAffectedPage] = useState(0)
   const [affectedLoading, setAffectedLoading] = useState(false)
   const [selectedIssueDetail, setSelectedIssueDetail] = useState<IssueRecord | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
@@ -77,7 +76,6 @@ export default function IssuesScreen() {
       })
       setAffectedUrls(result.items || [])
       setAffectedTotal(result.total || 0)
-      setAffectedPage(page)
     } catch (e: any) {
       console.error('[Issues] Failed to load affected URLs:', e)
       setAffectedUrls([])

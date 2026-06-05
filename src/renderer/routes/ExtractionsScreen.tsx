@@ -33,11 +33,6 @@ export default function ExtractionsScreen() {
     }
   }
 
-  function startAdd() {
-    setEditing(null); setError('')
-    setFormName(''); setFormSelector(''); setFormType('css'); setFormAttribute('')
-  }
-
   function startEdit(rule: ExtractionRule) {
     setEditing(rule.id); setError('')
     setFormName(rule.name); setFormSelector(rule.selector); setFormType(rule.rule_type)
