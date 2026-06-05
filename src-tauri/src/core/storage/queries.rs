@@ -31,14 +31,6 @@ fn get_datetime_opt(row: &rusqlite::Row, idx: &str) -> Result<Option<DateTime<Ut
     Ok(s.and_then(|v| parse_sqlite_datetime(&v).ok()))
 }
 
-fn get_datetime_col(row: &rusqlite::Row, idx: usize) -> Result<DateTime<Utc>> {
-    let s: String = row.get(idx)?;
-    let dt = parse_sqlite_datetime(&s).map_err(|e| {
-        rusqlite::Error::FromSqlConversionFailure(0, rusqlite::types::Type::Text, Box::new(e))
-    })?;
-    Ok(dt)
-}
-
 /// Derive human-readable label, explanation, and recommendation from issue metadata.
 fn derive_issue_context(
     issue_type: &str,
@@ -979,21 +971,6 @@ pub fn query_issues(
         .collect();
 
     Ok((records, total))
-}
-
-fn map_issue_row(row: &rusqlite::Row) -> rusqlite::Result<IssueRecord> {
-    Ok(IssueRecord {
-        id: row.get("id")?,
-        issue_type: row.get("issue_type")?,
-        severity: row.get("severity")?,
-        category: row.get("category")?,
-        url_id: row.get("url_id")?,
-        url: row.get("url")?,
-        message: row.get("message")?,
-        details_json: row.get("details_json")?,
-        detected_at: get_datetime(row, "detected_at")?,
-        is_fixed: row.get("is_fixed")?,
-    })
 }
 
 // ─── Links ───────────────────────────────────────────────────────

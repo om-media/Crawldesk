@@ -62,7 +62,6 @@ fn wildcard_to_regex(pattern: &str) -> String {
 #[derive(Clone)]
 pub struct ScopeService {
     root_hostname: String,
-    root_scheme: String,
     allowed_hostnames: Vec<String>,
     blocked_hostnames: Vec<String>,
     include_patterns: Vec<ScopePattern>,
@@ -82,7 +81,6 @@ impl ScopeService {
 
         Self {
             root_hostname: hostname.clone(),
-            root_scheme: parsed.scheme().to_string(),
             allowed_hostnames,
             blocked_hostnames: Vec::new(),
             include_patterns: Vec::new(),

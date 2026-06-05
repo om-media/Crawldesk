@@ -2,7 +2,7 @@
 
 use crate::core::crawler::models::FrontierEntry;
 use crate::core::crawler::normalizer::{are_same_url, normalize_url};
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::{HashSet, VecDeque};
 use tracing::{debug, trace};
 
 /// URL frontier for managing the crawl queue.
@@ -11,8 +11,6 @@ pub struct UrlFrontier {
     queue: VecDeque<FrontierEntry>,
     /// Track visited URLs (deduplication)
     visited: HashSet<String>,
-    /// Track max depth seen per URL pattern (for scope enforcement)
-    max_depth_seen: HashMap<String, i32>,
     /// Limits
     max_urls: usize,
     max_depth: i32,
@@ -23,7 +21,6 @@ impl UrlFrontier {
         Self {
             queue: VecDeque::new(),
             visited: HashSet::new(),
-            max_depth_seen: HashMap::new(),
             max_urls,
             max_depth,
         }

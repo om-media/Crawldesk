@@ -755,7 +755,7 @@ mod tests {
             ],
         };
 
-        let url_id = insert_page_crawled(&mut conn, &data).unwrap();
+        let _url_id = insert_page_crawled(&mut conn, &data).unwrap();
 
         // Verify issue was inserted
         let issue_count: i64 = conn
