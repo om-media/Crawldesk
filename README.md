@@ -221,4 +221,5 @@ Crawl settings are per-crawl and fully configurable:
 
 ## License
 
-Proprietary (c) om-media
+NextGen SEO is licensed under the GNU Affero General Public License v3.0.
+
