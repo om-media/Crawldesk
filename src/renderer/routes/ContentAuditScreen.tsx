@@ -111,7 +111,7 @@ export default function ContentAuditScreen() {
       </div>
 
       {loadError && <ErrorBanner message={loadError} onRetry={loadAudit} />}
-      {exportStatus && <div className="mb-4 text-sm text-emerald bg-emerald/10 border border-emerald/30 rounded px-3 py-2">{exportStatus}</div>}
+      {exportStatus && <div className="mb-4 text-sm text-emerald bg-emerald/10 border border-emerald/30 rounded-sm px-3 py-2">{exportStatus}</div>}
 
       <div className="mb-6 grid grid-cols-1 gap-3 md:grid-cols-4">
         <div className="kpi-card">
@@ -147,12 +147,12 @@ export default function ContentAuditScreen() {
             placeholder="Filter content pages..."
             value={filterText}
             onChange={event => setFilterText(event.target.value)}
-            className="input-field !w-full max-w-sm"
+            className="input-field w-full! max-w-sm"
           />
           <span className="text-xs text-primary-muted">
             Showing {filteredPages.length.toLocaleString('en-US')} of {pages.length.toLocaleString('en-US')} pages
           </span>
-          <button type="button" onClick={exportContentAudit} disabled={exporting || loading || filteredPages.length === 0} className="btn-primary !py-2 !px-4 text-sm">
+          <button type="button" onClick={exportContentAudit} disabled={exporting || loading || filteredPages.length === 0} className="btn-primary py-2! px-4! text-sm">
             {exporting ? 'Exporting...' : 'Export CSV'}
           </button>
         </div>
@@ -175,7 +175,7 @@ export default function ContentAuditScreen() {
           </thead>
           <tbody>
             {filteredPages.map(page => (
-              <tr key={page.urlId} className="border-b border-lumen hover:bg-[#0c1820]">
+              <tr key={page.urlId} className="border-b border-lumen hover:bg-panel-dark">
                 <td className="px-4 py-2">
                   <div className="max-w-[720px] truncate text-primary-text">{page.title || page.url}</div>
                   <div className="max-w-[720px] truncate text-xs text-primary-muted">{page.url}</div>

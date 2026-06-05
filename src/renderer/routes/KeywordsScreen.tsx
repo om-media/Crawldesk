@@ -79,7 +79,7 @@ export default function KeywordsScreen() {
       <h1 className="text-[30px] leading-none tracking-tight font-bold text-primary-text mb-6">Keywords</h1>
 
       {loadError && <ErrorBanner message={loadError} onRetry={loadKeywords} />}
-      {exportStatus && <div className="mb-4 text-sm text-emerald bg-emerald/10 border border-emerald/30 rounded px-3 py-2">{exportStatus}</div>}
+      {exportStatus && <div className="mb-4 text-sm text-emerald bg-emerald/10 border border-emerald/30 rounded-sm px-3 py-2">{exportStatus}</div>}
 
       {/* Summary */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
@@ -118,10 +118,10 @@ export default function KeywordsScreen() {
             value={search}
             onChange={event => setSearch(event.target.value)}
             placeholder="Filter keywords..."
-            className="input-field !w-56"
+            className="input-field w-56!"
             type="text"
           />
-          <button type="button" onClick={exportKeywords} disabled={exporting || loading || filteredKeywords.length === 0} className="btn-primary !py-2 !px-4 text-sm">
+          <button type="button" onClick={exportKeywords} disabled={exporting || loading || filteredKeywords.length === 0} className="btn-primary py-2! px-4! text-sm">
             {exporting ? 'Exporting...' : 'Export CSV'}
           </button>
           <span className="text-xs text-primary-muted whitespace-nowrap">
@@ -152,7 +152,7 @@ export default function KeywordsScreen() {
             <th className="px-4 py-2 font-medium text-primary-muted w-24 text-right">Count</th>
           </tr></thead>
           <tbody>{filteredKeywords.map((k, i) => (
-            <tr key={i} className="border-b border-lumen hover:bg-[#0c1820]">
+            <tr key={i} className="border-b border-lumen hover:bg-panel-dark">
               <td className="px-4 py-2 text-primary-muted">{i + 1}</td>
               <td className="px-4 py-2 text-primary-text">{k.phrase}</td>
               <td className="px-4 py-2 text-right text-primary-text font-mono">{k.count}</td>

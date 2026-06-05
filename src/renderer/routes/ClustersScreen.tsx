@@ -108,7 +108,7 @@ export default function ClustersScreen() {
           value={search}
           onChange={event => setSearch(event.target.value)}
           placeholder="Filter clusters..."
-          className="input-field !w-64"
+          className="input-field w-64!"
           type="text"
         />
         <div className="flex flex-wrap items-center justify-end gap-3">
@@ -126,7 +126,7 @@ export default function ClustersScreen() {
       </div>
 
       {exportStatus && (
-        <div className={`mb-4 rounded border px-3 py-2 text-xs ${exportStatus.startsWith('Exported') ? 'border-teal-accent/40 bg-teal-accent/10 text-teal-accent' : 'border-red-500/40 bg-red-500/10 text-red-300'}`}>
+        <div className={`mb-4 rounded-sm border px-3 py-2 text-xs ${exportStatus.startsWith('Exported') ? 'border-teal-accent/40 bg-teal-accent/10 text-teal-accent' : 'border-red-500/40 bg-red-500/10 text-red-300'}`}>
           {exportStatus}
         </div>
       )}
@@ -164,7 +164,7 @@ export default function ClustersScreen() {
           {expandedCluster === cluster.id && (
             <div className="px-5 pb-4">
               <p className="text-xs text-primary-muted mb-2 font-medium uppercase tracking-wider">Representative URL</p>
-              <code className="block bg-midnight p-2 rounded text-xs text-teal-accent break-all mb-3">{cluster.representativeUrl}</code>
+              <code className="block bg-midnight p-2 rounded-sm text-xs text-teal-accent break-all mb-3">{cluster.representativeUrl}</code>
               <table className="w-full text-xs">
                 <thead><tr className="border-b border-row"><th className="py-1.5 pr-4 text-left text-primary-muted">URL</th><th className="py-1.5 text-right text-primary-muted w-20">Similarity</th></tr></thead>
                 <tbody>

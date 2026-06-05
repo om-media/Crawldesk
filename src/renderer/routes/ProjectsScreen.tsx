@@ -113,7 +113,7 @@ export default function ProjectsScreen({ onNavigate }: Props) {
             value={projectSearch}
             onChange={event => setProjectSearch(event.target.value)}
             placeholder="Filter projects..."
-            className="input-field !w-full max-w-sm"
+            className="input-field w-full! max-w-sm"
           />
           <span className="text-xs text-primary-muted">
             Showing {filteredProjects.length.toLocaleString('en-US')} of {projects.length.toLocaleString('en-US')}
@@ -126,7 +126,7 @@ export default function ProjectsScreen({ onNavigate }: Props) {
         ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredProjects.map(p => (
-            <div key={p.id} className={`card hover:border-teal-accent/50 transition-all cursor-pointer ${selectedProjectId === p.id ? '!border-teal-accent !bg-teal-bg/30' : ''}`} onClick={() => openProject(p.id)}>
+            <div key={p.id} className={`card hover:border-teal-accent/50 transition-all cursor-pointer ${selectedProjectId === p.id ? 'border-teal-accent! bg-teal-bg/30!' : ''}`} onClick={() => openProject(p.id)}>
               <div className="flex items-start justify-between mb-3">
                 <h3 className="font-semibold text-primary-text">{p.name}</h3>
                 <span className="pill-neutral text-[10px] font-medium">{selectedProjectId === p.id ? 'Selected' : 'Project'}</span>
@@ -137,7 +137,7 @@ export default function ProjectsScreen({ onNavigate }: Props) {
                 {p.lastCrawlIssueCount != null && <span>{p.lastCrawlIssueCount} issues</span>}
               </div>
               <div className="mt-3 flex justify-end gap-2" onClick={(e) => e.stopPropagation()}>
-                <button onClick={() => { setPendingDelete(p); setDeleteError(null) }} className="btn-danger !py-1.5 !px-3 !text-xs rounded-lg">Delete</button>
+                <button onClick={() => { setPendingDelete(p); setDeleteError(null) }} className="btn-danger py-1.5! px-3! text-xs! rounded-lg">Delete</button>
               </div>
             </div>
           ))}
@@ -148,7 +148,7 @@ export default function ProjectsScreen({ onNavigate }: Props) {
 
       {/* New Project Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[100]" onClick={() => { setShowModal(false); setUrlError('') }}>
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-100" onClick={() => { setShowModal(false); setUrlError('') }}>
           <div className="bg-panel-dark border border-lumen rounded-xl shadow-2xl w-full max-w-md p-6" onClick={e => e.stopPropagation()} style={{ borderRadius: '14px' }}>
             <h2 className="text-lg font-bold text-primary-text mb-5">New Project</h2>
             <form onSubmit={handleCreate} className="space-y-4">
@@ -171,7 +171,7 @@ export default function ProjectsScreen({ onNavigate }: Props) {
       )}
 
       {pendingDelete && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[100]" onClick={() => { if (!deletingId) setPendingDelete(null) }}>
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-100" onClick={() => { if (!deletingId) setPendingDelete(null) }}>
           <div className="bg-panel-dark border border-lumen rounded-xl shadow-2xl w-full max-w-md p-6" onClick={e => e.stopPropagation()} style={{ borderRadius: '14px' }}>
             <h2 className="text-lg font-bold text-primary-text mb-2">Delete project?</h2>
             <p className="text-sm text-primary-muted mb-4">

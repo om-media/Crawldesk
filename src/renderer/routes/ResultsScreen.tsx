@@ -74,7 +74,7 @@ function normalizeUrlRecord(record: any): UrlRecord {
 }
 
 function statusBadge(code?: number | null) {
-  if (!code) return <span className="text-primary-muted bg-panel-dark rounded px-2 py-0.5 text-xs font-medium">N/A</span>
+  if (!code) return <span className="text-primary-muted bg-panel-dark rounded-sm px-2 py-0.5 text-xs font-medium">N/A</span>
   if (code >= 200 && code < 300) return <span className="pill-success">{code}</span>
   if (code >= 300 && code < 400) return <span className="pill-warning">{code}</span>
   return <span className="pill-error">{code}</span>
@@ -261,7 +261,7 @@ export default function ResultsScreen() {
       )}
 
       {exportStatus && (
-        <div className={`mb-4 rounded border px-3 py-2 text-sm ${exportStatus.startsWith('Exported') ? 'border-teal-accent/40 bg-teal-accent/10 text-teal-accent' : 'border-red-500/40 bg-red-500/10 text-red-300'}`}>
+        <div className={`mb-4 rounded-sm border px-3 py-2 text-sm ${exportStatus.startsWith('Exported') ? 'border-teal-accent/40 bg-teal-accent/10 text-teal-accent' : 'border-red-500/40 bg-red-500/10 text-red-300'}`}>
           {exportStatus}
         </div>
       )}
@@ -272,13 +272,13 @@ export default function ResultsScreen() {
           value={searchInput}
           onChange={e => handleSearchChange(e.target.value)}
           placeholder="Search URL / title / meta..."
-          className="!w-64 input-field"
+          className="w-64! input-field"
           type="text"
         />
         <select
           value={filters.statusCategory}
           onChange={e => { setFilters(f => ({ ...f, statusCategory: e.target.value as any })); setPage(0) }}
-          className="input-field !w-32"
+          className="input-field w-32!"
         >
           <option value="">All Status</option>
           <option value="2xx">2xx</option>
@@ -289,7 +289,7 @@ export default function ResultsScreen() {
         <select
           value={filters.indexability}
           onChange={e => { setFilters(f => ({ ...f, indexability: e.target.value as any })); setPage(0) }}
-          className="input-field !w-36"
+          className="input-field w-36!"
         >
           <option value="">All Indexability</option>
           <option value="indexable">Indexable</option>
@@ -343,7 +343,7 @@ export default function ResultsScreen() {
                     type="button"
                     key={u.id}
                     data-results-row
-                    className="grid w-full max-w-full min-w-0 items-center border-b border-row hover:bg-[#0f1f2a] focus:bg-[#0f1f2a] focus:outline-none focus-visible:ring-1 focus-visible:ring-teal-accent cursor-pointer transition-colors text-left"
+                    className="grid w-full max-w-full min-w-0 items-center border-b border-row hover:bg-[#0f1f2a] focus:bg-[#0f1f2a] focus:outline-hidden focus-visible:ring-1 focus-visible:ring-teal-accent cursor-pointer transition-colors text-left"
                     style={{ minHeight: ROW_HEIGHT, gridTemplateColumns: TABLE_GRID_COLUMNS }}
                     onClick={() => setSelectedUrl(u)}
                     aria-label={`Open URL details for ${u.url}`}
@@ -381,7 +381,7 @@ export default function ResultsScreen() {
           <button
             disabled={page === 0}
             onClick={() => setPage(p => Math.max(0, p - 1))}
-            className="btn-secondary !py-1.5 !px-3 text-xs"
+            className="btn-secondary py-1.5! px-3! text-xs"
           >
             Previous
           </button>
@@ -390,7 +390,7 @@ export default function ResultsScreen() {
             <input
               type="text"
               inputMode="numeric"
-              className="input-field !w-12 !py-1 text-center text-sm"
+              className="input-field w-12! py-1! text-center text-sm"
               value={page + 1}
               onChange={e => {
                 const val = parseInt(e.target.value, 10)
@@ -406,7 +406,7 @@ export default function ResultsScreen() {
           <button
             disabled={page + 1 >= totalPages}
             onClick={() => setPage(p => p + 1)}
-            className="btn-secondary !py-1.5 !px-3 text-xs"
+            className="btn-secondary py-1.5! px-3! text-xs"
           >
             Next
           </button>
@@ -415,7 +415,7 @@ export default function ResultsScreen() {
 
       {/* URL Detail Drawer */}
       {selectedUrl && (
-        <div className="fixed inset-0 bg-black/60 z-[100] flex justify-end" onClick={() => setSelectedUrl(null)}>
+        <div className="fixed inset-0 bg-black/60 z-100 flex justify-end" onClick={() => setSelectedUrl(null)}>
           <div className="w-full max-w-lg bg-panel-dark h-full overflow-y-auto shadow-xl border-l border-lumen" onClick={e => e.stopPropagation()}>
             <div className="sticky top-0 bg-panel-dark border-b border-lumen px-6 py-4 flex items-start justify-between">
               <h2 className="text-lg font-semibold text-primary-text break-all pr-2 leading-tight">{selectedUrl.url}</h2>
@@ -443,15 +443,15 @@ export default function ResultsScreen() {
                       <dt className="text-xs text-primary-muted uppercase tracking-wider">Custom Extractions</dt>
                       <dd className="mt-2 space-y-2">
                         {selectedExtractions.map((result, index) => (
-                          <div key={`${result.ruleId ?? index}-${result.name ?? 'extraction'}`} className="rounded border border-row bg-midnight/40 p-2">
+                          <div key={`${result.ruleId ?? index}-${result.name ?? 'extraction'}`} className="rounded-sm border border-row bg-midnight/40 p-2">
                             <div className="flex items-center justify-between gap-2">
                               <span className="font-medium text-primary-text truncate">{result.name || `Rule ${result.ruleId ?? index + 1}`}</span>
                               <span className="text-[11px] uppercase text-primary-muted shrink-0">{result.ruleType || 'rule'}</span>
                             </div>
                             {result.error ? (
-                              <p className="mt-1 text-xs text-red-300 break-words">{result.error}</p>
+                              <p className="mt-1 text-xs text-red-300 wrap-break-word">{result.error}</p>
                             ) : (
-                              <p className="mt-1 text-xs text-teal-text break-words">{formatExtractionValue(result)}</p>
+                              <p className="mt-1 text-xs text-teal-text wrap-break-word">{formatExtractionValue(result)}</p>
                             )}
                             <p className="mt-1 text-[11px] text-primary-muted">
                               {Number(result.matchCount ?? 0).toLocaleString()} matches

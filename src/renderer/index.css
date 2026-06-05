@@ -1,9 +1,172 @@
 /* Rethink Sans from Google Fonts */
-@import url('https://fonts.googleapis.com/css2?family=Rethink+Sans:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Rethink+Sans:wght@400;500;600;700&display=swap')
+layer(base);
 
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import 'tailwindcss';
+
+@theme {
+  --font-sans: Rethink Sans, sans-serif;
+
+  --color-midnight: #071016;
+
+  --color-panel-dark: #0c1820;
+
+  --color-sidebar: #08141b;
+  --color-lumen: #1f3640;
+  --color-row: #162b34;
+
+  --color-teal-accent: #14b8a6;
+  --color-teal-bg: #12362f;
+  --color-teal-text: #cfe6e3;
+
+  --color-primary-text: #e6f6f4;
+  --color-primary-muted: #89a4aa;
+
+  --color-emerald: #10b981;
+  --color-amber: #f59e0b;
+}
+
+/*
+  The default border color has changed to `currentcolor` in Tailwind CSS v4,
+  so we've added these compatibility styles to make sure everything still
+  looks the same as it did with Tailwind CSS v3.
+
+  If we ever want to remove these styles, we need to add an explicit border
+  color utility to any element that depends on these defaults.
+*/
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-gray-200, currentcolor);
+  }
+}
+
+@utility app-shell {
+  background:
+    radial-gradient(circle at 22% 12%, rgba(46, 72, 82, 0.22), transparent 30%),
+    linear-gradient(135deg, #101820 0%, #090f14 48%, #0b1118 100%);
+}
+
+@utility app-topbar {
+  @apply flex h-[62px] shrink-0 items-center gap-3 border-b border-lumen bg-[#0b1117]/95 px-6 shadow-lg shadow-black/15;
+}
+
+@utility url-field {
+  @apply flex h-10 min-w-0 flex-1 items-center gap-2 rounded-md border border-lumen bg-panel-dark px-3 text-sm text-primary-text shadow-inner shadow-black/20;
+
+  & input {
+    @apply min-w-0 flex-1 bg-transparent text-sm font-medium text-primary-text outline-hidden placeholder:text-primary-muted;
+  }
+}
+
+@utility url-icon {
+  @apply shrink-0 text-primary-muted;
+}
+
+@utility url-caret {
+  @apply shrink-0 text-primary-muted;
+}
+
+@utility icon-button {
+  @apply inline-flex h-10 shrink-0 items-center justify-center rounded-md border border-lumen bg-panel-dark px-3 text-sm font-semibold text-primary-text transition-colors hover:bg-[#1b2630] disabled:cursor-not-allowed disabled:opacity-50;
+  @apply w-10 px-0 text-base;
+}
+
+@utility toolbar-button {
+  @apply inline-flex h-10 shrink-0 items-center justify-center rounded-md border border-lumen bg-panel-dark px-3 text-sm font-semibold text-primary-text transition-colors hover:bg-[#1b2630] disabled:cursor-not-allowed disabled:opacity-50;
+}
+
+@utility start-button {
+  @apply inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-md bg-[#79d34f] px-5 text-sm font-bold text-[#0b1b0e] transition-colors hover:bg-[#8be15f] disabled:cursor-not-allowed disabled:opacity-60;
+}
+
+@utility crawl-state {
+  @apply ml-auto inline-flex h-10 shrink-0 items-center gap-2 rounded-md border border-lumen bg-panel-dark px-4 text-sm font-semibold text-primary-muted;
+}
+
+@utility status-bar {
+  @apply flex h-[30px] shrink-0 items-center gap-3 border-t border-lumen bg-[#0b1117] px-5 text-xs text-primary-muted;
+}
+
+@utility brand-mark {
+  @apply flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-[#14241e] text-[25px] leading-none text-[#77d34c];
+}
+
+@utility sidebar-item {
+  @apply relative flex h-[45px] w-full items-center gap-3 rounded-md px-3 text-left text-[14px] font-semibold text-primary-muted transition-colors hover:bg-[#1b252d] focus:outline-hidden focus-visible:ring-2 focus-visible:ring-teal-accent;
+}
+
+@utility sidebar-item-active {
+  @apply bg-[#222a31] text-primary-text shadow-inner shadow-white/5;
+
+  &::before {
+    content: '';
+    @apply absolute left-0 top-2 h-7 w-[3px] rounded-r-full bg-[#77d34c];
+  }
+
+  & .sidebar-icon {
+    @apply text-[#77d34c];
+  }
+}
+
+@utility sidebar-icon {
+  @apply flex h-5 w-5 shrink-0 items-center justify-center text-[17px] text-primary-muted;
+
+  .sidebar-item-active & {
+    @apply text-[#77d34c];
+  }
+}
+
+@utility sidebar-count {
+  @apply ml-auto rounded-sm bg-[#2b333b] px-2 py-0.5 text-xs font-semibold text-primary-muted;
+}
+
+@utility btn-primary {
+  /* Buttons */
+  @apply inline-flex items-center justify-center gap-1.5 rounded-md bg-[#79d34f] px-4 py-2.5 text-sm font-bold text-[#0b1b0e] transition-all hover:bg-[#8be15f] disabled:opacity-50 disabled:cursor-not-allowed;
+}
+
+@utility btn-secondary {
+  @apply inline-flex items-center justify-center gap-1.5 rounded-md border border-lumen bg-panel-dark px-3 py-2 text-xs font-medium text-primary-text hover:bg-midnight/80 transition-colors disabled:opacity-40;
+}
+
+@utility btn-danger {
+  @apply inline-flex items-center justify-center rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 transition-colors disabled:opacity-50;
+}
+
+@utility pill-success {
+  /* Pills / Badges */
+  @apply inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium bg-[#123827] text-emerald;
+}
+
+@utility pill-warning {
+  @apply inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium bg-[#3a2a0a] text-amber;
+}
+
+@utility pill-error {
+  @apply inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium bg-[#3b171b] text-red-500;
+}
+
+@utility pill-neutral {
+  @apply inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium bg-panel-dark border border-lumen text-primary-muted;
+}
+
+@utility card {
+  /* Cards */
+  @apply rounded-md border border-lumen bg-panel-dark p-5 shadow-lg shadow-midnight/30;
+}
+
+@utility kpi-card {
+  @apply rounded-[10px] border border-lumen bg-[#0f2028] p-4;
+}
+
+@utility input-field {
+  /* Inputs */
+  @apply block w-full rounded-md border border-lumen bg-panel-dark px-3 py-2 text-sm text-primary-text placeholder:text-primary-muted focus:border-teal-accent focus:outline-hidden focus:ring-1 focus:ring-teal-accent transition-colors;
+}
 
 @layer base {
   * { border-color: #1f3640; }
@@ -12,94 +175,6 @@
 }
 
 @layer components {
-  .app-shell {
-    background:
-      radial-gradient(circle at 22% 12%, rgba(46, 72, 82, 0.22), transparent 30%),
-      linear-gradient(135deg, #101820 0%, #090f14 48%, #0b1118 100%);
-  }
-
-  .app-topbar {
-    @apply flex h-[62px] shrink-0 items-center gap-3 border-b border-lumen bg-[#0b1117]/95 px-6 shadow-lg shadow-black/15;
-  }
-
-  .url-field {
-    @apply flex h-10 min-w-0 flex-1 items-center gap-2 rounded-md border border-lumen bg-panel-dark px-3 text-sm text-primary-text shadow-inner shadow-black/20;
-  }
-
-  .url-field input {
-    @apply min-w-0 flex-1 bg-transparent text-sm font-medium text-primary-text outline-none placeholder:text-primary-muted;
-  }
-
-  .url-icon, .url-caret {
-    @apply shrink-0 text-primary-muted;
-  }
-
-  .icon-button, .toolbar-button {
-    @apply inline-flex h-10 shrink-0 items-center justify-center rounded-md border border-lumen bg-panel-dark px-3 text-sm font-semibold text-primary-text transition-colors hover:bg-[#1b2630] disabled:cursor-not-allowed disabled:opacity-50;
-  }
-
-  .icon-button {
-    @apply w-10 px-0 text-base;
-  }
-
-  .start-button {
-    @apply inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-md bg-[#79d34f] px-5 text-sm font-bold text-[#0b1b0e] transition-colors hover:bg-[#8be15f] disabled:cursor-not-allowed disabled:opacity-60;
-  }
-
-  .crawl-state {
-    @apply ml-auto inline-flex h-10 shrink-0 items-center gap-2 rounded-md border border-lumen bg-panel-dark px-4 text-sm font-semibold text-primary-muted;
-  }
-
-  .status-bar {
-    @apply flex h-[30px] shrink-0 items-center gap-3 border-t border-lumen bg-[#0b1117] px-5 text-xs text-primary-muted;
-  }
-
-  .brand-mark {
-    @apply flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-[#14241e] text-[25px] leading-none text-[#77d34c];
-  }
-
-  .sidebar-item {
-    @apply relative flex h-[45px] w-full items-center gap-3 rounded-md px-3 text-left text-[14px] font-semibold text-primary-muted transition-colors hover:bg-[#1b252d] focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-accent;
-  }
-
-  .sidebar-item-active {
-    @apply bg-[#222a31] text-primary-text shadow-inner shadow-white/5;
-  }
-
-  .sidebar-item-active::before {
-    content: '';
-    @apply absolute left-0 top-2 h-7 w-[3px] rounded-r-full bg-[#77d34c];
-  }
-
-  .sidebar-icon {
-    @apply flex h-5 w-5 shrink-0 items-center justify-center text-[17px] text-primary-muted;
-  }
-
-  .sidebar-item-active .sidebar-icon {
-    @apply text-[#77d34c];
-  }
-
-  .sidebar-count {
-    @apply ml-auto rounded bg-[#2b333b] px-2 py-0.5 text-xs font-semibold text-primary-muted;
-  }
-
-  /* Buttons */
-  .btn-primary { @apply inline-flex items-center justify-center gap-1.5 rounded-md bg-[#79d34f] px-4 py-2.5 text-sm font-bold text-[#0b1b0e] transition-all hover:bg-[#8be15f] disabled:opacity-50 disabled:cursor-not-allowed; }
-  .btn-secondary { @apply inline-flex items-center justify-center gap-1.5 rounded-md border border-lumen bg-panel-dark px-3 py-2 text-xs font-medium text-primary-text hover:bg-midnight/80 transition-colors disabled:opacity-40; }
-  .btn-danger { @apply inline-flex items-center justify-center rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 transition-colors disabled:opacity-50; }
-
-  /* Pills / Badges */
-  .pill-success { @apply inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium bg-[#123827] text-emerald; }
-  .pill-warning { @apply inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium bg-[#3a2a0a] text-amber; }
-  .pill-error { @apply inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium bg-[#3b171b] text-red-500; }
-  .pill-neutral { @apply inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium bg-panel-dark border border-lumen text-primary-muted; }
-
-  /* Cards */
-  .card { @apply rounded-md border border-lumen bg-panel-dark p-5 shadow-lg shadow-midnight/30; }
-  .kpi-card { @apply rounded-[10px] border border-lumen bg-[#0f2028] p-4; }
-
-  /* Inputs */
-  .input-field { @apply block w-full rounded-md border border-lumen bg-panel-dark px-3 py-2 text-sm text-primary-text placeholder:text-primary-muted focus:border-teal-accent focus:outline-none focus:ring-1 focus:ring-teal-accent transition-colors; }
 
   /* Table overrides for dark theme */
   table thead tr { @apply border-b border-row; }

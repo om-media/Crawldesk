@@ -134,7 +134,7 @@ export default function ExtractionsScreen() {
               <div key={r.id} className={`flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 p-3 rounded-lg ${r.active ? 'bg-sidebar' : 'bg-midnight/30 opacity-60'} border border-lumen/50`}>
                 <input
                   type="checkbox" checked={!!r.active} onChange={() => toggleActive(r.id, r.active ? 0 : 1)}
-                  className="w-4 h-4 rounded border-lumen text-teal-accent bg-panel-dark mt-1" title={r.active ? 'Deactivate' : 'Activate'}
+                  className="w-4 h-4 rounded-sm border-lumen text-teal-accent bg-panel-dark mt-1" title={r.active ? 'Deactivate' : 'Activate'}
                 />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">

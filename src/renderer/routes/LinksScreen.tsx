@@ -153,7 +153,7 @@ export default function LinksScreen() {
                 </thead>
                 <tbody>
                   {anchorSummary.map(row => (
-                    <tr key={row.anchorText} className="border-b border-row hover:bg-[#0c1820]">
+                    <tr key={row.anchorText} className="border-b border-row hover:bg-panel-dark">
                       <td className="px-4 py-2 text-primary-text">{row.anchorText || '-'}</td>
                       <td className="px-4 py-2 text-right text-primary-text font-mono">{Number(row.count ?? 0).toLocaleString()}</td>
                       <td className="px-4 py-2 text-right text-primary-muted font-mono">{Number(row.sourceUrlCount ?? 0).toLocaleString()}</td>
@@ -169,7 +169,7 @@ export default function LinksScreen() {
           <table className="w-full text-sm text-left border border-lumen rounded-lg bg-panel-dark overflow-hidden">
             <thead><tr className="border-b border-lumen"><th className="px-4 py-2 font-medium text-primary-muted">Source URL</th><th className="px-4 py-2 font-medium text-primary-muted">Target URL</th><th className="px-4 py-2 font-medium text-primary-muted w-32">Anchor Text</th><th className="px-4 py-2 font-medium text-primary-muted w-24">Type</th><th className="px-4 py-2 font-medium text-primary-muted w-20">Internal</th></tr></thead>
             <tbody>{links.map(l => (
-              <tr key={l.id} className="border-b border-lumen hover:bg-[#0c1820]">
+              <tr key={l.id} className="border-b border-lumen hover:bg-panel-dark">
                 <td className="px-4 py-2 max-w-xs truncate text-primary-text">{l.source_url}</td>
                 <td className="px-4 py-2 max-w-xs truncate text-primary-text">{l.target_url}</td>
                 <td className="px-4 py-2 max-w-xs truncate text-primary-text">{l.anchor_text || '-'}</td>
@@ -181,9 +181,9 @@ export default function LinksScreen() {
           {/* Pagination */}
           {(summary?.totalLinks ?? 0) > pageSize && (
             <div className="flex items-center justify-between mt-4">
-              <button disabled={page === 0} onClick={() => setPage(p => p - 1)} className="btn-secondary !py-1.5 !px-3 text-xs">Previous</button>
+              <button disabled={page === 0} onClick={() => setPage(p => p - 1)} className="btn-secondary py-1.5! px-3! text-xs">Previous</button>
               <span className="text-sm text-primary-muted">Page {page + 1} of {Math.ceil((summary?.totalLinks ?? 0) / pageSize)}</span>
-              <button disabled={(page + 1) * pageSize >= (summary?.totalLinks ?? 0)} onClick={() => setPage(p => p + 1)} className="btn-secondary !py-1.5 !px-3 text-xs">Next</button>
+              <button disabled={(page + 1) * pageSize >= (summary?.totalLinks ?? 0)} onClick={() => setPage(p => p + 1)} className="btn-secondary py-1.5! px-3! text-xs">Next</button>
             </div>
           )}
         </>

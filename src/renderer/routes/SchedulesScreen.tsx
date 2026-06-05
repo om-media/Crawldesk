@@ -279,20 +279,20 @@ export default function SchedulesScreen() {
       <h1 className="text-[30px] leading-none tracking-tight font-bold text-primary-text mb-2">Crawl Scheduling</h1>
       <p className="text-sm text-primary-muted mb-6">Set up recurring crawls with cron expressions. Compare results across runs to track SEO changes over time.</p>
       {error && <ErrorBanner message={error} onRetry={error.startsWith('Failed') ? loadSchedules : undefined} />}
-      {notice && <div className="mb-4 text-sm text-emerald bg-emerald/10 border border-emerald/30 rounded px-3 py-2">{notice}</div>}
+      {notice && <div className="mb-4 text-sm text-emerald bg-emerald/10 border border-emerald/30 rounded-sm px-3 py-2">{notice}</div>}
 
       {/* New Schedule Form */}
       {!showForm ? (
-        <button onClick={() => { setError(''); setShowForm(true) }} className="btn-secondary !py-2 !px-4 text-sm mb-4">+ New Schedule</button>
+        <button onClick={() => { setError(''); setShowForm(true) }} className="btn-secondary py-2! px-4! text-sm mb-4">+ New Schedule</button>
       ) : (
         <form onSubmit={createSchedule} className="card p-4 mb-4 grid grid-cols-1 md:grid-cols-3 xl:grid-cols-[minmax(220px,1fr)_minmax(180px,220px)_minmax(120px,150px)_minmax(120px,150px)_minmax(120px,150px)_minmax(180px,220px)_auto_auto] gap-3 items-end" style={{ borderRadius: '12px' }}>
           <div>
             <label className="block text-xs text-primary-muted uppercase tracking-wider mb-1">Start URL</label>
-            <input value={form.startUrl} onChange={e => setForm(f => ({ ...f, startUrl: e.target.value }))} placeholder="https://example.com" className="input-field w-full !py-2 !text-sm" required />
+            <input value={form.startUrl} onChange={e => setForm(f => ({ ...f, startUrl: e.target.value }))} placeholder="https://example.com" className="input-field w-full py-2! text-sm!" required />
           </div>
           <div>
             <label className="block text-xs text-primary-muted uppercase tracking-wider mb-1">Cron Expression</label>
-            <input value={form.cronExpression} onChange={e => setForm(f => ({ ...f, cronExpression: e.target.value }))} placeholder="0 2 * * *" className="input-field w-full !py-2 !text-sm" required />
+            <input value={form.cronExpression} onChange={e => setForm(f => ({ ...f, cronExpression: e.target.value }))} placeholder="0 2 * * *" className="input-field w-full py-2! text-sm!" required />
             {form.cronExpression && <p className="text-xs text-teal-accent mt-1">{describeCron(form.cronExpression)}</p>}
           </div>
           <NumberField label="Max URLs" value={form.maxUrls} onChange={value => setForm(f => ({ ...f, maxUrls: value }))} min={1} />
@@ -300,13 +300,13 @@ export default function SchedulesScreen() {
           <NumberField label="Concurrency" value={form.concurrency} onChange={value => setForm(f => ({ ...f, concurrency: value }))} min={1} />
           <div>
             <label className="block text-xs text-primary-muted uppercase tracking-wider mb-1">Quick Presets</label>
-            <select onChange={e => { if (e.target.value) setForm(f => ({ ...f, cronExpression: e.target.value })) }} className="input-field w-full !py-2 !text-sm" defaultValue="">
+            <select onChange={e => { if (e.target.value) setForm(f => ({ ...f, cronExpression: e.target.value })) }} className="input-field w-full py-2! text-sm!" defaultValue="">
               <option value="">Choose...</option>
               {cronPresets.map(p => <option key={p.expr} value={p.expr}>{p.label}</option>)}
             </select>
           </div>
-          <button type="submit" disabled={saving || !selectedProjectId} className="btn-primary !py-2 !px-4 whitespace-nowrap">{saving ? 'Saving...' : 'Save'}</button>
-          <button type="button" onClick={() => setShowForm(false)} className="btn-secondary !py-2 !px-3">Cancel</button>
+          <button type="submit" disabled={saving || !selectedProjectId} className="btn-primary py-2! px-4! whitespace-nowrap">{saving ? 'Saving...' : 'Save'}</button>
+          <button type="button" onClick={() => setShowForm(false)} className="btn-secondary py-2! px-3!">Cancel</button>
         </form>
       )}
 
@@ -321,7 +321,7 @@ export default function SchedulesScreen() {
       {!loading && schedules.length === 0 && (
         <div className="card py-10 text-center">
           <p className="text-primary-text">No scheduled crawls yet.</p>
-          <p className="text-xs text-primary-muted mt-1">Common cron examples: <code className="bg-midnight px-1.5 py-0.5 rounded">0 2 * * *</code> = daily at 2 AM, <code className="bg-midnight px-1.5 py-0.5 rounded">0 */12 * * *</code> = every 12 hours</p>
+          <p className="text-xs text-primary-muted mt-1">Common cron examples: <code className="bg-midnight px-1.5 py-0.5 rounded-sm">0 2 * * *</code> = daily at 2 AM, <code className="bg-midnight px-1.5 py-0.5 rounded-sm">0 */12 * * *</code> = every 12 hours</p>
         </div>
       )}
 
@@ -333,11 +333,11 @@ export default function SchedulesScreen() {
             <div className="flex-1 min-w-0 grid grid-cols-1 md:grid-cols-3 xl:grid-cols-[minmax(220px,1fr)_minmax(180px,220px)_minmax(110px,130px)_minmax(110px,130px)_minmax(110px,130px)] gap-3">
               <div>
                 <label className="block text-xs text-primary-muted uppercase tracking-wider mb-1">Start URL</label>
-                <input value={editForm.startUrl} onChange={e => setEditForm(f => ({ ...f, startUrl: e.target.value }))} className="input-field w-full !py-2 !text-sm" required />
+                <input value={editForm.startUrl} onChange={e => setEditForm(f => ({ ...f, startUrl: e.target.value }))} className="input-field w-full py-2! text-sm!" required />
               </div>
               <div>
                 <label className="block text-xs text-primary-muted uppercase tracking-wider mb-1">Cron Expression</label>
-                <input value={editForm.cronExpression} onChange={e => setEditForm(f => ({ ...f, cronExpression: e.target.value }))} className="input-field w-full !py-2 !text-sm" required />
+                <input value={editForm.cronExpression} onChange={e => setEditForm(f => ({ ...f, cronExpression: e.target.value }))} className="input-field w-full py-2! text-sm!" required />
                 {editForm.cronExpression && <p className="text-xs text-teal-accent mt-1">{describeCron(editForm.cronExpression)}</p>}
               </div>
               <NumberField label="Max URLs" value={editForm.maxUrls} onChange={value => setEditForm(f => ({ ...f, maxUrls: value }))} min={1} />
@@ -362,24 +362,24 @@ export default function SchedulesScreen() {
           <div className="flex items-center gap-2 shrink-0">
             {isEditing ? (
               <>
-                <button onClick={() => saveScheduleEdit(s)} disabled={updatingScheduleId === s.id} className="btn-primary !py-1.5 !px-3 text-xs">
+                <button onClick={() => saveScheduleEdit(s)} disabled={updatingScheduleId === s.id} className="btn-primary py-1.5! px-3! text-xs">
                   {updatingScheduleId === s.id ? 'Saving...' : 'Save changes'}
                 </button>
-                <button onClick={cancelEditing} className="btn-secondary !py-1.5 !px-3 text-xs">Cancel</button>
+                <button onClick={cancelEditing} className="btn-secondary py-1.5! px-3! text-xs">Cancel</button>
               </>
             ) : (
               <>
-                <button onClick={() => runScheduleNow(s.id)} disabled={runningScheduleId === s.id} className="btn-primary !py-1.5 !px-3 text-xs">
+                <button onClick={() => runScheduleNow(s.id)} disabled={runningScheduleId === s.id} className="btn-primary py-1.5! px-3! text-xs">
                   {runningScheduleId === s.id ? 'Starting...' : 'Run now'}
                 </button>
-                <button onClick={() => startEditing(s)} className="btn-secondary !py-1.5 !px-3 text-xs">Edit</button>
-                <button onClick={() => duplicateSchedule(s)} disabled={duplicatingScheduleId === s.id} className="btn-secondary !py-1.5 !px-3 text-xs">
+                <button onClick={() => startEditing(s)} className="btn-secondary py-1.5! px-3! text-xs">Edit</button>
+                <button onClick={() => duplicateSchedule(s)} disabled={duplicatingScheduleId === s.id} className="btn-secondary py-1.5! px-3! text-xs">
                   {duplicatingScheduleId === s.id ? 'Copying...' : 'Duplicate'}
                 </button>
-                <button onClick={() => toggleEnabled(s.id, !s.enabled)} className={`btn-secondary !py-1.5 !px-3 text-xs ${s.enabled ? '' : '!opacity-60'}`}>
+                <button onClick={() => toggleEnabled(s.id, !s.enabled)} className={`btn-secondary py-1.5! px-3! text-xs ${s.enabled ? '' : 'opacity-60!'}`}>
                   {s.enabled ? 'Disable' : 'Enable'}
                 </button>
-                <button onClick={() => deleteSchedule(s.id)} className="btn-secondary !py-1.5 !px-3 text-xs text-red-400 hover:text-red-300">Delete</button>
+                <button onClick={() => deleteSchedule(s.id)} className="btn-secondary py-1.5! px-3! text-xs text-red-400 hover:text-red-300">Delete</button>
               </>
             )}
           </div>
@@ -407,7 +407,7 @@ function NumberField({ label, value, onChange, min }: { label: string, value: st
         min={min}
         value={value}
         onChange={e => onChange(e.target.value)}
-        className="input-field w-full !py-2 !text-sm"
+        className="input-field w-full py-2! text-sm!"
         required
       />
     </div>
@@ -559,7 +559,7 @@ function DiffViewer({ projectId }: { projectId: string }) {
               <td className={`py-2 px-3 ${d.critical_issues_delta <= 0 ? 'text-emerald' : 'text-red-400 font-bold'}`}>{d.critical_issues_delta > 0 ? '+' : ''}{d.critical_issues_delta}</td>
               <td className="py-2 px-3 text-primary-muted text-xs">{new Date(d.created_at).toLocaleDateString('en-US')}</td>
               <td className="py-2 px-3">
-                <button onClick={() => toggleDetails(d.id)} className="btn-secondary !py-1 !px-2 text-xs">
+                <button onClick={() => toggleDetails(d.id)} className="btn-secondary py-1! px-2! text-xs">
                   {expandedId === d.id ? 'Hide' : 'Details'}
                 </button>
               </td>
@@ -621,7 +621,7 @@ function DiffDetailPanel({ detail }: { detail: CrawlDiffDetail }) {
 
 function UrlChangeList({ title, rows, tone, changed = false }: { title: string, rows: CrawlDiffUrlChange[], tone: 'good' | 'bad' | 'warn', changed?: boolean }) {
   return (
-    <div className="rounded border border-row bg-midnight/40 p-3 min-w-0">
+    <div className="rounded-sm border border-row bg-midnight/40 p-3 min-w-0">
       <h3 className={`text-xs uppercase tracking-wider font-semibold mb-2 ${toneClass(tone)}`}>{title} ({rows.length})</h3>
       {!rows.length ? <p className="text-xs text-primary-muted">No rows in this sample.</p> : (
         <div className="space-y-2">
@@ -649,7 +649,7 @@ function UrlChangeList({ title, rows, tone, changed = false }: { title: string, 
 
 function IssueChangeList({ title, rows, tone }: { title: string, rows: CrawlDiffIssueChange[], tone: 'good' | 'bad' }) {
   return (
-    <div className="rounded border border-row bg-midnight/40 p-3 min-w-0">
+    <div className="rounded-sm border border-row bg-midnight/40 p-3 min-w-0">
       <h3 className={`text-xs uppercase tracking-wider font-semibold mb-2 ${toneClass(tone)}`}>{title} ({rows.length})</h3>
       {!rows.length ? <p className="text-xs text-primary-muted">No rows in this sample.</p> : (
         <div className="space-y-2">
@@ -671,7 +671,7 @@ function IssueChangeList({ title, rows, tone }: { title: string, rows: CrawlDiff
 
 function BrokenLinkChangeList({ title, rows, tone }: { title: string, rows: CrawlDiffBrokenLinkChange[], tone: 'good' | 'bad' }) {
   return (
-    <div className="rounded border border-row bg-midnight/40 p-3 min-w-0">
+    <div className="rounded-sm border border-row bg-midnight/40 p-3 min-w-0">
       <h3 className={`text-xs uppercase tracking-wider font-semibold mb-2 ${toneClass(tone)}`}>{title} ({rows.length})</h3>
       {!rows.length ? <p className="text-xs text-primary-muted">No rows in this sample.</p> : (
         <div className="space-y-2">

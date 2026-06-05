@@ -10,7 +10,7 @@ export default function ErrorBanner({ message, onRetry }: ErrorBannerProps) {
       {onRetry && (
         <button
           onClick={onRetry}
-          className="btn-secondary !py-1.5 !px-3 text-xs ml-4 shrink-0"
+          className="btn-secondary py-1.5! px-3! text-xs ml-4 shrink-0"
         >
           Retry
         </button>

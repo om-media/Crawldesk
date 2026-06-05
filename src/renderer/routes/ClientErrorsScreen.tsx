@@ -106,7 +106,7 @@ export default function ClientErrorsScreen() {
       {/* Status filter tabs */}
       <div className="flex gap-2 mb-4 flex-wrap">
         {tabs.map(tab => (
-          <button key={tab.key} onClick={() => { setStatusFilter(tab.key); setPage(0) }} className={`!px-4 !py-1.5 rounded-full text-sm transition-colors ${statusFilter === tab.key ? 'bg-teal-bg border border-lumen text-teal-accent' : 'bg-panel-dark text-primary-muted hover:text-primary-text'}`}>
+          <button key={tab.key} onClick={() => { setStatusFilter(tab.key); setPage(0) }} className={`px-4! py-1.5! rounded-full text-sm transition-colors ${statusFilter === tab.key ? 'bg-teal-bg border border-lumen text-teal-accent' : 'bg-panel-dark text-primary-muted hover:text-primary-text'}`}>
             {tab.label}
           </button>
         ))}
@@ -114,7 +114,7 @@ export default function ClientErrorsScreen() {
           <input type="checkbox" checked={sortByPriority} onChange={e => setSortByPriority(e.target.checked)} className="accent-teal-accent" />
           Sort by priority
         </label>
-        <button onClick={exportCurrentView} className="btn-secondary !py-1.5 !px-3 text-xs">Export CSV</button>
+        <button onClick={exportCurrentView} className="btn-secondary py-1.5! px-3! text-xs">Export CSV</button>
       </div>
 
       {/* Table */}
@@ -154,9 +154,9 @@ export default function ClientErrorsScreen() {
       {/* Pagination */}
       {total > pageSize && (
         <div className="flex items-center justify-between mt-4">
-          <button disabled={page === 0} onClick={() => setPage(p => p - 1)} className="btn-secondary !py-1.5 !px-3 text-xs">Previous</button>
+          <button disabled={page === 0} onClick={() => setPage(p => p - 1)} className="btn-secondary py-1.5! px-3! text-xs">Previous</button>
           <span className="text-sm text-primary-muted">Page {page + 1} of {Math.ceil(total / pageSize)}</span>
-          <button disabled={(page + 1) * pageSize >= total} onClick={() => setPage(p => p + 1)} className="btn-secondary !py-1.5 !px-3 text-xs">Next</button>
+          <button disabled={(page + 1) * pageSize >= total} onClick={() => setPage(p => p + 1)} className="btn-secondary py-1.5! px-3! text-xs">Next</button>
         </div>
       )}
 

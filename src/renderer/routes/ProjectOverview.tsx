@@ -157,7 +157,7 @@ export default function ProjectOverview({ crawlId, onNavigate }: Props) {
         ].map(kpi => (
           <div key={kpi.label} className="kpi-card">
             <div className="flex items-center gap-2 mb-2">
-              <span className="w-[20px] h-[20px] rounded-full flex-shrink-0" style={{ backgroundColor: kpi.icon + '20' }}>
+              <span className="w-[20px] h-[20px] rounded-full shrink-0" style={{ backgroundColor: kpi.icon + '20' }}>
                 <span className="block w-full h-full rounded-full opacity-70" style={{ backgroundColor: kpi.icon }} />
               </span>
               <p className="text-xs text-primary-muted font-semibold">{kpi.label}</p>
@@ -194,7 +194,7 @@ export default function ProjectOverview({ crawlId, onNavigate }: Props) {
                   {Object.keys(depthDist).length > 0 ? Object.entries(depthDist).sort(([a], [b]) => Number(a) - Number(b)).map(([depth, count]: any) => {
                     const maxVal = Math.max(...Object.values(depthDist))
                     const h = Math.max(6, (Number(count) / maxVal) * 60)
-                    return <div key={depth} className="flex-1 rounded-sm group relative" style={{ height: `${h}px`, backgroundColor: '#14B8A6', opacity: 0.5 + (Number(count) / maxVal) * 0.5 }} title={`Depth ${depth}: ${count} URLs`}>
+                    return <div key={depth} className="flex-1 rounded-xs group relative" style={{ height: `${h}px`, backgroundColor: '#14B8A6', opacity: 0.5 + (Number(count) / maxVal) * 0.5 }} title={`Depth ${depth}: ${count} URLs`}>
                       <div className="absolute -top-6 left-1/2 -translate-x-1/2 text-[10px] text-primary-muted font-medium opacity-0 group-hover:opacity-100 whitespace-nowrap pointer-events-none">{count} @ d{depth}</div>
                     </div>
                   }) : (
@@ -209,7 +209,7 @@ export default function ProjectOverview({ crawlId, onNavigate }: Props) {
           <div className="card p-5" style={{ borderRadius: '12px' }}>
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-sm font-semibold text-primary-text">Recent Crawled URLs</h3>
-              <button onClick={() => onNavigate?.('results')} className="btn-secondary !py-1.5 !px-3 text-xs">View All →</button>
+              <button onClick={() => onNavigate?.('results')} className="btn-secondary py-1.5! px-3! text-xs">View All →</button>
             </div>
             {!lastCrawl ? (
               <p className="text-sm text-primary-muted py-4 text-center">No crawls yet. Set up your first crawl to begin.</p>
@@ -265,7 +265,7 @@ export default function ProjectOverview({ crawlId, onNavigate }: Props) {
               <div className="space-y-2">
                 {issueSummary.slice(0, 6).map((item: any) => (
                   <div key={item.issue_type} className="flex items-center gap-2 py-2 border-b border-row last:border-b-0">
-                    <span className={`w-[20px] h-[20px] rounded-full flex-shrink-0 ${item.severity === 'critical' || item.severity === 'high' ? 'bg-red-500/20' : 'bg-amber/20'} flex items-center justify-center`}>
+                    <span className={`w-[20px] h-[20px] rounded-full shrink-0 ${item.severity === 'critical' || item.severity === 'high' ? 'bg-red-500/20' : 'bg-amber/20'} flex items-center justify-center`}>
                       <span className="text-[9px] font-bold" style={{ color: item.severity === 'critical' ? '#ef4444' : item.severity === 'high' ? '#f59e0b' : '#10b981' }}>!</span>
                     </span>
                     <span className="text-xs text-primary-text truncate flex-1">{item.label || item.issue_type}</span>
@@ -306,7 +306,7 @@ export default function ProjectOverview({ crawlId, onNavigate }: Props) {
                   const color = parseInt(code) < 300 ? '#10b981' : parseInt(code) < 400 ? '#f59e0b' : parseInt(code) < 500 ? '#ef4444' : '#89a4aa'
                   return (
                     <div key={code} className="flex items-center gap-2">
-                      <span className="w-[8px] h-[8px] rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
+                      <span className="w-[8px] h-[8px] rounded-full shrink-0" style={{ backgroundColor: color }} />
                       <span className="text-xs text-primary-muted flex-1">{code}</span>
                       <span className="text-xs text-primary-text font-medium">{(count as number).toLocaleString()}</span>
                     </div>

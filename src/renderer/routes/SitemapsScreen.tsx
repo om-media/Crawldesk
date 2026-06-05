@@ -191,7 +191,7 @@ export default function SitemapsScreen() {
               type="button"
               onClick={exportSelectedGroup}
               disabled={exporting || affectedLoading || loading || affectedTotal === 0}
-              className="btn-secondary !py-1.5 !px-3 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+              className="btn-secondary py-1.5! px-3! text-xs disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {exporting ? 'Exporting...' : 'Export CSV'}
             </button>
@@ -199,7 +199,7 @@ export default function SitemapsScreen() {
         </div>
 
         {exportStatus && (
-          <div className={`mx-4 mt-4 rounded border px-3 py-2 text-xs ${exportStatus.startsWith('Exported') ? 'border-teal-accent/40 bg-teal-accent/10 text-teal-accent' : 'border-red-500/40 bg-red-500/10 text-red-300'}`}>
+          <div className={`mx-4 mt-4 rounded-sm border px-3 py-2 text-xs ${exportStatus.startsWith('Exported') ? 'border-teal-accent/40 bg-teal-accent/10 text-teal-accent' : 'border-red-500/40 bg-red-500/10 text-red-300'}`}>
             {exportStatus}
           </div>
         )}

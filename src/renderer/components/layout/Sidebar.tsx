@@ -113,7 +113,7 @@ export default function Sidebar({ currentRoute, onNavigate }: SidebarProps) {
             <span>⌄</span>
           </div>
           {(projects.length > 0 ? projects.slice(0, 3).map((p) => (
-            <div key={p.id} className={`mt-1 flex items-center justify-between rounded px-2 py-1.5 text-[13px] ${p.id === selectedProjectId ? 'bg-teal-bg text-primary-text' : 'text-primary-muted'}`}>
+            <div key={p.id} className={`mt-1 flex items-center justify-between rounded-sm px-2 py-1.5 text-[13px] ${p.id === selectedProjectId ? 'bg-teal-bg text-primary-text' : 'text-primary-muted'}`}>
               <span className="truncate">▧ {p.name}</span>
               {p.id === selectedProjectId && <span className="text-emerald">●</span>}
             </div>

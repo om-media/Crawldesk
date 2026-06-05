@@ -121,7 +121,7 @@ export default function PerformanceScreen() {
         </button>
       </div>
       {error && <ErrorBanner message={error} onRetry={loadData} />}
-      {exportStatus && <div className="mb-4 text-sm text-emerald bg-emerald/10 border border-emerald/30 rounded px-3 py-2">{exportStatus}</div>}
+      {exportStatus && <div className="mb-4 text-sm text-emerald bg-emerald/10 border border-emerald/30 rounded-sm px-3 py-2">{exportStatus}</div>}
 
       {/* Summary cards */}
       {summary && summary.totalUrlsWithPsi > 0 && (
@@ -201,7 +201,7 @@ export default function PerformanceScreen() {
           placeholder="Filter by URL..."
           value={filterText}
           onChange={e => setFilterText(e.target.value)}
-          className="input-field !w-full max-w-sm"
+          className="input-field w-full! max-w-sm"
         />
         <div className="flex flex-wrap gap-2">
           {[
@@ -213,7 +213,7 @@ export default function PerformanceScreen() {
               key={option.key}
               type="button"
               onClick={() => setFilterMode(option.key as typeof filterMode)}
-              className={`btn-secondary !py-2 !px-3 text-xs ${filterMode === option.key ? 'border-teal-accent text-teal-accent' : ''}`}
+              className={`btn-secondary py-2! px-3! text-xs ${filterMode === option.key ? 'border-teal-accent text-teal-accent' : ''}`}
             >
               {option.label}
             </button>
@@ -221,14 +221,14 @@ export default function PerformanceScreen() {
         </div>
         <div>
           <label className="block text-xs text-primary-muted uppercase tracking-wider mb-1">Sort</label>
-          <select value={sortMode} onChange={e => setSortMode(e.target.value as typeof sortMode)} className="input-field !py-2 !text-sm">
+          <select value={sortMode} onChange={e => setSortMode(e.target.value as typeof sortMode)} className="input-field py-2! text-sm!">
             <option value="slowest">Slowest first</option>
             <option value="largest">Largest first</option>
             <option value="worstScore">Worst score first</option>
             <option value="url">URL A-Z</option>
           </select>
         </div>
-        <button type="button" onClick={exportPerformance} disabled={exporting || loading || filtered.length === 0} className="btn-primary !py-2 !px-4 text-sm">
+        <button type="button" onClick={exportPerformance} disabled={exporting || loading || filtered.length === 0} className="btn-primary py-2! px-4! text-sm">
           {exporting ? 'Exporting...' : 'Export CSV'}
         </button>
       </div>

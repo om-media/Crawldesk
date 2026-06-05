@@ -119,7 +119,7 @@ export default function ExportsScreen() {
             <button
               onClick={() => runExport(item.kind, item.entity, item.action)}
               disabled={isRunning}
-              className="btn-primary mt-auto pt-6 !py-3 disabled:opacity-60"
+              className="btn-primary mt-auto pt-6 py-3! disabled:opacity-60"
             >
               {isRunning ? 'Exporting...' : item.label}
             </button>

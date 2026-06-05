@@ -206,7 +206,7 @@ export default function IssuesScreen() {
             style={severityFilter === s.k ? { outline: `2px solid ${s.color}`, outlineOffset: '1px' } : undefined}
           >
             <div className="flex items-center gap-2 mb-2">
-              <span className="w-[20px] h-[20px] rounded-full flex-shrink-0" style={{ backgroundColor: s.color + '20' }}>
+              <span className="w-[20px] h-[20px] rounded-full shrink-0" style={{ backgroundColor: s.color + '20' }}>
                 <span className="block w-full h-full rounded-full opacity-70" style={{ backgroundColor: s.color }} />
               </span>
               <p className="text-xs text-primary-muted font-semibold">{s.label}</p>
@@ -221,12 +221,12 @@ export default function IssuesScreen() {
           value={searchTerm}
           onChange={(event) => setSearchTerm(event.target.value)}
           placeholder="Search issues"
-          className="bg-[#0d1117] border border-lumen rounded px-3 py-2 text-sm text-primary-text min-w-[220px]"
+          className="bg-[#0d1117] border border-lumen rounded-sm px-3 py-2 text-sm text-primary-text min-w-[220px]"
         />
         <select
           value={categoryFilter}
           onChange={(event) => setCategoryFilter(event.target.value as CategoryFilter)}
-          className="bg-[#0d1117] border border-lumen rounded px-3 py-2 text-sm text-primary-text"
+          className="bg-[#0d1117] border border-lumen rounded-sm px-3 py-2 text-sm text-primary-text"
         >
           <option value="all">All categories</option>
           {categories.map(category => (
@@ -269,7 +269,7 @@ export default function IssuesScreen() {
               <button
                 type="button"
                 onClick={() => handleIssueClick(i.issue_type)}
-                className="flex w-full items-center gap-4 px-4 py-3 cursor-pointer hover:bg-[#0f1f2a] focus:bg-[#0f1f2a] focus:outline-none focus-visible:ring-1 focus-visible:ring-teal-accent transition-colors text-left"
+                className="flex w-full items-center gap-4 px-4 py-3 cursor-pointer hover:bg-[#0f1f2a] focus:bg-[#0f1f2a] focus:outline-hidden focus-visible:ring-1 focus-visible:ring-teal-accent transition-colors text-left"
                 aria-expanded={selectedType === i.issue_type}
               >
                 <span className={`${i.severity === 'critical' ? 'pill-error' : i.severity === 'warning' ? 'pill-warning' : 'pill-neutral'}`}>
@@ -308,7 +308,7 @@ export default function IssuesScreen() {
                             key={u.id || idx}
                             type="button"
                             onClick={() => openIssueDetail(u)}
-                            className="w-full flex items-center gap-2 px-2 py-1.5 rounded hover:bg-[#0f1f2a] text-xs text-left"
+                            className="w-full flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-[#0f1f2a] text-xs text-left"
                           >
                             <span className={`${u.severity === 'critical' ? 'text-red-400' : u.severity === 'warning' ? 'text-amber-400' : 'text-blue-400'} font-mono`}>
                               {u.severity?.charAt(0).toUpperCase() || '-'}
@@ -432,7 +432,7 @@ function IssueDetailDrawer({
               <div className="text-xs text-primary-muted mb-2">Details</div>
               <div className="space-y-2">
                 {detailEntries.map(([key, value]) => (
-                  <div key={key} className="border border-lumen rounded p-2">
+                  <div key={key} className="border border-lumen rounded-sm p-2">
                     <div className="text-xs text-primary-muted font-mono">{key}</div>
                     <pre className="text-xs text-primary-text whitespace-pre-wrap break-all mt-1">
                       {typeof value === 'string' ? value : JSON.stringify(value, null, 2)}

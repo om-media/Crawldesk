@@ -153,11 +153,11 @@ export default function CrawlSetup({ onComplete }: Props) {
 
         {/* Limits */}
         <div className="grid grid-cols-2 gap-4">
-          <div className="kpi-card"><label className="block text-xs font-medium text-primary-muted uppercase tracking-wider mb-1">Max URLs</label><input type="number" value={settings.maxUrls} onChange={numInput('maxUrls')} min={1} max={500000} className="!text-lg font-semibold input-field text-primary-text" /></div>
-          <div className="kpi-card"><label className="block text-xs font-medium text-primary-muted uppercase tracking-wider mb-1">Max Depth</label><input type="number" value={settings.maxDepth} onChange={numInput('maxDepth')} min={0} max={20} className="!text-lg font-semibold input-field text-primary-text" /></div>
-          <div className="kpi-card"><label className="block text-xs font-medium text-primary-muted uppercase tracking-wider mb-1">Concurrency (max 20)</label><input type="number" value={settings.concurrency} onChange={numInput('concurrency')} min={1} max={20} className="!text-lg font-semibold input-field text-primary-text" /></div>
-          <div className="kpi-card"><label className="block text-xs font-medium text-primary-muted uppercase tracking-wider mb-1">Timeout (ms)</label><input type="number" value={settings.requestTimeoutMs} onChange={numInput('requestTimeoutMs')} min={1000} max={60000} step={1000} className="!text-lg font-semibold input-field text-primary-text" /></div>
-          <div className="kpi-card"><label className="block text-xs font-medium text-primary-muted uppercase tracking-wider mb-1">Max URL Length</label><input type="number" value={settings.maxUrlLength} onChange={numInput('maxUrlLength')} min={256} max={8192} step={128} className="!text-lg font-semibold input-field text-primary-text" /></div>
+          <div className="kpi-card"><label className="block text-xs font-medium text-primary-muted uppercase tracking-wider mb-1">Max URLs</label><input type="number" value={settings.maxUrls} onChange={numInput('maxUrls')} min={1} max={500000} className="text-lg! font-semibold input-field text-primary-text" /></div>
+          <div className="kpi-card"><label className="block text-xs font-medium text-primary-muted uppercase tracking-wider mb-1">Max Depth</label><input type="number" value={settings.maxDepth} onChange={numInput('maxDepth')} min={0} max={20} className="text-lg! font-semibold input-field text-primary-text" /></div>
+          <div className="kpi-card"><label className="block text-xs font-medium text-primary-muted uppercase tracking-wider mb-1">Concurrency (max 20)</label><input type="number" value={settings.concurrency} onChange={numInput('concurrency')} min={1} max={20} className="text-lg! font-semibold input-field text-primary-text" /></div>
+          <div className="kpi-card"><label className="block text-xs font-medium text-primary-muted uppercase tracking-wider mb-1">Timeout (ms)</label><input type="number" value={settings.requestTimeoutMs} onChange={numInput('requestTimeoutMs')} min={1000} max={60000} step={1000} className="text-lg! font-semibold input-field text-primary-text" /></div>
+          <div className="kpi-card"><label className="block text-xs font-medium text-primary-muted uppercase tracking-wider mb-1">Max URL Length</label><input type="number" value={settings.maxUrlLength} onChange={numInput('maxUrlLength')} min={256} max={8192} step={128} className="text-lg! font-semibold input-field text-primary-text" /></div>
         </div>
 
         {/* Toggles */}
@@ -172,7 +172,7 @@ export default function CrawlSetup({ onComplete }: Props) {
               { label: 'Crawl External Links', key: 'crawlExternalLinks' },
             ].map(({ label, key }) => (
               <label key={key} className="flex items-center gap-3 cursor-pointer">
-                <input type="checkbox" checked={!!(settings as any)[key]} onChange={() => setSettings(s => ({ ...s, [key]: !s[key as keyof typeof s] }))} className="w-4 h-4 rounded border-lumen text-teal-accent bg-panel-dark" />
+                <input type="checkbox" checked={!!(settings as any)[key]} onChange={() => setSettings(s => ({ ...s, [key]: !s[key as keyof typeof s] }))} className="w-4 h-4 rounded-sm border-lumen text-teal-accent bg-panel-dark" />
                 <span className="text-sm text-primary-text">{label}</span>
               </label>
             ))}

@@ -1,10 +1,11 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import tailwindcss from '@tailwindcss/vite'
 import path from 'path'
 
 // Vite dev server for renderer
 const rendererConfig = defineConfig({
-  plugins: [react()],
+  plugins: [react(), tailwindcss()],
   root: 'src/renderer',
   base: './',
   resolve: {
