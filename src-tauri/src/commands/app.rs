@@ -3,7 +3,7 @@
 use std::env;
 use std::path::PathBuf;
 use tauri::{AppHandle, Manager};
-use tauri_plugin_shell::ShellExt;
+use tauri_plugin_opener::OpenerExt;
 
 #[tauri::command]
 pub fn get_version() -> String {
@@ -31,16 +31,16 @@ pub fn get_data_path(app: AppHandle) -> Result<String, String> {
 
 #[tauri::command]
 pub fn open_external_url(app: AppHandle, url: String) -> Result<(), String> {
-    app.shell()
-        .open(&url, None)
+    app.opener()
+        .open_url(&url, None::<&str>)
         .map_err(|e| format!("Failed to open URL: {}", e))?;
     Ok(())
 }
 
 #[tauri::command]
 pub fn open_path(app: AppHandle, path: String) -> Result<(), String> {
-    app.shell()
-        .open(&path, None)
+    app.opener()
+        .open_path(&path, None::<&str>)
         .map_err(|e| format!("Failed to open path: {}", e))?;
     Ok(())
 }
